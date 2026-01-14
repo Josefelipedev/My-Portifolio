@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useLanguage } from '@/lib/i18n';
 
 interface ContributionDay {
   date: string;
@@ -75,7 +76,7 @@ function AnimatedCounter({ value, suffix = '' }: { value: number; suffix?: strin
 }
 
 // Contribution Heatmap
-function ContributionHeatmap({ contributions }: { contributions: ContributionDay[] }) {
+function ContributionHeatmap({ contributions, language }: { contributions: ContributionDay[]; language: string }) {
   const weeks: ContributionDay[][] = [];
   let currentWeek: ContributionDay[] = [];
 
@@ -98,7 +99,13 @@ function ContributionHeatmap({ contributions }: { contributions: ContributionDay
     return colors[level] || colors[0];
   };
 
-  const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+  const months = language === 'pt'
+    ? ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+    : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+  const contributionsText = language === 'pt' ? 'contribuições' : 'contributions';
+  const lessText = language === 'pt' ? 'Menos' : 'Less';
+  const moreText = language === 'pt' ? 'Mais' : 'More';
 
   return (
     <div className="overflow-x-auto">
@@ -109,7 +116,7 @@ function ContributionHeatmap({ contributions }: { contributions: ContributionDay
               <div
                 key={`${weekIndex}-${dayIndex}`}
                 className={`w-3 h-3 rounded-sm ${getLevelColor(day.level)} transition-all hover:ring-2 hover:ring-emerald-400/50`}
-                title={`${day.date}: ${day.count} contribuições`}
+                title={`${day.date}: ${day.count} ${contributionsText}`}
               />
             ))}
           </div>
@@ -121,11 +128,11 @@ function ContributionHeatmap({ contributions }: { contributions: ContributionDay
         ))}
       </div>
       <div className="flex items-center justify-end gap-2 mt-2 text-xs text-slate-500">
-        <span>Menos</span>
+        <span>{lessText}</span>
         {[0, 1, 2, 3, 4].map(level => (
           <div key={level} className={`w-3 h-3 rounded-sm ${getLevelColor(level)}`} />
         ))}
-        <span>Mais</span>
+        <span>{moreText}</span>
       </div>
     </div>
   );
@@ -200,6 +207,8 @@ function StatCard({
 }
 
 export function GitHubStatsClient({ stats }: Props) {
+  const { t, language } = useLanguage();
+
   return (
     <section id="github" className="py-20 px-4">
       <div className="max-w-6xl mx-auto">
@@ -207,23 +216,23 @@ export function GitHubStatsClient({ stats }: Props) {
         <div className="text-center mb-12">
           <h2 className="text-3xl md:text-4xl font-bold mb-4">
             <span className="bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
-              GitHub Stats
+              {t.github.title}
             </span>
           </h2>
           <p className="text-slate-400 max-w-2xl mx-auto">
-            Minhas contribuições e atividade no GitHub
+            {t.github.subtitle}
           </p>
         </div>
 
         {/* Stats Grid - Only show non-zero values */}
         {(() => {
           const statItems = [
-            { icon: <RepoIcon />, label: 'Repositórios', value: stats.stats.totalRepos, color: 'from-blue-500 to-cyan-500' },
-            { icon: <StarIcon />, label: 'Stars', value: stats.stats.totalStars, color: 'from-yellow-500 to-orange-500' },
-            { icon: <ForkIcon />, label: 'Forks', value: stats.stats.totalForks, color: 'from-purple-500 to-pink-500' },
-            { icon: <CommitIcon />, label: 'Commits', value: stats.stats.totalCommits, color: 'from-emerald-500 to-teal-500' },
-            { icon: <PRIcon />, label: 'Pull Requests', value: stats.stats.totalPRs, color: 'from-indigo-500 to-purple-500' },
-            { icon: <IssueIcon />, label: 'Issues', value: stats.stats.totalIssues, color: 'from-red-500 to-pink-500' },
+            { icon: <RepoIcon />, label: t.github.repos, value: stats.stats.totalRepos, color: 'from-blue-500 to-cyan-500' },
+            { icon: <StarIcon />, label: t.github.stars, value: stats.stats.totalStars, color: 'from-yellow-500 to-orange-500' },
+            { icon: <ForkIcon />, label: t.github.forks, value: stats.stats.totalForks, color: 'from-purple-500 to-pink-500' },
+            { icon: <CommitIcon />, label: t.github.commits, value: stats.stats.totalCommits, color: 'from-emerald-500 to-teal-500' },
+            { icon: <PRIcon />, label: t.github.pullRequests, value: stats.stats.totalPRs, color: 'from-indigo-500 to-purple-500' },
+            { icon: <IssueIcon />, label: t.github.issues, value: stats.stats.totalIssues, color: 'from-red-500 to-pink-500' },
           ].filter(item => item.value > 0);
 
           if (statItems.length === 0) return null;
@@ -257,7 +266,7 @@ export function GitHubStatsClient({ stats }: Props) {
               <div className="bg-slate-800/30 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-6">
                 <h3 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
                   <CodeIcon />
-                  Linguagens Mais Usadas
+                  {t.github.topLanguages}
                 </h3>
                 <LanguageChart languages={stats.languages} />
               </div>
@@ -268,9 +277,9 @@ export function GitHubStatsClient({ stats }: Props) {
               <div className="bg-slate-800/30 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-6">
                 <h3 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
                   <CalendarIcon />
-                  Contribuições
+                  {t.github.contributions}
                 </h3>
-                <ContributionHeatmap contributions={stats.contributions} />
+                <ContributionHeatmap contributions={stats.contributions} language={language} />
               </div>
             )}
           </div>
@@ -281,7 +290,7 @@ export function GitHubStatsClient({ stats }: Props) {
           <div className="mt-8 bg-slate-800/30 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-6">
             <h3 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
               <SkillIcon />
-              Skills Detectadas
+              {t.github.detectedSkills}
             </h3>
             <div className="flex flex-wrap gap-2">
               {stats.skills.map(skill => (
@@ -305,7 +314,7 @@ export function GitHubStatsClient({ stats }: Props) {
             className="inline-flex items-center gap-2 px-6 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-full transition-all hover:-translate-y-1"
           >
             <GitHubIcon />
-            Ver perfil completo no GitHub
+            {t.github.viewProfile}
             <ExternalLinkIcon />
           </a>
         </div>

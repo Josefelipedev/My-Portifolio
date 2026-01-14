@@ -4,6 +4,7 @@ import './globals.css';
 import ParticlesBackground from '@/components/ui/ParticlesBackground';
 import CustomCursor from '@/components/ui/CustomCursor';
 import GridBackground from '@/components/ui/GridBackground';
+import { Providers } from '@/components/Providers';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -15,12 +16,13 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   title: {
-    default: 'Portfolio | Full Stack Developer',
-    template: '%s | Portfolio',
+    default: 'Jose Felipe | Full Stack Developer',
+    template: '%s | Jose Felipe',
   },
   description:
-    'A modern portfolio showcasing projects and experiences. Built with Next.js, featuring GitHub integration and AI-powered project summaries.',
+    'Portfolio de Jose Felipe Almeida da Silva - Desenvolvedor Full Stack apaixonado por tecnologia. Built with Next.js, featuring GitHub integration and AI-powered project summaries.',
   keywords: [
+    'Jose Felipe',
     'portfolio',
     'developer',
     'full stack',
@@ -30,8 +32,8 @@ export const metadata: Metadata = {
     'web development',
     'software engineer',
   ],
-  authors: [{ name: 'Developer' }],
-  creator: 'Developer',
+  authors: [{ name: 'Jose Felipe Almeida da Silva' }],
+  creator: 'Jose Felipe Almeida da Silva',
   robots: {
     index: true,
     follow: true,
@@ -44,18 +46,18 @@ export const metadata: Metadata = {
     },
   },
   openGraph: {
-    title: 'Portfolio | Full Stack Developer',
+    title: 'Jose Felipe | Full Stack Developer',
     description:
-      'A modern portfolio showcasing projects and experiences. Built with Next.js.',
+      'Portfolio de Jose Felipe Almeida da Silva - Desenvolvedor Full Stack apaixonado por tecnologia.',
     type: 'website',
-    locale: 'en_US',
-    siteName: 'Developer Portfolio',
+    locale: 'pt_BR',
+    siteName: 'Jose Felipe Portfolio',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Portfolio | Full Stack Developer',
+    title: 'Jose Felipe | Full Stack Developer',
     description:
-      'A modern portfolio showcasing projects and experiences. Built with Next.js.',
+      'Portfolio de Jose Felipe Almeida da Silva - Desenvolvedor Full Stack apaixonado por tecnologia.',
   },
   icons: {
     icon: '/favicon.ico',
@@ -72,15 +74,17 @@ export default function RootLayout({
   return (
     <html lang="en" className="scroll-smooth dark">
       <body className={`${inter.className} antialiased bg-slate-900 text-white`}>
-        {/* Background Effects */}
-        <GridBackground />
-        <ParticlesBackground />
+        <Providers>
+          {/* Background Effects */}
+          <GridBackground />
+          <ParticlesBackground />
 
-        {/* Custom Cursor */}
-        <CustomCursor />
+          {/* Custom Cursor */}
+          <CustomCursor />
 
-        {/* Main Content */}
-        <div className="relative z-10">{children}</div>
+          {/* Main Content */}
+          <div className="relative z-10">{children}</div>
+        </Providers>
       </body>
     </html>
   );

@@ -1,21 +1,24 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-
-const navItems = [
-  { label: 'Home', href: '#hero' },
-  { label: 'About', href: '#about' },
-  { label: 'GitHub', href: '#github' },
-  { label: 'Skills', href: '#skills' },
-  { label: 'Projects', href: '#projects' },
-  { label: 'Experience', href: '#experience' },
-  { label: 'Contact', href: '#contact' },
-];
+import { useLanguage } from '@/lib/i18n';
+import { LanguageSwitcher } from './LanguageSwitcher';
 
 export function Navigation() {
+  const { t } = useLanguage();
   const [isScrolled, setIsScrolled] = useState(false);
   const [activeSection, setActiveSection] = useState('hero');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  const navItems = [
+    { label: t.nav.home, href: '#hero' },
+    { label: t.nav.about, href: '#about' },
+    { label: t.nav.github, href: '#github' },
+    { label: t.nav.skills, href: '#skills' },
+    { label: t.nav.projects, href: '#projects' },
+    { label: t.nav.experience, href: '#experience' },
+    { label: t.nav.contact, href: '#contact' },
+  ];
 
   useEffect(() => {
     const handleScroll = () => {
@@ -23,7 +26,7 @@ export function Navigation() {
 
       // Find active section
       const sections = navItems.map((item) => item.href.slice(1));
-      for (const section of sections.reverse()) {
+      for (const section of [...sections].reverse()) {
         const element = document.getElementById(section);
         if (element) {
           const rect = element.getBoundingClientRect();
@@ -37,7 +40,7 @@ export function Navigation() {
 
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+  }, [navItems]);
 
   const scrollToSection = (href: string) => {
     const element = document.getElementById(href.slice(1));
@@ -99,10 +102,18 @@ export function Navigation() {
             <span className="relative">{item.label}</span>
           </button>
         ))}
+
+        <div className="w-px h-6 bg-slate-700/50 mx-1" />
+
+        {/* Language Switcher */}
+        <LanguageSwitcher />
       </div>
 
       {/* Mobile Navigation */}
-      <div className="md:hidden">
+      <div className="md:hidden flex items-center gap-2">
+        {/* Language Switcher Mobile */}
+        <LanguageSwitcher />
+
         {/* Mobile Menu Button */}
         <button
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
