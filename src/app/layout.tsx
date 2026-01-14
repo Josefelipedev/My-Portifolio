@@ -1,0 +1,87 @@
+import type { Metadata, Viewport } from 'next';
+import { Inter } from 'next/font/google';
+import './globals.css';
+import ParticlesBackground from '@/components/ui/ParticlesBackground';
+import CustomCursor from '@/components/ui/CustomCursor';
+import GridBackground from '@/components/ui/GridBackground';
+
+const inter = Inter({ subsets: ['latin'] });
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  themeColor: '#0f172a',
+};
+
+export const metadata: Metadata = {
+  title: {
+    default: 'Portfolio | Full Stack Developer',
+    template: '%s | Portfolio',
+  },
+  description:
+    'A modern portfolio showcasing projects and experiences. Built with Next.js, featuring GitHub integration and AI-powered project summaries.',
+  keywords: [
+    'portfolio',
+    'developer',
+    'full stack',
+    'react',
+    'nextjs',
+    'typescript',
+    'web development',
+    'software engineer',
+  ],
+  authors: [{ name: 'Developer' }],
+  creator: 'Developer',
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-video-preview': -1,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+    },
+  },
+  openGraph: {
+    title: 'Portfolio | Full Stack Developer',
+    description:
+      'A modern portfolio showcasing projects and experiences. Built with Next.js.',
+    type: 'website',
+    locale: 'en_US',
+    siteName: 'Developer Portfolio',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Portfolio | Full Stack Developer',
+    description:
+      'A modern portfolio showcasing projects and experiences. Built with Next.js.',
+  },
+  icons: {
+    icon: '/favicon.ico',
+    apple: '/apple-touch-icon.png',
+  },
+  manifest: '/manifest.json',
+};
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang="en" className="scroll-smooth dark">
+      <body className={`${inter.className} antialiased bg-slate-900 text-white`}>
+        {/* Background Effects */}
+        <GridBackground />
+        <ParticlesBackground />
+
+        {/* Custom Cursor */}
+        <CustomCursor />
+
+        {/* Main Content */}
+        <div className="relative z-10">{children}</div>
+      </body>
+    </html>
+  );
+}

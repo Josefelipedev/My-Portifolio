@@ -1,0 +1,183 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Project {
+  id           String    @id @default(cuid())
+  title        String
+  description  String    @db.Text
+  technologies String    // Comma-separated list of technologies
+  repoUrl      String
+  demoUrl      String?
+
+  // GitHub integration fields
+  githubId     Int?      @unique
+  source       String    @default("manual") // "manual" | "github"
+  aiSummary    String?   @db.Text
+  aiSummarizedAt DateTime?
+  imageUrl     String?
+  stars        Int?
+  featured     Boolean   @default(false)
+
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([createdAt])
+  @@index([featured])
+  @@index([source])
+}
+
+model Experience {
+  id               String    @id @default(cuid())
+  title            String
+  description      String    @db.Text
+  responsibilities String    @db.Text // Comma-separated list of responsibilities
+  challenges       String    @db.Text // Comma-separated list of challenges
+  technologies     String    // Comma-separated list of technologies
+
+  // Enhanced fields
+  company          String?
+  startDate        DateTime?
+  endDate          DateTime? // null = current position
+  location         String?
+
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([createdAt])
+  @@index([startDate])
+}
+
+model GitHubRepoCache {
+  id          Int      @id
+  name        String
+  fullName    String
+  description String?  @db.Text
+  htmlUrl     String
+  homepage    String?
+  language    String?
+  topics      String?  // Comma-separated
+  stargazers  Int
+  forksCount  Int
+  updatedAt   DateTime
+  cachedAt    DateTime @default(now())
+
+  @@index([cachedAt])
+}
+
+model ContactMessage {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  subject   String?
+  message   String   @db.Text
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([read])
+  @@index([email])
+}
+
+model Skill {
+  id       String @id @default(cuid())
+  name     String
+  category String // "frontend" | "backend" | "devops" | "tools" | "other"
+  level    Int    // 1-5 proficiency
+  iconUrl  String?
+  order    Int    @default(0)
+
+  @@index([category])
+  @@index([order])
+}
+
+model SiteConfig {
+  id          String @id @default("main")
+  name        String @default("Portfolio")
+  title       String @default("Full Stack Developer")
+  bio         String? @db.Text
+  avatarUrl   String?
+  githubUrl   String?
+  linkedinUrl String?
+  twitterUrl  String?
+  email       String?
+  location    String?
+}
+
+// ==========================================
+// Authentication Models
+// ==========================================
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  passwordHash  String
+  name          String
+  isActive      Boolean   @default(true)
+
+  // Relations
+  sessions      Session[]
+  verificationCodes VerificationCode[]
+  loginHistory  LoginHistory[]
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model Session {
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  token         String    @unique
+  ipAddress     String?
+  userAgent     String?
+  isValid       Boolean   @default(true)
+
+  expiresAt     DateTime
+  createdAt     DateTime  @default(now())
+
+  @@index([userId])
+  @@index([token])
+  @@index([isValid])
+}
+
+model VerificationCode {
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  code          String
+  type          String    @default("login") // "login" | "password_reset"
+  isUsed        Boolean   @default(false)
+
+  expiresAt     DateTime
+  createdAt     DateTime  @default(now())
+
+  @@index([userId])
+  @@index([code])
+}
+
+model LoginHistory {
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  ipAddress     String?
+  userAgent     String?
+  location      String?
+  success       Boolean   @default(true)
+  failReason    String?
+
+  createdAt     DateTime  @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+}
