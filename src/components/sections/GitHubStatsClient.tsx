@@ -215,66 +215,66 @@ export function GitHubStatsClient({ stats }: Props) {
           </p>
         </div>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
-          <StatCard
-            icon={<RepoIcon />}
-            label="Repositórios"
-            value={stats.stats.totalRepos}
-            color="from-blue-500 to-cyan-500"
-          />
-          <StatCard
-            icon={<StarIcon />}
-            label="Stars"
-            value={stats.stats.totalStars}
-            color="from-yellow-500 to-orange-500"
-          />
-          <StatCard
-            icon={<ForkIcon />}
-            label="Forks"
-            value={stats.stats.totalForks}
-            color="from-purple-500 to-pink-500"
-          />
-          <StatCard
-            icon={<CommitIcon />}
-            label="Commits"
-            value={stats.stats.totalCommits}
-            color="from-emerald-500 to-teal-500"
-          />
-          <StatCard
-            icon={<PRIcon />}
-            label="Pull Requests"
-            value={stats.stats.totalPRs}
-            color="from-indigo-500 to-purple-500"
-          />
-          <StatCard
-            icon={<IssueIcon />}
-            label="Issues"
-            value={stats.stats.totalIssues}
-            color="from-red-500 to-pink-500"
-          />
-        </div>
+        {/* Stats Grid - Only show non-zero values */}
+        {(() => {
+          const statItems = [
+            { icon: <RepoIcon />, label: 'Repositórios', value: stats.stats.totalRepos, color: 'from-blue-500 to-cyan-500' },
+            { icon: <StarIcon />, label: 'Stars', value: stats.stats.totalStars, color: 'from-yellow-500 to-orange-500' },
+            { icon: <ForkIcon />, label: 'Forks', value: stats.stats.totalForks, color: 'from-purple-500 to-pink-500' },
+            { icon: <CommitIcon />, label: 'Commits', value: stats.stats.totalCommits, color: 'from-emerald-500 to-teal-500' },
+            { icon: <PRIcon />, label: 'Pull Requests', value: stats.stats.totalPRs, color: 'from-indigo-500 to-purple-500' },
+            { icon: <IssueIcon />, label: 'Issues', value: stats.stats.totalIssues, color: 'from-red-500 to-pink-500' },
+          ].filter(item => item.value > 0);
 
-        {/* Two Column Layout */}
-        <div className="grid md:grid-cols-2 gap-8">
-          {/* Languages */}
-          <div className="bg-slate-800/30 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-6">
-            <h3 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
-              <CodeIcon />
-              Linguagens Mais Usadas
-            </h3>
-            <LanguageChart languages={stats.languages} />
-          </div>
+          if (statItems.length === 0) return null;
 
-          {/* Contribution Heatmap */}
-          <div className="bg-slate-800/30 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-6">
-            <h3 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
-              <CalendarIcon />
-              Contribuições
-            </h3>
-            <ContributionHeatmap contributions={stats.contributions} />
+          // Dynamic grid columns based on number of items
+          const gridCols = statItems.length <= 2 ? 'grid-cols-2' :
+                           statItems.length <= 3 ? 'grid-cols-2 md:grid-cols-3' :
+                           statItems.length <= 4 ? 'grid-cols-2 md:grid-cols-4' :
+                           'grid-cols-2 md:grid-cols-3 lg:grid-cols-' + Math.min(statItems.length, 6);
+
+          return (
+            <div className={`grid ${gridCols} gap-4 mb-8`}>
+              {statItems.map((item, index) => (
+                <StatCard
+                  key={index}
+                  icon={item.icon}
+                  label={item.label}
+                  value={item.value}
+                  color={item.color}
+                />
+              ))}
+            </div>
+          );
+        })()}
+
+        {/* Two Column Layout - Only show sections with data */}
+        {(stats.languages.length > 0 || stats.contributions.length > 0) && (
+          <div className={`grid ${stats.languages.length > 0 && stats.contributions.length > 0 ? 'md:grid-cols-2' : 'md:grid-cols-1'} gap-8`}>
+            {/* Languages */}
+            {stats.languages.length > 0 && (
+              <div className="bg-slate-800/30 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-6">
+                <h3 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
+                  <CodeIcon />
+                  Linguagens Mais Usadas
+                </h3>
+                <LanguageChart languages={stats.languages} />
+              </div>
+            )}
+
+            {/* Contribution Heatmap */}
+            {stats.contributions.length > 0 && (
+              <div className="bg-slate-800/30 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-6">
+                <h3 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
+                  <CalendarIcon />
+                  Contribuições
+                </h3>
+                <ContributionHeatmap contributions={stats.contributions} />
+              </div>
+            )}
           </div>
-        </div>
+        )}
 
         {/* Skills from GitHub */}
         {stats.skills.length > 0 && (
