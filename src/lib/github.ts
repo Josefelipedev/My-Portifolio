@@ -1,4 +1,4 @@
-import { GitHubRepo } from './types';
+import { GitHubRepo, GitHubOrg } from './types';
 
 const GITHUB_API_BASE = 'https://api.github.com';
 
@@ -103,4 +103,39 @@ export function extractOwnerAndRepo(repoUrl: string): { owner: string; repo: str
     owner: match[1],
     repo: match[2].replace(/\.git$/, ''),
   };
+}
+
+export async function fetchUserOrgs(): Promise<GitHubOrg[]> {
+  const url = `${GITHUB_API_BASE}/user/orgs`;
+
+  const response = await fetch(url, {
+    headers: getHeaders(),
+    next: { revalidate: 3600 }, // Cache for 1 hour
+  });
+
+  if (!response.ok) {
+    throw new Error(`GitHub API error: ${response.status} ${response.statusText}`);
+  }
+
+  return response.json();
+}
+
+export async function fetchOrgRepos(
+  org: string,
+  page = 1,
+  perPage = 30,
+  sort: 'updated' | 'created' | 'pushed' | 'full_name' = 'updated'
+): Promise<GitHubRepo[]> {
+  const url = `${GITHUB_API_BASE}/orgs/${org}/repos?page=${page}&per_page=${perPage}&sort=${sort}&type=all`;
+
+  const response = await fetch(url, {
+    headers: getHeaders(),
+    next: { revalidate: 3600 }, // Cache for 1 hour
+  });
+
+  if (!response.ok) {
+    throw new Error(`GitHub API error: ${response.status} ${response.statusText}`);
+  }
+
+  return response.json();
 }

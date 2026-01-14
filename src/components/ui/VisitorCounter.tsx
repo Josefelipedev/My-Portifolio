@@ -55,11 +55,11 @@ export function VisitorCounter() {
     return null;
   }
 
-  if (!stats || stats.totalVisits === undefined) {
+  if (!stats || stats.uniqueVisits === undefined) {
     return null;
   }
 
-  const visitorsText = language === 'pt' ? 'visitantes' : 'visitors';
+  const visitorsText = language === 'pt' ? 'visitantes únicos' : 'unique visitors';
 
   return (
     <div className="inline-flex items-center gap-2 px-4 py-2 bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-full">
@@ -72,7 +72,7 @@ export function VisitorCounter() {
       </div>
       <span className="text-sm font-medium text-slate-300">
         <span className="text-emerald-400 font-bold">
-          {stats.totalVisits.toLocaleString()}
+          {stats.uniqueVisits.toLocaleString()}
         </span>{' '}
         {visitorsText}
       </span>
