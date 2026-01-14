@@ -11,9 +11,11 @@ interface VisitStats {
 export function VisitorCounter() {
   const { language } = useLanguage();
   const [stats, setStats] = useState<VisitStats | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
+
     const registerVisit = async () => {
       try {
         // Register the visit
@@ -21,29 +23,39 @@ export function VisitorCounter() {
           method: 'POST',
         });
         const data = await response.json();
-        setStats({
-          totalVisits: data.totalVisits,
-          uniqueVisits: data.uniqueVisits,
-        });
+        if (data.totalVisits !== undefined) {
+          setStats({
+            totalVisits: data.totalVisits,
+            uniqueVisits: data.uniqueVisits || 0,
+          });
+        }
       } catch (error) {
         console.error('Error registering visit:', error);
         // Try to at least get the current count
         try {
           const response = await fetch('/api/visits');
           const data = await response.json();
-          setStats(data);
+          if (data.totalVisits !== undefined) {
+            setStats({
+              totalVisits: data.totalVisits,
+              uniqueVisits: data.uniqueVisits || 0,
+            });
+          }
         } catch {
           // Silently fail
         }
-      } finally {
-        setIsLoading(false);
       }
     };
 
     registerVisit();
   }, []);
 
-  if (isLoading || !stats) {
+  // Don't render until client-side to avoid hydration mismatch
+  if (!mounted) {
+    return null;
+  }
+
+  if (!stats || stats.totalVisits === undefined) {
     return null;
   }
 
