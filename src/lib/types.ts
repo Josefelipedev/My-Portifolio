@@ -86,3 +86,27 @@ export interface ApiResponse<T = unknown> {
   data?: T;
   error?: string;
 }
+
+// GitHub Organization type
+export interface GitHubOrg {
+  id: number;
+  login: string;
+  description: string | null;
+  avatar_url: string;
+  html_url: string;
+  repos_url: string;
+}
+
+// Skill suggestion from AI
+export interface SkillSuggestion {
+  name: string;
+  category: 'frontend' | 'backend' | 'devops' | 'tools' | 'other';
+  level: number; // 1-5
+  reason: string; // AI justification
+}
+
+// Skill suggestion response
+export interface SkillSuggestionResponse {
+  suggestions: SkillSuggestion[];
+  provider: string;
+}
