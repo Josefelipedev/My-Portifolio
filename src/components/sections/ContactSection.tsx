@@ -1,7 +1,10 @@
 'use client';
 
-import { useState, FormEvent } from 'react';
+import { useState, FormEvent, useRef } from 'react';
+import { Turnstile, type TurnstileInstance } from '@marsidev/react-turnstile';
 import { GradientText } from '../ui/GradientText';
+
+const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
 
 export function ContactSection() {
   const [formData, setFormData] = useState({
@@ -11,19 +14,31 @@ export function ContactSection() {
     message: '',
     honeypot: '', // Anti-spam
   });
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
+  const turnstileRef = useRef<TurnstileInstance>(null);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setStatus('loading');
     setErrorMessage('');
 
+    // Check Turnstile if configured
+    if (TURNSTILE_SITE_KEY && !turnstileToken) {
+      setStatus('error');
+      setErrorMessage('Por favor, complete a verificação de segurança');
+      return;
+    }
+
     try {
       const response = await fetch('/api/contact', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          ...formData,
+          turnstileToken,
+        }),
       });
 
       const data = await response.json();
@@ -34,9 +49,12 @@ export function ContactSection() {
 
       setStatus('success');
       setFormData({ name: '', email: '', subject: '', message: '', honeypot: '' });
+      setTurnstileToken(null);
+      turnstileRef.current?.reset();
     } catch (error) {
       setStatus('error');
       setErrorMessage(error instanceof Error ? error.message : 'Something went wrong');
+      turnstileRef.current?.reset();
     }
   };
 
@@ -152,6 +170,22 @@ export function ContactSection() {
                   placeholder="Tell me about your project or just say hi..."
                 />
               </div>
+
+              {/* Turnstile widget */}
+              {TURNSTILE_SITE_KEY && (
+                <div className="flex justify-center">
+                  <Turnstile
+                    ref={turnstileRef}
+                    siteKey={TURNSTILE_SITE_KEY}
+                    onSuccess={setTurnstileToken}
+                    onError={() => setTurnstileToken(null)}
+                    onExpire={() => setTurnstileToken(null)}
+                    options={{
+                      theme: 'auto',
+                    }}
+                  />
+                </div>
+              )}
 
               {/* Error message */}
               {status === 'error' && (

@@ -84,7 +84,6 @@ interface Translations {
   };
   // Footer
   footer: {
-    builtWith: string;
     rights: string;
   };
 }
@@ -161,7 +160,6 @@ const translations: Record<Language, Translations> = {
       error: 'Erro ao enviar mensagem. Tente novamente.',
     },
     footer: {
-      builtWith: 'Feito com Next.js, Tailwind CSS e Claude AI',
       rights: 'Todos os direitos reservados.',
     },
   },
@@ -236,7 +234,6 @@ const translations: Record<Language, Translations> = {
       error: 'Error sending message. Please try again.',
     },
     footer: {
-      builtWith: 'Built with Next.js, Tailwind CSS, and Claude AI',
       rights: 'All rights reserved.',
     },
   },

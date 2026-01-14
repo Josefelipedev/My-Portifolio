@@ -12,6 +12,7 @@ import {
   validateEmail,
   validateMinLength,
 } from '@/lib/api-utils';
+import { sendContactNotification } from '@/lib/email';
 
 export async function POST(request: Request) {
   try {
@@ -27,12 +28,39 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { name, email, subject, message, honeypot } = body;
+    const { name, email, subject, message, honeypot, turnstileToken } = body;
 
     // Spam detection: if honeypot field is filled, reject silently
     if (honeypot) {
       // Return success to not give hints to bots
       return success({ success: true });
+    }
+
+    // Validate Turnstile token
+    const turnstileSecret = process.env.TURNSTILE_SECRET_KEY;
+    if (turnstileSecret) {
+      if (!turnstileToken) {
+        throw Errors.BadRequest('Verificação de segurança necessária');
+      }
+
+      const turnstileResponse = await fetch(
+        'https://challenges.cloudflare.com/turnstile/v0/siteverify',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            secret: turnstileSecret,
+            response: turnstileToken,
+            remoteip: ip,
+          }),
+        }
+      );
+
+      const turnstileData = await turnstileResponse.json();
+
+      if (!turnstileData.success) {
+        throw Errors.BadRequest('Falha na verificação de segurança');
+      }
     }
 
     // Validation
@@ -55,6 +83,16 @@ export async function POST(request: Request) {
         subject: subject?.trim() || null,
         message: message.trim(),
       },
+    });
+
+    // Send email notification (don't block on failure)
+    sendContactNotification(
+      name.trim(),
+      email.trim().toLowerCase(),
+      subject?.trim() || null,
+      message.trim()
+    ).catch((err) => {
+      console.error('Failed to send contact notification:', err);
     });
 
     return success({

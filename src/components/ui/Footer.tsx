@@ -14,9 +14,6 @@ export function Footer() {
           <VisitorCounter />
         </div>
 
-        <p className="text-zinc-500 text-sm">
-          {t.footer.builtWith}
-        </p>
         <p className="text-zinc-400 text-xs">
           {new Date().getFullYear()} {t.footer.rights}
         </p>
