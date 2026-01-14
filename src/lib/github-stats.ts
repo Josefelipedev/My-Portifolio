@@ -322,3 +322,94 @@ export async function getBasicGitHubStats(): Promise<{
     contributions: Math.floor(Math.random() * 500) + 200, // Placeholder
   };
 }
+
+// Fetch GitHub profile README
+export async function getGitHubProfileReadme(): Promise<{
+  content: string;
+  user: {
+    name: string;
+    login: string;
+    avatar: string;
+    bio: string;
+    location: string | null;
+    email: string | null;
+    company: string | null;
+    blog: string | null;
+  };
+} | null> {
+  const token = process.env.GITHUB_TOKEN;
+
+  // Get user info first
+  const user = await githubFetch<GitHubUser & {
+    location: string | null;
+    email: string | null;
+    company: string | null;
+    blog: string | null;
+  }>('/user');
+
+  if (!user) return null;
+
+  const login = user.login;
+
+  // Try to fetch the profile README (repo with same name as username)
+  try {
+    const res = await fetch(
+      `${GITHUB_API}/repos/${login}/${login}/readme`,
+      {
+        headers: {
+          Accept: 'application/vnd.github.v3.raw', // Get raw content
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        next: { revalidate: 3600 }, // Cache for 1 hour
+      }
+    );
+
+    if (!res.ok) {
+      console.log('No profile README found');
+      return {
+        content: '',
+        user: {
+          name: user.name || user.login,
+          login: user.login,
+          avatar: user.avatar_url,
+          bio: user.bio || '',
+          location: user.location,
+          email: user.email,
+          company: user.company,
+          blog: user.blog,
+        },
+      };
+    }
+
+    const content = await res.text();
+
+    return {
+      content,
+      user: {
+        name: user.name || user.login,
+        login: user.login,
+        avatar: user.avatar_url,
+        bio: user.bio || '',
+        location: user.location,
+        email: user.email,
+        company: user.company,
+        blog: user.blog,
+      },
+    };
+  } catch (error) {
+    console.error('Error fetching profile README:', error);
+    return {
+      content: '',
+      user: {
+        name: user.name || user.login,
+        login: user.login,
+        avatar: user.avatar_url,
+        bio: user.bio || '',
+        location: user.location,
+        email: user.email,
+        company: user.company,
+        blog: user.blog,
+      },
+    };
+  }
+}
