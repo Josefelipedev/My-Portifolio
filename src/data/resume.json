@@ -1,0 +1,158 @@
+{
+  "personalInfo": {
+    "name": "Jose Felipe Almeida da Silva",
+    "email": "josefelipedev@gmail.com",
+    "phone": "+351 913 884 527",
+    "address": "Rua Gago Coutinho 19, 8000-353, Faro",
+    "linkedin": "josefelipealmeida",
+    "github": "Josefelipedev",
+    "birthDate": "1998-03-19"
+  },
+  "professionalSummary": {
+    "pt": "Desenvolvedor full-stack com forte ênfase em desenvolvimento back-end e experiência comprovada no design e implementação de soluções modernas e escaláveis. Bacharel em Sistemas para Internet pelo IFC e atualmente cursando Engenharia de Sistemas e Tecnologias de Informação em Portugal. Planeja fazer pós-graduação em Cibersegurança, seguido de Mestrado em Engenharia de Software. Proficiente em Node.js, React.js e Laravel, com sólida experiência em integrações Meta API, mensageria assíncrona com Kafka e arquiteturas multi-tenant com OAuth2. Certificado em Docker, Azure AI e React Native.",
+    "en": "Full-stack developer with a strong emphasis on back-end development and proven experience in designing and implementing modern, scalable solutions. Holds a Bachelor's degree in Internet Systems from IFC and is currently pursuing a degree in Systems and Information Technologies Engineering in Portugal. Planning to undertake a postgraduate program in Cybersecurity, followed by a Master's degree in Software Engineering. Proficient in Node.js, React.js, and Laravel, with solid experience in Meta API integrations, asynchronous messaging using Kafka, and multi-tenant architectures with OAuth2. Certified in Docker, Azure AI, and React Native."
+  },
+  "experience": [
+    {
+      "title": "Mid-Level Developer",
+      "company": "Tallk.me",
+      "location": "Home Office / Brasil",
+      "startDate": "2024-10",
+      "endDate": "2025-07",
+      "responsibilities": [
+        "Full-stack development of SaaS applications using Node.js and React.js",
+        "Integrated Meta APIs, asynchronous messaging with Kafka, and OAuth2 authentication",
+        "Built an AI-powered WebChat with Redis and PostgreSQL in a multi-tenant, scalable architecture"
+      ]
+    },
+    {
+      "title": "Junior Developer",
+      "company": "Tallk.me",
+      "location": "Home Office / Brasil",
+      "startDate": "2023-04",
+      "endDate": "2024-09",
+      "responsibilities": [
+        "Developed web pages and interfaces in React.js for SaaS applications",
+        "Created chatbots integrated with the official WhatsApp API, implementing conditional logic and automated workflows",
+        "Refactored and maintained legacy systems using PHP, Laravel, and Node.js",
+        "Collaborated on full-stack projects and integrated relational databases"
+      ]
+    },
+    {
+      "title": "IT Support Analyst",
+      "company": "Tallk.me",
+      "location": "Home Office / Brasil",
+      "startDate": "2022-09",
+      "endDate": "2023-04",
+      "responsibilities": [
+        "Provided advanced technical support with SSH access for server and service maintenance",
+        "Configured and optimized VOIP telephony systems (Asterisk) for clients",
+        "Proposed and implemented platform improvements in collaboration with the development team",
+        "Developed web pages and integration scripts using PHP, JavaScript, and React.js"
+      ]
+    },
+    {
+      "title": "IT Support Intern",
+      "company": "Tallk.me",
+      "location": "Home Office / Brasil",
+      "startDate": "2022-04",
+      "endDate": "2022-08",
+      "responsibilities": [
+        "Assisted in troubleshooting technical issues with SSH access",
+        "Monitored logs, executed tests, and read backend source code",
+        "Participated in API integrations, code review, and PHP development for internal systems",
+        "Contributed to WordPress and PHP/JavaScript projects"
+      ]
+    },
+    {
+      "title": "Mobile Developer (Freelancer)",
+      "company": "Freelancer",
+      "location": "Remote",
+      "startDate": "2024-03",
+      "endDate": "2024-09",
+      "responsibilities": [
+        "Developed Flutter/Dart apps for e-commerce and service platforms",
+        "Integrated card payment gateways (checkout, refunds, subscriptions, webhooks, 3-D Secure, tokenization)",
+        "Built REST service layers and implemented secure payment flows"
+      ]
+    }
+  ],
+  "education": [
+    {
+      "degree": "Internet Systems",
+      "institution": "Federal Institute of Santa Catarina - Camboriú",
+      "location": "Balneário Camboriú, Brasil",
+      "startDate": "2020-03",
+      "endDate": "2024-12",
+      "description": "Degree focused on web, mobile, and intranet systems development, covering software engineering, networking, and databases."
+    },
+    {
+      "degree": "Systems and Information Technologies Engineering",
+      "institution": "Universidade do Algarve",
+      "location": "Faro, Portugal",
+      "startDate": "2025-09",
+      "endDate": null,
+      "description": "Bachelor's degree focusing on information systems, software development, and intelligent technologies, covering mathematics, programming, AI, web, mobile, and networks."
+    }
+  ],
+  "skills": [
+    { "name": "PHP", "level": 3, "category": "backend" },
+    { "name": "Docker", "level": 3, "category": "devops" },
+    { "name": "Laravel", "level": 3, "category": "backend" },
+    { "name": "React", "level": 4, "category": "frontend" },
+    { "name": "Python", "level": 1, "category": "backend" },
+    { "name": "C#/.NET", "level": 1, "category": "backend" },
+    { "name": "TypeScript", "level": 4, "category": "frontend" },
+    { "name": "Java", "level": 2, "category": "backend" },
+    { "name": "Node.js", "level": 4, "category": "backend" },
+    { "name": "PostgreSQL", "level": 4, "category": "backend" },
+    { "name": "Redis", "level": 3, "category": "backend" },
+    { "name": "Kafka", "level": 3, "category": "backend" },
+    { "name": "Git", "level": 5, "category": "devops" },
+    { "name": "Flutter/Dart", "level": 3, "category": "mobile" },
+    { "name": "Next.js", "level": 4, "category": "frontend" },
+    { "name": "Tailwind CSS", "level": 4, "category": "frontend" }
+  ],
+  "certifications": [
+    {
+      "name": "Java Developer",
+      "issuer": "DIO (Digital Innovation One)",
+      "date": "2025-03",
+      "description": "Java training with emphasis on Object-Oriented Programming (OOP) and Spring Framework"
+    },
+    {
+      "name": "React Native Developer",
+      "issuer": "DIO (Digital Innovation One)",
+      "date": "2024-11",
+      "description": "Training in mobile app development with React Native, focusing on UI, APIs, and best practices"
+    },
+    {
+      "name": "Docker Fundamentals",
+      "issuer": "Docker",
+      "date": "2024-09",
+      "description": "Docker training focusing on containers, CLI, custom images, and clusters"
+    },
+    {
+      "name": "Formação .NET Developer",
+      "issuer": "DIO (Digital Innovation One)",
+      "date": "2024-06",
+      "description": ".NET development training"
+    },
+    {
+      "name": "React.js & Next.js",
+      "issuer": "Udemy",
+      "date": "2023",
+      "description": "ReactJS, NextJS, Styled-Components, testing with Jest, Storybook, Strapi, HTML, and CSS with TypeScript and JavaScript"
+    },
+    {
+      "name": "PHP Programming",
+      "issuer": "Udemy",
+      "date": "2022",
+      "description": "Knowledge of PHP syntax, including creation of functions, classes, and objects. Integration of PHP with HTML, CSS, and JavaScript"
+    }
+  ],
+  "languages": [
+    { "language": "Portuguese", "level": "Native" },
+    { "language": "English", "level": "Intermediate", "notes": "Weekly classes, good comprehension, currently improving speaking skills" }
+  ]
+}
