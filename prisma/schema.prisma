@@ -181,3 +181,28 @@ model LoginHistory {
   @@index([userId])
   @@index([createdAt])
 }
+
+// ==========================================
+// Site Analytics
+// ==========================================
+
+model SiteStats {
+  id            String    @id @default("main")
+  totalVisits   Int       @default(0)
+  uniqueVisits  Int       @default(0)
+  updatedAt     DateTime  @updatedAt
+}
+
+model PageView {
+  id            String    @id @default(cuid())
+  visitorId     String    // Anonymous visitor ID (stored in cookie)
+  page          String    @default("/")
+  referrer      String?
+  userAgent     String?
+  country       String?
+  createdAt     DateTime  @default(now())
+
+  @@index([visitorId])
+  @@index([createdAt])
+  @@index([page])
+}
