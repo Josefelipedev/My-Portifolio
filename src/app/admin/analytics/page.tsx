@@ -40,8 +40,16 @@ export default function AnalyticsPage() {
 
   const fetchAnalytics = async () => {
     try {
-      const res = await fetch('/api/analytics');
-      if (!res.ok) throw new Error('Failed to fetch analytics');
+      const res = await fetch('/api/analytics', {
+        credentials: 'include',
+      });
+      if (!res.ok) {
+        if (res.status === 401) {
+          window.location.href = '/admin/login';
+          return;
+        }
+        throw new Error('Failed to fetch analytics');
+      }
       const json = await res.json();
       setData(json);
     } catch (err) {
