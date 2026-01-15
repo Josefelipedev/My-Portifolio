@@ -51,7 +51,28 @@ export async function POST(request: Request) {
       );
     }
 
-    // Success - code sent to email
+    // In development mode, token is returned directly (no verification needed)
+    if (result.token && !result.requiresVerification) {
+      const response = NextResponse.json({
+        success: true,
+        message: 'Login realizado com sucesso (modo desenvolvimento)',
+        userId: result.userId,
+        requiresVerification: false,
+      });
+
+      // Set the auth cookie
+      response.cookies.set('auth_token', result.token, {
+        httpOnly: true,
+        secure: false, // localhost doesn't use HTTPS
+        sameSite: 'lax',
+        maxAge: 24 * 60 * 60, // 24 hours
+        path: '/',
+      });
+
+      return response;
+    }
+
+    // Production mode - code sent to email
     return NextResponse.json({
       success: true,
       message: 'Código de verificação enviado para seu email',

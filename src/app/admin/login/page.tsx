@@ -31,9 +31,16 @@ export default function LoginPage() {
 
       const data = await res.json();
 
-      if (res.ok && data.requiresVerification) {
-        setUserId(data.userId);
-        setStep('verification');
+      if (res.ok) {
+        if (data.requiresVerification) {
+          // Production mode: need to enter verification code
+          setUserId(data.userId);
+          setStep('verification');
+        } else {
+          // Development mode: logged in directly, redirect to admin
+          router.push('/admin');
+          router.refresh();
+        }
       } else if (res.status === 429) {
         setBlockedFor(data.blockedFor);
         setError(`Muitas tentativas. Bloqueado por ${data.blockedFor} minutos.`);
