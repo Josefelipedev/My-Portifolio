@@ -60,8 +60,8 @@ export const metadata: Metadata = {
       'Portfolio de Jose Felipe Almeida da Silva - Desenvolvedor Full Stack apaixonado por tecnologia.',
   },
   icons: {
-    icon: '/favicon.ico',
-    apple: '/apple-touch-icon.png',
+    icon: '/icon.png',
+    apple: '/icon.png',
   },
   manifest: '/manifest.json',
 };
