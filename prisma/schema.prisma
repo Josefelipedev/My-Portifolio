@@ -200,10 +200,16 @@ model PageView {
   page          String    @default("/")
   referrer      String?
   userAgent     String?
+  ipAddress     String?
   country       String?
+  city          String?
+  device        String?   // "desktop" | "mobile" | "tablet"
+  browser       String?
+  os            String?
   createdAt     DateTime  @default(now())
 
   @@index([visitorId])
   @@index([createdAt])
   @@index([page])
+  @@index([ipAddress])
 }
