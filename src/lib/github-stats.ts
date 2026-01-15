@@ -128,12 +128,31 @@ export async function getGitHubStats(username?: string): Promise<GitHubStats | n
 
   const login = user.login;
 
-  // Fetch repos
-  const repos = await githubFetch<GitHubRepo[]>(
+  // Fetch user repos
+  const userRepos = await githubFetch<GitHubRepo[]>(
     `/users/${login}/repos?per_page=100&sort=updated`
   );
 
-  if (!repos) return null;
+  if (!userRepos) return null;
+
+  // Fetch organizations
+  const orgs = await githubFetch<Array<{ login: string }>>('/user/orgs');
+
+  // Fetch repos from organizations
+  let orgRepos: GitHubRepo[] = [];
+  if (orgs && orgs.length > 0) {
+    for (const org of orgs) {
+      const repos = await githubFetch<GitHubRepo[]>(
+        `/orgs/${org.login}/repos?per_page=100&sort=updated`
+      );
+      if (repos) {
+        orgRepos = [...orgRepos, ...repos];
+      }
+    }
+  }
+
+  // Combine user repos and org repos
+  const repos = [...userRepos, ...orgRepos];
 
   // Calculate language stats
   const languageBytes: Record<string, number> = {};
@@ -142,7 +161,7 @@ export async function getGitHubStats(username?: string): Promise<GitHubStats | n
   for (const repo of repos) {
     if (repo.language) {
       const langData = await githubFetch<Record<string, number>>(
-        `/repos/${login}/${repo.name}/languages`
+        `/repos/${repo.full_name}/languages`
       );
       if (langData) {
         for (const [lang, bytes] of Object.entries(langData)) {
