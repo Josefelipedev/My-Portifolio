@@ -3,6 +3,21 @@
 import { useState, useRef } from 'react';
 import Link from 'next/link';
 
+interface Experience {
+  title: string;
+  company: string;
+  location?: string;
+  startDate: string;
+  endDate?: string;
+  responsibilities: string[];
+}
+
+interface Skill {
+  name: string;
+  level: number;
+  category: string;
+}
+
 interface ResumeAnalysis {
   personalInfo: {
     name: string;
@@ -16,14 +31,7 @@ interface ResumeAnalysis {
     pt: string;
     en: string;
   };
-  experience: Array<{
-    title: string;
-    company: string;
-    location?: string;
-    startDate: string;
-    endDate?: string;
-    responsibilities: string[];
-  }>;
+  experience: Experience[];
   education: Array<{
     degree: string;
     institution: string;
@@ -32,11 +40,7 @@ interface ResumeAnalysis {
     endDate?: string;
     description?: string;
   }>;
-  skills: Array<{
-    name: string;
-    level: number;
-    category: string;
-  }>;
+  skills: Skill[];
   certifications: Array<{
     name: string;
     issuer: string;
@@ -50,6 +54,18 @@ interface ResumeAnalysis {
   }>;
 }
 
+interface EditableExperience extends Experience {
+  id: string;
+  included: boolean;
+  action: 'add' | 'update' | 'remove' | 'keep';
+}
+
+interface EditableSkill extends Skill {
+  id: string;
+  included: boolean;
+  action: 'add' | 'update' | 'remove' | 'keep';
+}
+
 interface ComparisonItem<T> {
   action: 'add' | 'update' | 'remove' | 'keep';
   current?: T;
@@ -60,7 +76,7 @@ interface ComparisonItem<T> {
 interface ComparisonResult {
   experiences: ComparisonItem<{
     title: string;
-    company: string;
+    company: string | null;
     location?: string | null;
     startDate?: string | null;
     endDate?: string | null;
@@ -91,11 +107,18 @@ export default function ResumeAdminPage() {
   const [provider, setProvider] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Editable states for comparison view
+  const [editableExperiences, setEditableExperiences] = useState<EditableExperience[]>([]);
+  const [editableSkills, setEditableSkills] = useState<EditableSkill[]>([]);
+
+  // Modal states
+  const [editingExperience, setEditingExperience] = useState<EditableExperience | null>(null);
+  const [editingSkill, setEditingSkill] = useState<EditableSkill | null>(null);
+
   const [syncOptions, setSyncOptions] = useState({
     syncExperiences: true,
     syncSkills: true,
     syncJson: true,
-    clearExisting: false,
   });
 
   const handleAnalyze = async (file?: File) => {
@@ -162,6 +185,31 @@ export default function ResumeAdminPage() {
       }
 
       setComparison(data.comparison);
+
+      // Convert comparison to editable format
+      const expEditable: EditableExperience[] = data.comparison.experiences.map((item: ComparisonItem<{ title: string; company: string | null; location?: string | null; startDate?: string | null; endDate?: string | null; description?: string }>, idx: number) => ({
+        id: `exp-${idx}`,
+        title: item.new?.title || item.current?.title || '',
+        company: item.new?.company || item.current?.company || '',
+        location: item.new?.location || item.current?.location || '',
+        startDate: item.new?.startDate || item.current?.startDate || '',
+        endDate: item.new?.endDate || item.current?.endDate || '',
+        responsibilities: item.new?.description?.split('. ') || item.current?.description?.split('. ') || [],
+        included: item.action !== 'keep',
+        action: item.action,
+      }));
+
+      const skillEditable: EditableSkill[] = data.comparison.skills.map((item: ComparisonItem<{ name: string; category: string; level: number }>, idx: number) => ({
+        id: `skill-${idx}`,
+        name: item.new?.name || item.current?.name || '',
+        category: item.new?.category || item.current?.category || 'other',
+        level: item.new?.level || item.current?.level || 3,
+        included: item.action !== 'keep',
+        action: item.action,
+      }));
+
+      setEditableExperiences(expEditable);
+      setEditableSkills(skillEditable);
       setViewMode('comparison');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to compare');
@@ -178,11 +226,33 @@ export default function ResumeAdminPage() {
       setError(null);
       setSuccess(null);
 
+      // Build modified analysis from editable states
+      const modifiedAnalysis: ResumeAnalysis = {
+        ...analysis,
+        experience: editableExperiences
+          .filter(exp => exp.included && exp.action !== 'remove')
+          .map(exp => ({
+            title: exp.title,
+            company: exp.company,
+            location: exp.location,
+            startDate: exp.startDate,
+            endDate: exp.endDate,
+            responsibilities: exp.responsibilities,
+          })),
+        skills: editableSkills
+          .filter(skill => skill.included && skill.action !== 'remove')
+          .map(skill => ({
+            name: skill.name,
+            category: skill.category,
+            level: skill.level,
+          })),
+      };
+
       const response = await fetch('/api/resume/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          analysis,
+          analysis: modifiedAnalysis,
           options: syncOptions,
         }),
       });
@@ -206,9 +276,37 @@ export default function ResumeAdminPage() {
   const handleReset = () => {
     setAnalysis(null);
     setComparison(null);
+    setEditableExperiences([]);
+    setEditableSkills([]);
     setViewMode('upload');
     setError(null);
     setSuccess(null);
+  };
+
+  const toggleExperienceIncluded = (id: string) => {
+    setEditableExperiences(prev =>
+      prev.map(exp => exp.id === id ? { ...exp, included: !exp.included } : exp)
+    );
+  };
+
+  const toggleSkillIncluded = (id: string) => {
+    setEditableSkills(prev =>
+      prev.map(skill => skill.id === id ? { ...skill, included: !skill.included } : skill)
+    );
+  };
+
+  const updateExperience = (updated: EditableExperience) => {
+    setEditableExperiences(prev =>
+      prev.map(exp => exp.id === updated.id ? updated : exp)
+    );
+    setEditingExperience(null);
+  };
+
+  const updateSkill = (updated: EditableSkill) => {
+    setEditableSkills(prev =>
+      prev.map(skill => skill.id === updated.id ? updated : skill)
+    );
+    setEditingSkill(null);
   };
 
   const getLevelLabel = (level: number) => {
@@ -216,7 +314,8 @@ export default function ResumeAdminPage() {
     return labels[level] || '';
   };
 
-  const getActionColor = (action: string) => {
+  const getActionColor = (action: string, included: boolean) => {
+    if (!included) return 'bg-zinc-100 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500 border-zinc-200 dark:border-zinc-700 opacity-50';
     switch (action) {
       case 'add':
         return 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800';
@@ -233,17 +332,18 @@ export default function ResumeAdminPage() {
 
   const getActionLabel = (action: string) => {
     switch (action) {
-      case 'add':
-        return 'Adicionar';
-      case 'update':
-        return 'Atualizar';
-      case 'remove':
-        return 'Remover';
-      case 'keep':
-        return 'Manter';
-      default:
-        return action;
+      case 'add': return 'Add';
+      case 'update': return 'Update';
+      case 'remove': return 'Remove';
+      case 'keep': return 'Keep';
+      default: return action;
     }
+  };
+
+  const countIncluded = () => {
+    const expCount = editableExperiences.filter(e => e.included && e.action !== 'keep').length;
+    const skillCount = editableSkills.filter(s => s.included && s.action !== 'keep').length;
+    return { expCount, skillCount };
   };
 
   return (
@@ -314,7 +414,7 @@ export default function ResumeAdminPage() {
                 Step 1: Analyze Resume PDF
               </h2>
               <p className="text-zinc-600 dark:text-zinc-400 mb-6 max-w-md mx-auto text-sm md:text-base">
-                Upload a new PDF or analyze the existing resume at <code className="text-xs md:text-sm bg-zinc-100 dark:bg-zinc-700 px-2 py-0.5 rounded">src/data/resume.pdf</code>
+                Upload a new PDF or analyze the existing resume
               </p>
 
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -365,7 +465,6 @@ export default function ResumeAdminPage() {
         {/* Step 2: Analysis Results */}
         {viewMode === 'analysis' && analysis && (
           <>
-            {/* Action Bar */}
             <div className="bg-white dark:bg-zinc-800 rounded-xl p-4 md:p-6 border border-zinc-200 dark:border-zinc-700 mb-6">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div>
@@ -388,22 +487,7 @@ export default function ResumeAdminPage() {
                     disabled={comparing}
                     className="px-4 py-2 bg-blue-500 text-white font-medium rounded-lg hover:bg-blue-600 disabled:opacity-50 transition-colors flex items-center gap-2"
                   >
-                    {comparing ? (
-                      <>
-                        <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                        </svg>
-                        Comparing...
-                      </>
-                    ) : (
-                      <>
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                        </svg>
-                        Compare with Database
-                      </>
-                    )}
+                    {comparing ? 'Comparing...' : 'Compare with Database'}
                   </button>
                 </div>
               </div>
@@ -421,109 +505,52 @@ export default function ResumeAdminPage() {
                   <p className="text-sm text-zinc-500 mb-1">Email</p>
                   <p className="text-zinc-900 dark:text-zinc-100">{analysis.personalInfo.email || '-'}</p>
                 </div>
-                <div>
-                  <p className="text-sm text-zinc-500 mb-1">Phone</p>
-                  <p className="text-zinc-900 dark:text-zinc-100">{analysis.personalInfo.phone || '-'}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-zinc-500 mb-1">Location</p>
-                  <p className="text-zinc-900 dark:text-zinc-100">{analysis.personalInfo.address || '-'}</p>
-                </div>
               </div>
             </div>
 
-            {/* Experience */}
+            {/* Experience Preview */}
             <div className="bg-white dark:bg-zinc-800 rounded-xl p-4 md:p-6 border border-zinc-200 dark:border-zinc-700 mb-6">
               <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
                 Experience ({analysis.experience.length})
               </h2>
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {analysis.experience.map((exp, idx) => (
-                  <div key={idx} className="p-4 bg-zinc-50 dark:bg-zinc-900 rounded-lg">
-                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 mb-2">
-                      <div>
-                        <h3 className="font-semibold text-zinc-900 dark:text-zinc-100">{exp.title}</h3>
-                        <p className="text-sm text-zinc-600 dark:text-zinc-400">
-                          {exp.company} {exp.location && `• ${exp.location}`}
-                        </p>
-                      </div>
-                      <span className="text-sm text-zinc-500">
-                        {exp.startDate} - {exp.endDate || 'Present'}
-                      </span>
-                    </div>
-                    {exp.responsibilities.length > 0 && (
-                      <ul className="list-disc list-inside text-sm text-zinc-600 dark:text-zinc-400 mt-2">
-                        {exp.responsibilities.slice(0, 3).map((r, i) => (
-                          <li key={i}>{r}</li>
-                        ))}
-                        {exp.responsibilities.length > 3 && (
-                          <li className="text-zinc-400">+{exp.responsibilities.length - 3} more...</li>
-                        )}
-                      </ul>
-                    )}
+                  <div key={idx} className="p-3 bg-zinc-50 dark:bg-zinc-900 rounded-lg">
+                    <p className="font-medium text-zinc-900 dark:text-zinc-100">{exp.title}</p>
+                    <p className="text-sm text-zinc-600 dark:text-zinc-400">{exp.company}</p>
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* Skills */}
-            <div className="bg-white dark:bg-zinc-800 rounded-xl p-4 md:p-6 border border-zinc-200 dark:border-zinc-700 mb-6">
+            {/* Skills Preview */}
+            <div className="bg-white dark:bg-zinc-800 rounded-xl p-4 md:p-6 border border-zinc-200 dark:border-zinc-700">
               <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
                 Skills ({analysis.skills.length})
               </h2>
               <div className="flex flex-wrap gap-2">
                 {analysis.skills.map((skill, idx) => (
-                  <span
-                    key={idx}
-                    className="px-3 py-1.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-lg text-sm flex items-center gap-2"
-                  >
-                    {skill.name}
-                    <span className="text-xs opacity-70">
-                      ({getLevelLabel(skill.level)})
-                    </span>
+                  <span key={idx} className="px-3 py-1.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-lg text-sm">
+                    {skill.name} ({getLevelLabel(skill.level)})
                   </span>
-                ))}
-              </div>
-            </div>
-
-            {/* Education */}
-            <div className="bg-white dark:bg-zinc-800 rounded-xl p-4 md:p-6 border border-zinc-200 dark:border-zinc-700">
-              <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
-                Education ({analysis.education.length})
-              </h2>
-              <div className="space-y-4">
-                {analysis.education.map((edu, idx) => (
-                  <div key={idx} className="p-4 bg-zinc-50 dark:bg-zinc-900 rounded-lg">
-                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2">
-                      <div>
-                        <h3 className="font-semibold text-zinc-900 dark:text-zinc-100">{edu.degree}</h3>
-                        <p className="text-sm text-zinc-600 dark:text-zinc-400">
-                          {edu.institution} {edu.location && `• ${edu.location}`}
-                        </p>
-                      </div>
-                      <span className="text-sm text-zinc-500">
-                        {edu.startDate} - {edu.endDate || 'Present'}
-                      </span>
-                    </div>
-                  </div>
                 ))}
               </div>
             </div>
           </>
         )}
 
-        {/* Step 3: Comparison View */}
-        {viewMode === 'comparison' && comparison && (
+        {/* Step 3: Comparison View with Edit */}
+        {viewMode === 'comparison' && (
           <>
             {/* Action Bar */}
             <div className="bg-white dark:bg-zinc-800 rounded-xl p-4 md:p-6 border border-zinc-200 dark:border-zinc-700 mb-6">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div>
                   <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-                    Step 3: Review Changes
+                    Step 3: Edit & Select Changes
                   </h2>
                   <p className="text-sm text-zinc-500">
-                    Review what will be added, updated, or removed
+                    Click on items to edit, use checkboxes to include/exclude
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-3">
@@ -538,35 +565,20 @@ export default function ResumeAdminPage() {
                     disabled={syncing}
                     className="px-4 py-2 bg-green-500 text-white font-medium rounded-lg hover:bg-green-600 disabled:opacity-50 transition-colors flex items-center gap-2"
                   >
-                    {syncing ? (
-                      <>
-                        <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                        </svg>
-                        Syncing...
-                      </>
-                    ) : (
-                      <>
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                        Apply Changes
-                      </>
-                    )}
+                    {syncing ? 'Syncing...' : `Apply (${countIncluded().expCount + countIncluded().skillCount} changes)`}
                   </button>
                 </div>
               </div>
 
               {/* Sync Options */}
               <div className="mt-4 pt-4 border-t border-zinc-200 dark:border-zinc-700">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="flex flex-wrap gap-4">
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
                       type="checkbox"
                       checked={syncOptions.syncExperiences}
                       onChange={(e) => setSyncOptions({ ...syncOptions, syncExperiences: e.target.checked })}
-                      className="w-4 h-4 rounded border-zinc-300 text-blue-500"
+                      className="w-4 h-4 rounded"
                     />
                     <span className="text-sm text-zinc-700 dark:text-zinc-300">Sync Experiences</span>
                   </label>
@@ -575,7 +587,7 @@ export default function ResumeAdminPage() {
                       type="checkbox"
                       checked={syncOptions.syncSkills}
                       onChange={(e) => setSyncOptions({ ...syncOptions, syncSkills: e.target.checked })}
-                      className="w-4 h-4 rounded border-zinc-300 text-blue-500"
+                      className="w-4 h-4 rounded"
                     />
                     <span className="text-sm text-zinc-700 dark:text-zinc-300">Sync Skills</span>
                   </label>
@@ -584,146 +596,277 @@ export default function ResumeAdminPage() {
                       type="checkbox"
                       checked={syncOptions.syncJson}
                       onChange={(e) => setSyncOptions({ ...syncOptions, syncJson: e.target.checked })}
-                      className="w-4 h-4 rounded border-zinc-300 text-blue-500"
+                      className="w-4 h-4 rounded"
                     />
                     <span className="text-sm text-zinc-700 dark:text-zinc-300">Update resume.json</span>
                   </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={syncOptions.clearExisting}
-                      onChange={(e) => setSyncOptions({ ...syncOptions, clearExisting: e.target.checked })}
-                      className="w-4 h-4 rounded border-zinc-300 text-red-500"
-                    />
-                    <span className="text-sm text-red-600 dark:text-red-400">Clear existing</span>
-                  </label>
                 </div>
               </div>
             </div>
 
-            {/* Summary */}
-            <div className="grid grid-cols-2 gap-4 mb-6">
-              <div className="bg-white dark:bg-zinc-800 rounded-xl p-4 border border-zinc-200 dark:border-zinc-700">
-                <h3 className="font-semibold text-zinc-900 dark:text-zinc-100 mb-3">Experiences</h3>
-                <div className="flex flex-wrap gap-2">
-                  <span className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded text-sm">
-                    +{comparison.summary.experiences.add} add
-                  </span>
-                  <span className="px-2 py-1 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 rounded text-sm">
-                    ~{comparison.summary.experiences.update} update
-                  </span>
-                  <span className="px-2 py-1 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded text-sm">
-                    -{comparison.summary.experiences.remove} remove
-                  </span>
-                  <span className="px-2 py-1 bg-zinc-100 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400 rounded text-sm">
-                    ={comparison.summary.experiences.keep} keep
-                  </span>
-                </div>
-              </div>
-              <div className="bg-white dark:bg-zinc-800 rounded-xl p-4 border border-zinc-200 dark:border-zinc-700">
-                <h3 className="font-semibold text-zinc-900 dark:text-zinc-100 mb-3">Skills</h3>
-                <div className="flex flex-wrap gap-2">
-                  <span className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded text-sm">
-                    +{comparison.summary.skills.add} add
-                  </span>
-                  <span className="px-2 py-1 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 rounded text-sm">
-                    ~{comparison.summary.skills.update} update
-                  </span>
-                  <span className="px-2 py-1 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded text-sm">
-                    -{comparison.summary.skills.remove} remove
-                  </span>
-                  <span className="px-2 py-1 bg-zinc-100 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400 rounded text-sm">
-                    ={comparison.summary.skills.keep} keep
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Experiences Comparison */}
+            {/* Experiences with Edit */}
             <div className="bg-white dark:bg-zinc-800 rounded-xl p-4 md:p-6 border border-zinc-200 dark:border-zinc-700 mb-6">
-              <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
-                Experiences Changes
-              </h2>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+                  Experiences ({editableExperiences.filter(e => e.included).length}/{editableExperiences.length} selected)
+                </h2>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setEditableExperiences(prev => prev.map(e => ({ ...e, included: true })))}
+                    className="text-xs px-2 py-1 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded"
+                  >
+                    Select All
+                  </button>
+                  <button
+                    onClick={() => setEditableExperiences(prev => prev.map(e => ({ ...e, included: false })))}
+                    className="text-xs px-2 py-1 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded"
+                  >
+                    Deselect All
+                  </button>
+                </div>
+              </div>
               <div className="space-y-3">
-                {comparison.experiences.map((item, idx) => (
-                  <div key={idx} className={`p-4 rounded-lg border ${getActionColor(item.action)}`}>
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1">
+                {editableExperiences.map((exp) => (
+                  <div
+                    key={exp.id}
+                    className={`p-4 rounded-lg border transition-all ${getActionColor(exp.action, exp.included)}`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <input
+                        type="checkbox"
+                        checked={exp.included}
+                        onChange={() => toggleExperienceIncluded(exp.id)}
+                        className="mt-1 w-4 h-4 rounded"
+                      />
+                      <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className={`px-2 py-0.5 rounded text-xs font-medium ${getActionColor(item.action)}`}>
-                            {getActionLabel(item.action)}
+                          <span className={`px-2 py-0.5 rounded text-xs font-medium`}>
+                            {getActionLabel(exp.action)}
                           </span>
                         </div>
-                        {item.action === 'add' && item.new && (
-                          <div>
-                            <p className="font-medium">{item.new.title}</p>
-                            <p className="text-sm opacity-70">{item.new.company}</p>
-                          </div>
-                        )}
-                        {item.action === 'remove' && item.current && (
-                          <div>
-                            <p className="font-medium line-through">{item.current.title}</p>
-                            <p className="text-sm opacity-70 line-through">{item.current.company}</p>
-                          </div>
-                        )}
-                        {item.action === 'update' && (
-                          <div>
-                            <p className="font-medium">{item.current?.title}</p>
-                            <p className="text-sm opacity-70">{item.current?.company}</p>
-                            {item.changes && (
-                              <ul className="mt-2 text-sm">
-                                {item.changes.map((change, i) => (
-                                  <li key={i} className="opacity-80">• {change}</li>
-                                ))}
-                              </ul>
-                            )}
-                          </div>
-                        )}
-                        {item.action === 'keep' && item.current && (
-                          <div>
-                            <p className="font-medium">{item.current.title}</p>
-                            <p className="text-sm opacity-70">{item.current.company}</p>
-                          </div>
-                        )}
+                        <p className={`font-medium ${!exp.included ? 'line-through opacity-50' : ''}`}>
+                          {exp.title}
+                        </p>
+                        <p className={`text-sm opacity-70 ${!exp.included ? 'line-through' : ''}`}>
+                          {exp.company} • {exp.startDate} - {exp.endDate || 'Present'}
+                        </p>
                       </div>
+                      <button
+                        onClick={() => setEditingExperience(exp)}
+                        className="p-2 hover:bg-white/50 dark:hover:bg-black/20 rounded-lg transition-colors"
+                        title="Edit"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                        </svg>
+                      </button>
                     </div>
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* Skills Comparison */}
+            {/* Skills with Edit */}
             <div className="bg-white dark:bg-zinc-800 rounded-xl p-4 md:p-6 border border-zinc-200 dark:border-zinc-700">
-              <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
-                Skills Changes
-              </h2>
-              <div className="flex flex-wrap gap-2">
-                {comparison.skills.map((item, idx) => (
-                  <div
-                    key={idx}
-                    className={`px-3 py-2 rounded-lg border ${getActionColor(item.action)}`}
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+                  Skills ({editableSkills.filter(s => s.included).length}/{editableSkills.length} selected)
+                </h2>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setEditableSkills(prev => prev.map(s => ({ ...s, included: true })))}
+                    className="text-xs px-2 py-1 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded"
                   >
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-medium opacity-70">
-                        {item.action === 'add' && '+'}
-                        {item.action === 'remove' && '-'}
-                        {item.action === 'update' && '~'}
-                        {item.action === 'keep' && '='}
-                      </span>
-                      <span className={item.action === 'remove' ? 'line-through' : ''}>
-                        {item.current?.name || item.new?.name}
-                      </span>
-                      {item.action === 'update' && item.changes && (
-                        <span className="text-xs opacity-70">
-                          ({item.changes.join(', ')})
-                        </span>
-                      )}
-                    </div>
+                    Select All
+                  </button>
+                  <button
+                    onClick={() => setEditableSkills(prev => prev.map(s => ({ ...s, included: false })))}
+                    className="text-xs px-2 py-1 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded"
+                  >
+                    Deselect All
+                  </button>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {editableSkills.map((skill) => (
+                  <div
+                    key={skill.id}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-all ${getActionColor(skill.action, skill.included)}`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={skill.included}
+                      onChange={() => toggleSkillIncluded(skill.id)}
+                      className="w-3 h-3 rounded"
+                    />
+                    <span className={`text-xs opacity-70`}>
+                      {skill.action === 'add' && '+'}
+                      {skill.action === 'remove' && '-'}
+                      {skill.action === 'update' && '~'}
+                    </span>
+                    <span className={!skill.included ? 'line-through opacity-50' : ''}>
+                      {skill.name}
+                    </span>
+                    <span className="text-xs opacity-50">Lv.{skill.level}</span>
+                    <button
+                      onClick={() => setEditingSkill(skill)}
+                      className="p-1 hover:bg-white/50 dark:hover:bg-black/20 rounded transition-colors"
+                      title="Edit"
+                    >
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                      </svg>
+                    </button>
                   </div>
                 ))}
               </div>
             </div>
           </>
+        )}
+
+        {/* Edit Experience Modal */}
+        {editingExperience && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white dark:bg-zinc-800 rounded-xl p-6 max-w-lg w-full max-h-[90vh] overflow-y-auto">
+              <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-4">Edit Experience</h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Title</label>
+                  <input
+                    type="text"
+                    value={editingExperience.title}
+                    onChange={(e) => setEditingExperience({ ...editingExperience, title: e.target.value })}
+                    className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Company</label>
+                  <input
+                    type="text"
+                    value={editingExperience.company}
+                    onChange={(e) => setEditingExperience({ ...editingExperience, company: e.target.value })}
+                    className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Location</label>
+                  <input
+                    type="text"
+                    value={editingExperience.location || ''}
+                    onChange={(e) => setEditingExperience({ ...editingExperience, location: e.target.value })}
+                    className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Start Date</label>
+                    <input
+                      type="text"
+                      placeholder="YYYY-MM"
+                      value={editingExperience.startDate}
+                      onChange={(e) => setEditingExperience({ ...editingExperience, startDate: e.target.value })}
+                      className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">End Date</label>
+                    <input
+                      type="text"
+                      placeholder="YYYY-MM or empty"
+                      value={editingExperience.endDate || ''}
+                      onChange={(e) => setEditingExperience({ ...editingExperience, endDate: e.target.value || undefined })}
+                      className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Responsibilities (one per line)</label>
+                  <textarea
+                    rows={4}
+                    value={editingExperience.responsibilities.join('\n')}
+                    onChange={(e) => setEditingExperience({ ...editingExperience, responsibilities: e.target.value.split('\n').filter(r => r.trim()) })}
+                    className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg resize-none"
+                  />
+                </div>
+              </div>
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={() => setEditingExperience(null)}
+                  className="flex-1 px-4 py-2 bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300 rounded-lg hover:bg-zinc-300 dark:hover:bg-zinc-600"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => updateExperience(editingExperience)}
+                  className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+                >
+                  Save
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Edit Skill Modal */}
+        {editingSkill && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white dark:bg-zinc-800 rounded-xl p-6 max-w-sm w-full">
+              <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-4">Edit Skill</h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Name</label>
+                  <input
+                    type="text"
+                    value={editingSkill.name}
+                    onChange={(e) => setEditingSkill({ ...editingSkill, name: e.target.value })}
+                    className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Category</label>
+                  <select
+                    value={editingSkill.category}
+                    onChange={(e) => setEditingSkill({ ...editingSkill, category: e.target.value })}
+                    className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg"
+                  >
+                    <option value="frontend">Frontend</option>
+                    <option value="backend">Backend</option>
+                    <option value="devops">DevOps</option>
+                    <option value="tools">Tools</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Level (1-5)</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="range"
+                      min="1"
+                      max="5"
+                      value={editingSkill.level}
+                      onChange={(e) => setEditingSkill({ ...editingSkill, level: parseInt(e.target.value) })}
+                      className="flex-1"
+                    />
+                    <span className="text-sm font-medium w-20">{getLevelLabel(editingSkill.level)}</span>
+                  </div>
+                </div>
+              </div>
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={() => setEditingSkill(null)}
+                  className="flex-1 px-4 py-2 bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300 rounded-lg hover:bg-zinc-300 dark:hover:bg-zinc-600"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => updateSkill(editingSkill)}
+                  className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+                >
+                  Save
+                </button>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>
