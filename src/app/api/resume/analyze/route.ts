@@ -7,8 +7,9 @@ import path from 'path';
 // Dynamic import for pdf-parse
 async function parsePDF(buffer: Buffer): Promise<{ text: string }> {
   const { PDFParse } = await import('pdf-parse');
-  const parser = new PDFParse();
-  const result = await parser.parseBuffer(buffer);
+  const parser = new PDFParse({ verbosity: 0, data: buffer });
+  await parser.load();
+  const result = await parser.getText();
   return { text: result.text };
 }
 
