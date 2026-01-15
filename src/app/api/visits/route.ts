@@ -2,6 +2,32 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { v4 as uuidv4 } from 'uuid';
 
+// Anonymize IP address for GDPR/LGPD compliance
+// IPv4: 192.168.1.100 -> 192.168.1.0
+// IPv6: 2001:db8:85a3::8a2e:370:7334 -> 2001:db8:85a3::0
+function anonymizeIP(ip: string | undefined): string | undefined {
+  if (!ip) return undefined;
+
+  // Check if IPv6
+  if (ip.includes(':')) {
+    // Anonymize last 80 bits (keep first 48 bits / 3 groups)
+    const parts = ip.split(':');
+    if (parts.length >= 3) {
+      return parts.slice(0, 3).join(':') + '::0';
+    }
+    return ip.split(':').slice(0, -2).join(':') + '::0';
+  }
+
+  // IPv4: zero out last octet
+  const parts = ip.split('.');
+  if (parts.length === 4) {
+    parts[3] = '0';
+    return parts.join('.');
+  }
+
+  return undefined; // Invalid IP format
+}
+
 // Parse user agent to extract device, browser, and OS info
 function parseUserAgent(ua: string | null): { device: string; browser: string; os: string } {
   if (!ua) return { device: 'unknown', browser: 'unknown', os: 'unknown' };
@@ -65,10 +91,11 @@ export async function POST(request: NextRequest) {
     const userAgent = request.headers.get('user-agent') || undefined;
     const referrer = request.headers.get('referer') || undefined;
 
-    // Get IP address
+    // Get IP address and anonymize for privacy (GDPR/LGPD compliance)
     const forwardedFor = request.headers.get('x-forwarded-for');
     const realIp = request.headers.get('x-real-ip');
-    const ipAddress = forwardedFor?.split(',')[0]?.trim() || realIp || undefined;
+    const rawIp = forwardedFor?.split(',')[0]?.trim() || realIp || undefined;
+    const ipAddress = anonymizeIP(rawIp);
 
     // Parse user agent
     const { device, browser, os } = parseUserAgent(userAgent || null);

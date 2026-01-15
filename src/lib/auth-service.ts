@@ -6,6 +6,31 @@ import { sendVerificationCode, sendLoginAlert } from './email';
 const CODE_EXPIRY_MINUTES = 10;
 const SESSION_EXPIRY_HOURS = 24;
 
+// Anonymize IP address for GDPR/LGPD compliance
+// IPv4: 192.168.1.100 -> 192.168.1.0
+// IPv6: 2001:db8:85a3::8a2e:370:7334 -> 2001:db8:85a3::0
+function anonymizeIP(ip: string): string {
+  if (!ip || ip === 'unknown') return ip;
+
+  // Check if IPv6
+  if (ip.includes(':')) {
+    const parts = ip.split(':');
+    if (parts.length >= 3) {
+      return parts.slice(0, 3).join(':') + '::0';
+    }
+    return ip.split(':').slice(0, -2).join(':') + '::0';
+  }
+
+  // IPv4: zero out last octet
+  const parts = ip.split('.');
+  if (parts.length === 4) {
+    parts[3] = '0';
+    return parts.join('.');
+  }
+
+  return ip;
+}
+
 // Generate a 6-digit verification code
 function generateCode(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
@@ -92,7 +117,7 @@ export async function initiateLogin(
         data: {
           userId: user.id,
           token: sessionToken,
-          ipAddress: requestInfo.ipAddress,
+          ipAddress: anonymizeIP(requestInfo.ipAddress),
           userAgent: requestInfo.userAgent,
           expiresAt,
         },
@@ -205,7 +230,7 @@ export async function verifyCodeAndCreateSession(
       data: {
         userId,
         token: sessionToken,
-        ipAddress: requestInfo.ipAddress,
+        ipAddress: anonymizeIP(requestInfo.ipAddress),
         userAgent: requestInfo.userAgent,
         expiresAt,
       },
@@ -303,7 +328,7 @@ async function recordLoginAttempt(
     await prisma.loginHistory.create({
       data: {
         userId,
-        ipAddress: requestInfo.ipAddress,
+        ipAddress: anonymizeIP(requestInfo.ipAddress),
         userAgent: requestInfo.userAgent,
         success,
         failReason,
