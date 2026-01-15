@@ -10,5 +10,6 @@ declare module 'pdf-parse' {
 
   function pdf(dataBuffer: Buffer, options?: Record<string, unknown>): Promise<PDFData>;
 
+  export default pdf;
   export = pdf;
 }
