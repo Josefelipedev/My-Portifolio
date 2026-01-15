@@ -4,13 +4,12 @@ import { analyzeResumePDF, getCurrentAIProvider } from '@/lib/claude';
 import { promises as fs } from 'fs';
 import path from 'path';
 
-// Dynamic import for pdf-parse
-async function parsePDF(buffer: Buffer): Promise<{ text: string }> {
-  const { PDFParse } = await import('pdf-parse');
-  const parser = new PDFParse({ verbosity: 0, data: buffer });
-  await parser.load();
-  const result = await parser.getText();
-  return { text: result.text };
+// Extract text from PDF using unpdf
+async function extractTextFromPDF(buffer: Buffer): Promise<string> {
+  const { extractText } = await import('unpdf');
+  const result = await extractText(buffer);
+  // unpdf returns text as array of strings (one per page)
+  return Array.isArray(result.text) ? result.text.join('\n') : result.text;
 }
 
 export async function POST(request: Request) {
@@ -40,7 +39,7 @@ export async function POST(request: Request) {
       const arrayBuffer = await file.arrayBuffer();
       pdfBuffer = Buffer.from(arrayBuffer);
 
-      // Optionally save the uploaded file
+      // Save the uploaded file
       const savePath = path.join(process.cwd(), 'src', 'data', 'resume.pdf');
       await fs.writeFile(savePath, pdfBuffer);
     } else {
@@ -58,8 +57,7 @@ export async function POST(request: Request) {
     }
 
     // Extract text from PDF
-    const pdfData = await parsePDF(pdfBuffer);
-    const pdfText = pdfData.text;
+    const pdfText = await extractTextFromPDF(pdfBuffer);
 
     if (!pdfText || pdfText.trim().length < 50) {
       return NextResponse.json(
@@ -68,7 +66,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // Analyze with AI
+    // Analyze with Together AI
     const analysis = await analyzeResumePDF(pdfText);
     const provider = getCurrentAIProvider();
 
