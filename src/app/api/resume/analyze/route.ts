@@ -3,7 +3,13 @@ import { isAuthenticated } from '@/lib/auth';
 import { analyzeResumePDF, getCurrentAIProvider } from '@/lib/claude';
 import { promises as fs } from 'fs';
 import path from 'path';
-import pdf from 'pdf-parse';
+
+// Dynamic import for pdf-parse (CommonJS module)
+async function parsePDF(buffer: Buffer): Promise<{ text: string }> {
+  const pdfParse = await import('pdf-parse');
+  const pdf = pdfParse.default || pdfParse;
+  return pdf(buffer);
+}
 
 export async function POST(request: Request) {
   try {
@@ -50,7 +56,7 @@ export async function POST(request: Request) {
     }
 
     // Extract text from PDF
-    const pdfData = await pdf(pdfBuffer);
+    const pdfData = await parsePDF(pdfBuffer);
     const pdfText = pdfData.text;
 
     if (!pdfText || pdfText.trim().length < 50) {
