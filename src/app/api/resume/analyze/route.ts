@@ -4,11 +4,12 @@ import { analyzeResumePDF, getCurrentAIProvider } from '@/lib/claude';
 import { promises as fs } from 'fs';
 import path from 'path';
 
-// Dynamic import for pdf-parse (CommonJS module)
+// Dynamic import for pdf-parse
 async function parsePDF(buffer: Buffer): Promise<{ text: string }> {
-  const pdfParse = await import('pdf-parse');
-  const pdf = pdfParse.default || pdfParse;
-  return pdf(buffer);
+  const { PDFParse } = await import('pdf-parse');
+  const parser = new PDFParse();
+  const result = await parser.parseBuffer(buffer);
+  return { text: result.text };
 }
 
 export async function POST(request: Request) {
