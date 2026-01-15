@@ -248,7 +248,9 @@ interface LanguageContextType {
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
-  const [language, setLanguage] = useState<Language>('pt');
+  // Default to English
+  const [language, setLanguage] = useState<Language>('en');
+  const [isInitialized, setIsInitialized] = useState(false);
 
   useEffect(() => {
     // Check localStorage for saved preference
@@ -256,10 +258,14 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     if (saved && (saved === 'pt' || saved === 'en')) {
       setLanguage(saved);
     } else {
-      // Detect browser language
-      const browserLang = navigator.language.slice(0, 2);
-      setLanguage(browserLang === 'pt' ? 'pt' : 'en');
+      // Detect browser language - default to English if not Portuguese
+      const browserLang = navigator.language.slice(0, 2).toLowerCase();
+      const detectedLang = browserLang === 'pt' ? 'pt' : 'en';
+      setLanguage(detectedLang);
+      // Save the detected preference
+      localStorage.setItem('portfolio-language', detectedLang);
     }
+    setIsInitialized(true);
   }, []);
 
   const handleSetLanguage = (lang: Language) => {
