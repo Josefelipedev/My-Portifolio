@@ -1,15 +1,18 @@
 declare module 'pdf-parse' {
-  interface PDFParseResult {
+  interface PDFParseOptions {
+    verbosity?: number;
+    data?: Buffer;
+  }
+
+  interface PDFParseTextResult {
     text: string;
-    numpages?: number;
-    info?: Record<string, unknown>;
-    metadata?: Record<string, unknown>;
-    version?: string;
   }
 
   class PDFParse {
-    constructor(options?: Record<string, unknown>);
-    parseBuffer(buffer: Buffer): Promise<PDFParseResult>;
+    constructor(options?: PDFParseOptions);
+    load(): Promise<void>;
+    getText(): Promise<PDFParseTextResult>;
+    destroy(): Promise<void>;
   }
 
   export { PDFParse };
