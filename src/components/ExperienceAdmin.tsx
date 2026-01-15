@@ -7,6 +7,7 @@ import { Experience } from '@prisma/client';
 export default function ExperienceAdmin({ experiences: initialExperiences }: { experiences: Experience[] }) {
   const [experiences] = useState<Experience[]>(initialExperiences);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [editingExperience, setEditingExperience] = useState<Experience | null>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -18,31 +19,34 @@ export default function ExperienceAdmin({ experiences: initialExperiences }: { e
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsLoading(true);
 
-    const payload = { title, description, responsibilities, challenges, technologies };
+    try {
+      const payload = { title, description, responsibilities, challenges, technologies };
 
-    if (editingExperience) {
-      // Update existing experience
-      const res = await fetch(`/api/experiences/${editingExperience.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      if (res.ok) {
-        router.refresh();
-        closeModal();
+      if (editingExperience) {
+        const res = await fetch(`/api/experiences/${editingExperience.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (res.ok) {
+          router.refresh();
+          closeModal();
+        }
+      } else {
+        const res = await fetch('/api/experiences', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (res.ok) {
+          router.refresh();
+          closeModal();
+        }
       }
-    } else {
-      // Create new experience
-      const res = await fetch('/api/experiences', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      if (res.ok) {
-        router.refresh();
-        closeModal();
-      }
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -288,14 +292,22 @@ export default function ExperienceAdmin({ experiences: initialExperiences }: { e
                 <button
                   type="button"
                   onClick={closeModal}
-                  className="px-4 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded-lg transition-colors"
+                  disabled={isLoading}
+                  className="px-4 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded-lg transition-colors disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-purple-500 text-white text-sm font-medium rounded-lg hover:bg-purple-600 transition-colors"
+                  disabled={isLoading}
+                  className="px-4 py-2 bg-purple-500 text-white text-sm font-medium rounded-lg hover:bg-purple-600 transition-colors disabled:opacity-50 flex items-center gap-2"
                 >
+                  {isLoading && (
+                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                  )}
                   {editingExperience ? 'Save Changes' : 'Add Experience'}
                 </button>
               </div>

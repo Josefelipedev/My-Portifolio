@@ -14,7 +14,10 @@ export const viewport: Viewport = {
   themeColor: '#0f172a',
 };
 
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://josefelipe.dev';
+
 export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl),
   title: {
     default: 'Jose Felipe | Full Stack Developer',
     template: '%s | Jose Felipe',
@@ -34,6 +37,9 @@ export const metadata: Metadata = {
   ],
   authors: [{ name: 'Jose Felipe Almeida da Silva' }],
   creator: 'Jose Felipe Almeida da Silva',
+  alternates: {
+    canonical: '/',
+  },
   robots: {
     index: true,
     follow: true,
@@ -52,6 +58,7 @@ export const metadata: Metadata = {
     type: 'website',
     locale: 'pt_BR',
     siteName: 'Jose Felipe Portfolio',
+    url: siteUrl,
   },
   twitter: {
     card: 'summary_large_image',

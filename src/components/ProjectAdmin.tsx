@@ -22,6 +22,8 @@ interface Project {
 export default function ProjectAdmin({ projects: initialProjects }: { projects: Project[] }) {
   const [projects] = useState<Project[]>(initialProjects);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [readme, setReadme] = useState('');
@@ -34,23 +36,66 @@ export default function ProjectAdmin({ projects: initialProjects }: { projects: 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const res = await fetch('/api/projects', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    setIsLoading(true);
+
+    try {
+      const payload = {
         title,
         description,
         readme: readme || null,
         technologies,
         repoUrl,
-        demoUrl
-      }),
-    });
-    if (res.ok) {
-      router.refresh();
-      resetForm();
-      setIsModalOpen(false);
+        demoUrl: demoUrl || null
+      };
+
+      if (editingProject) {
+        const res = await fetch(`/api/projects/${editingProject.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (res.ok) {
+          router.refresh();
+          closeModal();
+        }
+      } else {
+        const res = await fetch('/api/projects', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (res.ok) {
+          router.refresh();
+          closeModal();
+        }
+      }
+    } finally {
+      setIsLoading(false);
     }
+  };
+
+  const openEditModal = (project: Project) => {
+    setEditingProject(project);
+    setTitle(project.title);
+    setDescription(project.description);
+    setReadme(project.readme || '');
+    setTechnologies(project.technologies);
+    setRepoUrl(project.repoUrl);
+    setDemoUrl(project.demoUrl || '');
+    setShowReadme(!!project.readme);
+    setIsModalOpen(true);
+  };
+
+  const openAddModal = () => {
+    setEditingProject(null);
+    resetForm();
+    setIsModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setEditingProject(null);
+    resetForm();
   };
 
   const resetForm = () => {
@@ -90,7 +135,7 @@ export default function ProjectAdmin({ projects: initialProjects }: { projects: 
           Projects ({projects.length})
         </h2>
         <button
-          onClick={() => setIsModalOpen(true)}
+          onClick={openAddModal}
           className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white text-sm font-medium rounded-lg hover:bg-blue-600 transition-colors"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -172,6 +217,15 @@ export default function ProjectAdmin({ projects: initialProjects }: { projects: 
                       </svg>
                     </button>
                     <button
+                      onClick={() => openEditModal(project)}
+                      className="p-1.5 text-zinc-400 hover:text-blue-500 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded transition-colors"
+                      title="Edit project"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                    </button>
+                    <button
                       onClick={() => handleDelete(project.id)}
                       className="p-1.5 text-zinc-400 hover:text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition-colors"
                       title="Delete project"
@@ -221,16 +275,18 @@ export default function ProjectAdmin({ projects: initialProjects }: { projects: 
 
       {/* Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => setIsModalOpen(false)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={closeModal}>
           <div
             className="bg-white dark:bg-zinc-800 rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
             <div className="flex items-center justify-between p-4 border-b border-zinc-200 dark:border-zinc-700">
-              <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Add New Project</h3>
+              <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+                {editingProject ? 'Edit Project' : 'Add New Project'}
+              </h3>
               <button
-                onClick={() => setIsModalOpen(false)}
+                onClick={closeModal}
                 className="p-1 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded-lg transition-colors"
               >
                 <svg className="w-5 h-5 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -332,16 +388,24 @@ export default function ProjectAdmin({ projects: initialProjects }: { projects: 
               <div className="flex justify-end gap-3 pt-2">
                 <button
                   type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded-lg transition-colors"
+                  onClick={closeModal}
+                  disabled={isLoading}
+                  className="px-4 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded-lg transition-colors disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-blue-500 text-white text-sm font-medium rounded-lg hover:bg-blue-600 transition-colors"
+                  disabled={isLoading}
+                  className="px-4 py-2 bg-blue-500 text-white text-sm font-medium rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 flex items-center gap-2"
                 >
-                  Add Project
+                  {isLoading && (
+                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                  )}
+                  {editingProject ? 'Save Changes' : 'Add Project'}
                 </button>
               </div>
             </form>

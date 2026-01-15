@@ -1,0 +1,12 @@
+# robots.txt for Jose Felipe Portfolio
+
+User-agent: *
+Allow: /
+
+# Disallow admin pages
+Disallow: /admin
+Disallow: /admin/*
+Disallow: /api/*
+
+# Sitemap
+Sitemap: https://josefelipe.dev/sitemap.xml

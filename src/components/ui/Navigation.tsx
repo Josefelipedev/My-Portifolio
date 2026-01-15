@@ -1,8 +1,34 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useLanguage } from '@/lib/i18n';
 import { LanguageSwitcher } from './LanguageSwitcher';
+
+// Throttle function to limit scroll event frequency
+function useThrottle<T extends (...args: unknown[]) => void>(fn: T, delay: number) {
+  const lastCall = useRef(0);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  return useCallback((...args: Parameters<T>) => {
+    const now = Date.now();
+    const remaining = delay - (now - lastCall.current);
+
+    if (remaining <= 0) {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+      lastCall.current = now;
+      fn(...args);
+    } else if (!timeoutRef.current) {
+      timeoutRef.current = setTimeout(() => {
+        lastCall.current = Date.now();
+        timeoutRef.current = null;
+        fn(...args);
+      }, remaining);
+    }
+  }, [fn, delay]);
+}
 
 export function Navigation() {
   const { t } = useLanguage();
@@ -20,27 +46,29 @@ export function Navigation() {
     { label: t.nav.contact, href: '#contact' },
   ];
 
-  useEffect(() => {
-    const handleScroll = () => {
-      setIsScrolled(window.scrollY > 50);
+  const updateActiveSection = useCallback(() => {
+    setIsScrolled(window.scrollY > 50);
 
-      // Find active section
-      const sections = navItems.map((item) => item.href.slice(1));
-      for (const section of [...sections].reverse()) {
-        const element = document.getElementById(section);
-        if (element) {
-          const rect = element.getBoundingClientRect();
-          if (rect.top <= 100) {
-            setActiveSection(section);
-            break;
-          }
+    // Find active section
+    const sections = ['hero', 'about', 'github', 'skills', 'projects', 'experience', 'contact'];
+    for (const section of [...sections].reverse()) {
+      const element = document.getElementById(section);
+      if (element) {
+        const rect = element.getBoundingClientRect();
+        if (rect.top <= 100) {
+          setActiveSection(section);
+          break;
         }
       }
-    };
+    }
+  }, []);
 
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, [navItems]);
+  const throttledScroll = useThrottle(updateActiveSection, 100);
+
+  useEffect(() => {
+    window.addEventListener('scroll', throttledScroll);
+    return () => window.removeEventListener('scroll', throttledScroll);
+  }, [throttledScroll]);
 
   // Close mobile menu when clicking outside
   useEffect(() => {
