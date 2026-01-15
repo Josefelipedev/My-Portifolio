@@ -7,7 +7,9 @@ import path from 'path';
 // Extract text from PDF using unpdf
 async function extractTextFromPDF(buffer: Buffer): Promise<string> {
   const { extractText } = await import('unpdf');
-  const result = await extractText(buffer);
+  // unpdf expects Uint8Array, not Buffer
+  const uint8Array = new Uint8Array(buffer);
+  const result = await extractText(uint8Array);
   // unpdf returns text as array of strings (one per page)
   return Array.isArray(result.text) ? result.text.join('\n') : result.text;
 }
