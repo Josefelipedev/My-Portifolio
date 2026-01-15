@@ -7,6 +7,7 @@ import { Experience } from '@prisma/client';
 export default function ExperienceAdmin({ experiences: initialExperiences }: { experiences: Experience[] }) {
   const [experiences] = useState<Experience[]>(initialExperiences);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingExperience, setEditingExperience] = useState<Experience | null>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [responsibilities, setResponsibilities] = useState('');
@@ -17,16 +18,54 @@ export default function ExperienceAdmin({ experiences: initialExperiences }: { e
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const res = await fetch('/api/experiences', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title, description, responsibilities, challenges, technologies }),
-    });
-    if (res.ok) {
-      router.refresh();
-      resetForm();
-      setIsModalOpen(false);
+
+    const payload = { title, description, responsibilities, challenges, technologies };
+
+    if (editingExperience) {
+      // Update existing experience
+      const res = await fetch(`/api/experiences/${editingExperience.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (res.ok) {
+        router.refresh();
+        closeModal();
+      }
+    } else {
+      // Create new experience
+      const res = await fetch('/api/experiences', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (res.ok) {
+        router.refresh();
+        closeModal();
+      }
     }
+  };
+
+  const openEditModal = (experience: Experience) => {
+    setEditingExperience(experience);
+    setTitle(experience.title);
+    setDescription(experience.description);
+    setResponsibilities(experience.responsibilities || '');
+    setChallenges(experience.challenges || '');
+    setTechnologies(experience.technologies);
+    setIsModalOpen(true);
+  };
+
+  const openAddModal = () => {
+    setEditingExperience(null);
+    resetForm();
+    setIsModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setEditingExperience(null);
+    resetForm();
   };
 
   const resetForm = () => {
@@ -53,7 +92,7 @@ export default function ExperienceAdmin({ experiences: initialExperiences }: { e
           Experiences ({experiences.length})
         </h2>
         <button
-          onClick={() => setIsModalOpen(true)}
+          onClick={openAddModal}
           className="flex items-center gap-2 px-4 py-2 bg-purple-500 text-white text-sm font-medium rounded-lg hover:bg-purple-600 transition-colors"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -102,6 +141,15 @@ export default function ExperienceAdmin({ experiences: initialExperiences }: { e
 
                   {/* Actions */}
                   <div className="flex items-center gap-1 ml-2">
+                    <button
+                      onClick={() => openEditModal(experience)}
+                      className="p-1.5 text-zinc-400 hover:text-blue-500 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded transition-colors"
+                      title="Edit experience"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                    </button>
                     <button
                       onClick={() => handleDelete(experience.id)}
                       className="p-1.5 text-zinc-400 hover:text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition-colors"
@@ -152,16 +200,18 @@ export default function ExperienceAdmin({ experiences: initialExperiences }: { e
 
       {/* Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => setIsModalOpen(false)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={closeModal}>
           <div
             className="bg-white dark:bg-zinc-800 rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
             <div className="flex items-center justify-between p-4 border-b border-zinc-200 dark:border-zinc-700">
-              <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Add New Experience</h3>
+              <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+                {editingExperience ? 'Edit Experience' : 'Add New Experience'}
+              </h3>
               <button
-                onClick={() => setIsModalOpen(false)}
+                onClick={closeModal}
                 className="p-1 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded-lg transition-colors"
               >
                 <svg className="w-5 h-5 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -237,7 +287,7 @@ export default function ExperienceAdmin({ experiences: initialExperiences }: { e
               <div className="flex justify-end gap-3 pt-2">
                 <button
                   type="button"
-                  onClick={() => setIsModalOpen(false)}
+                  onClick={closeModal}
                   className="px-4 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded-lg transition-colors"
                 >
                   Cancel
@@ -246,7 +296,7 @@ export default function ExperienceAdmin({ experiences: initialExperiences }: { e
                   type="submit"
                   className="px-4 py-2 bg-purple-500 text-white text-sm font-medium rounded-lg hover:bg-purple-600 transition-colors"
                 >
-                  Add Experience
+                  {editingExperience ? 'Save Changes' : 'Add Experience'}
                 </button>
               </div>
             </form>
