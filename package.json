@@ -20,7 +20,6 @@
     "@anthropic-ai/sdk": "^0.71.2",
     "@marsidev/react-turnstile": "^1.4.1",
     "@prisma/adapter-pg": "^7.2.0",
-    "@prisma/client": "^7.2.0",
     "@tailwindcss/postcss": "^4.1.18",
     "bcryptjs": "^3.0.3",
     "dotenv": "^17.2.3",
@@ -37,6 +36,7 @@
     "uuid": "^13.0.0"
   },
   "devDependencies": {
+    "@prisma/client": "^7.2.0",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.2.0",
     "@types/bcryptjs": "^2.4.6",
@@ -52,7 +52,7 @@
     "eslint-config-next": "^16.1.1",
     "jsdom": "^26.1.0",
     "postcss": "^8.5.6",
-    "prisma": "^6.19.2",
+    "prisma": "^7.2.0",
     "tailwindcss": "^4.1.18",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
