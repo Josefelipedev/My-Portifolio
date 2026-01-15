@@ -26,6 +26,7 @@ interface LoginStep1Result {
   error?: string;
   requiresVerification?: boolean;
   userId?: string;
+  token?: string; // Token returned directly in dev mode (no verification needed)
 }
 
 interface LoginStep2Result {
@@ -39,7 +40,13 @@ interface RequestInfo {
   userAgent: string;
 }
 
+// Check if running in development mode (localhost)
+function isDevMode(): boolean {
+  return process.env.NODE_ENV === 'development';
+}
+
 // Step 1: Validate email and password, send verification code
+// In development mode, skip verification and return token directly
 export async function initiateLogin(
   email: string,
   password: string,
@@ -69,6 +76,51 @@ export async function initiateLogin(
       return { success: false, error: 'Email ou senha inválidos' };
     }
 
+    // In development mode, skip email verification and create session directly
+    if (isDevMode()) {
+      // Invalidate ALL existing sessions for this user
+      await prisma.session.updateMany({
+        where: { userId: user.id, isValid: true },
+        data: { isValid: false },
+      });
+
+      // Create new session
+      const sessionToken = generateSessionToken();
+      const expiresAt = new Date(Date.now() + SESSION_EXPIRY_HOURS * 60 * 60 * 1000);
+
+      await prisma.session.create({
+        data: {
+          userId: user.id,
+          token: sessionToken,
+          ipAddress: requestInfo.ipAddress,
+          userAgent: requestInfo.userAgent,
+          expiresAt,
+        },
+      });
+
+      // Create JWT for cookie
+      const secret = new TextEncoder().encode(process.env.JWT_SECRET);
+      const jwt = await new SignJWT({
+        userId: user.id,
+        sessionToken,
+      })
+        .setProtectedHeader({ alg: 'HS256' })
+        .setExpirationTime(`${SESSION_EXPIRY_HOURS}h`)
+        .setIssuedAt()
+        .sign(secret);
+
+      // Record successful login
+      await recordLoginAttempt(user.id, requestInfo, true);
+
+      return {
+        success: true,
+        requiresVerification: false,
+        userId: user.id,
+        token: jwt,
+      };
+    }
+
+    // Production mode: require email verification
     // Invalidate any existing verification codes
     await prisma.verificationCode.updateMany({
       where: {
