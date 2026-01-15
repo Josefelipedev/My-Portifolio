@@ -8,6 +8,7 @@ interface Project {
   id: string;
   title: string;
   description: string;
+  readme: string | null;
   technologies: string;
   repoUrl: string;
   demoUrl: string | null;
@@ -22,9 +23,11 @@ export default function ProjectAdmin({ projects: initialProjects }: { projects: 
   const [projects, setProjects] = useState<Project[]>(initialProjects);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [readme, setReadme] = useState('');
   const [technologies, setTechnologies] = useState('');
   const [repoUrl, setRepoUrl] = useState('');
   const [demoUrl, setDemoUrl] = useState('');
+  const [showReadme, setShowReadme] = useState(false);
   const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -32,15 +35,24 @@ export default function ProjectAdmin({ projects: initialProjects }: { projects: 
     const res = await fetch('/api/projects', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title, description, technologies, repoUrl, demoUrl }),
+      body: JSON.stringify({
+        title,
+        description,
+        readme: readme || null,
+        technologies,
+        repoUrl,
+        demoUrl
+      }),
     });
     if (res.ok) {
       router.refresh();
       setTitle('');
       setDescription('');
+      setReadme('');
       setTechnologies('');
       setRepoUrl('');
       setDemoUrl('');
+      setShowReadme(false);
     }
   };
 
@@ -111,6 +123,36 @@ export default function ProjectAdmin({ projects: initialProjects }: { projects: 
           rows={3}
           required
         />
+
+        {/* README Toggle */}
+        <div className="mt-4">
+          <button
+            type="button"
+            onClick={() => setShowReadme(!showReadme)}
+            className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors"
+          >
+            <svg
+              className={`w-4 h-4 transition-transform ${showReadme ? 'rotate-90' : ''}`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+            {showReadme ? 'Hide README' : 'Add README (optional)'}
+          </button>
+
+          {showReadme && (
+            <textarea
+              placeholder="Paste your README content here (Markdown supported)"
+              value={readme}
+              onChange={(e) => setReadme(e.target.value)}
+              className="w-full p-3 mt-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none resize-none font-mono text-sm"
+              rows={10}
+            />
+          )}
+        </div>
+
         <button
           type="submit"
           className="mt-4 px-6 py-2 bg-blue-500 text-white font-medium rounded-lg hover:bg-blue-600 transition-colors"
@@ -141,6 +183,11 @@ export default function ProjectAdmin({ projects: initialProjects }: { projects: 
                     {project.featured && (
                       <span className="px-2 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 text-xs rounded-full">
                         Featured
+                      </span>
+                    )}
+                    {project.readme && (
+                      <span className="px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 text-xs rounded-full">
+                        README
                       </span>
                     )}
                     {project.stars !== null && project.stars > 0 && (
