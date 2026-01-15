@@ -1,8 +1,8 @@
 'use client';
 
+import Image from 'next/image';
 import Card3D from '../ui/Card3D';
 import ScrollReveal from '../ui/ScrollReveal';
-import { SkillBadge } from '../ui/SkillBadge';
 
 interface Project {
   id: string;
@@ -43,14 +43,17 @@ export default function ProjectCard({ project, index }: ProjectCardProps) {
           {/* Project image or gradient placeholder */}
           <div className="relative h-48 bg-gradient-to-br from-blue-500/10 via-purple-500/10 to-pink-500/10 flex items-center justify-center overflow-hidden">
             {project.imageUrl ? (
-              <img
+              <Image
                 src={project.imageUrl}
-                alt={project.title}
-                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                alt={`${project.title} project thumbnail`}
+                fill
+                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                className="object-cover group-hover:scale-110 transition-transform duration-500"
+                loading="lazy"
               />
             ) : (
               <div className="relative">
-                <div className="text-8xl font-bold text-blue-500/20 group-hover:scale-110 transition-transform duration-500">
+                <div className="text-8xl font-bold text-blue-500/20 group-hover:scale-110 transition-transform duration-500" aria-hidden="true">
                   {project.title.charAt(0)}
                 </div>
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-800/80 to-transparent" />
@@ -116,9 +119,10 @@ export default function ProjectCard({ project, index }: ProjectCardProps) {
                 href={project.repoUrl}
                 target="_blank"
                 rel="noopener noreferrer"
+                aria-label={`View ${project.title} source code on GitHub`}
                 className="flex items-center gap-2 px-4 py-2 bg-slate-700/50 text-zinc-300 rounded-xl hover:bg-slate-600/50 transition-all duration-300 text-sm font-medium border border-slate-600/50 hover:border-slate-500/50"
               >
-                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                   <path fillRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" clipRule="evenodd" />
                 </svg>
                 Code
@@ -128,9 +132,10 @@ export default function ProjectCard({ project, index }: ProjectCardProps) {
                   href={project.demoUrl}
                   target="_blank"
                   rel="noopener noreferrer"
+                  aria-label={`View ${project.title} live demo`}
                   className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-xl hover:shadow-lg hover:shadow-blue-500/25 transition-all duration-300 text-sm font-medium"
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                   </svg>
                   Demo
