@@ -108,8 +108,8 @@ function ContributionHeatmap({ contributions, language }: { contributions: Contr
   const moreText = language === 'pt' ? 'Mais' : 'More';
 
   return (
-    <div className="overflow-x-auto">
-      <div className="flex gap-[3px] min-w-max">
+    <div className="overflow-x-auto max-w-full">
+      <div className="flex gap-[3px]" style={{ minWidth: 'fit-content' }}>
         {weeks.map((week, weekIndex) => (
           <div key={weekIndex} className="flex flex-col gap-[3px]">
             {week.map((day, dayIndex) => (
@@ -122,7 +122,7 @@ function ContributionHeatmap({ contributions, language }: { contributions: Contr
           </div>
         ))}
       </div>
-      <div className="flex justify-between mt-2 text-xs text-slate-500">
+      <div className="hidden sm:flex justify-between mt-2 text-xs text-slate-500 min-w-max">
         {months.map(month => (
           <span key={month}>{month}</span>
         ))}
@@ -210,7 +210,7 @@ export function GitHubStatsClient({ stats }: Props) {
   const { t, language } = useLanguage();
 
   return (
-    <section id="github" className="py-20 px-4">
+    <section id="github" className="py-20 px-4 overflow-hidden">
       <div className="max-w-6xl mx-auto">
         {/* Section Header */}
         <div className="text-center mb-12">
@@ -238,10 +238,16 @@ export function GitHubStatsClient({ stats }: Props) {
           if (statItems.length === 0) return null;
 
           // Dynamic grid columns based on number of items
-          const gridCols = statItems.length <= 2 ? 'grid-cols-2' :
-                           statItems.length <= 3 ? 'grid-cols-2 md:grid-cols-3' :
-                           statItems.length <= 4 ? 'grid-cols-2 md:grid-cols-4' :
-                           'grid-cols-2 md:grid-cols-3 lg:grid-cols-' + Math.min(statItems.length, 6);
+          // Using complete class names for Tailwind static analysis
+          const gridColsMap: Record<number, string> = {
+            1: 'grid-cols-1',
+            2: 'grid-cols-2',
+            3: 'grid-cols-2 md:grid-cols-3',
+            4: 'grid-cols-2 md:grid-cols-4',
+            5: 'grid-cols-2 md:grid-cols-3 lg:grid-cols-5',
+            6: 'grid-cols-2 md:grid-cols-3 lg:grid-cols-6',
+          };
+          const gridCols = gridColsMap[Math.min(statItems.length, 6)] || 'grid-cols-2 md:grid-cols-3';
 
           return (
             <div className={`grid ${gridCols} gap-4 mb-8`}>
@@ -263,7 +269,7 @@ export function GitHubStatsClient({ stats }: Props) {
           <div className={`grid ${stats.languages.length > 0 && stats.contributions.length > 0 ? 'md:grid-cols-2' : 'md:grid-cols-1'} gap-8`}>
             {/* Languages */}
             {stats.languages.length > 0 && (
-              <div className="bg-slate-800/30 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-6">
+              <div className="bg-slate-800/30 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-6 overflow-hidden">
                 <h3 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
                   <CodeIcon />
                   {t.github.topLanguages}
@@ -274,7 +280,7 @@ export function GitHubStatsClient({ stats }: Props) {
 
             {/* Contribution Heatmap */}
             {stats.contributions.length > 0 && (
-              <div className="bg-slate-800/30 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-6">
+              <div className="bg-slate-800/30 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-6 overflow-hidden">
                 <h3 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
                   <CalendarIcon />
                   {t.github.contributions}
