@@ -1,64 +1,167 @@
 # My Portfolio
 
-This is a portfolio web application built with Next.js, TypeScript, Tailwind CSS, and Prisma. It allows for dynamic management of projects and professional experiences through a password-protected admin panel.
+Portfolio pessoal moderno com Next.js, gestão dinâmica de conteúdo e painel administrativo.
+
+## Sobre o Projeto
+
+Um site de portfolio full-stack que permite showcase de projetos e experiências profissionais através de uma interface limpa e moderna, com painel de administração para gerenciamento de conteúdo.
 
 ## Features
 
-- **Single-page portfolio:** A clean and modern single-page layout.
-- **Dynamic Content:** Projects and experiences are fetched from a database.
-- **Admin Panel:** A protected admin page at `/admin` to manage content.
-- **Authentication:** Simple password-based authentication for the admin panel.
+- **Single-page portfolio** - Layout moderno e responsivo
+- **Conteúdo dinâmico** - Projetos e experiências do banco de dados
+- **Painel Admin** - Interface protegida para gerenciar conteúdo
+- **Integração GitHub** - Sync automático de repositórios
+- **Analytics** - Tracking de visitas e interações
+- **AI Features** - Resumo de projetos com Claude
 
-## Getting Started
+## Tech Stack
 
-### Prerequisites
+| Categoria | Tecnologia |
+|-----------|------------|
+| Framework | Next.js 16 (React 19) |
+| Linguagem | TypeScript |
+| Styling | Tailwind CSS 4 |
+| Banco de Dados | PostgreSQL |
+| ORM | Prisma |
+| Auth | JWT |
+| AI | Anthropic Claude SDK |
+| Email | Nodemailer |
+| Testes | Vitest + React Testing Library |
 
-- Node.js (v18 or later)
-- npm
+## Estrutura
 
-### Installation
+```
+myportfolio/
+├── src/
+│   ├── app/
+│   │   ├── page.tsx           # Homepage (portfolio)
+│   │   ├── admin/             # Painel administrativo
+│   │   └── api/               # API routes
+│   ├── components/            # React components
+│   └── lib/                   # Utils e helpers
+├── prisma/
+│   └── schema.prisma          # Database schema
+├── scripts/                   # Scripts utilitários
+├── public/                    # Assets estáticos
+└── package.json
+```
 
-1.  Clone the repository:
-    ```bash
-    git clone <repository-url>
-    cd myportfolio
-    ```
-2.  Install dependencies:
-    ```bash
-    npm install
-    ```
-3.  Set up the database:
-    ```bash
-    npx prisma migrate dev
-    ```
-4.  Set up your admin password:
-    - Open the `.env` file and set a new password hash for the `PASSWORD_HASH` variable.
-    - You can generate a new hash by running the following command:
-      ```bash
-      node scripts/hash-password.mjs YOUR_NEW_PASSWORD
-      ```
-    - Replace `YOUR_NEW_PASSWORD` with your desired password.
-    - You should also change the `JWT_SECRET` to a long, random string.
+## Modelos de Dados
 
-5.  Run the development server:
-    ```bash
-    npm run dev
-    ```
+### Projects
+Projetos do portfolio com integração GitHub.
 
-The application will be available at [http://localhost:3000](http://localhost:3000). The admin panel is at [http://localhost:3000/admin](http://localhost:3000/admin).
+### Experiences
+Histórico profissional (timeline).
 
-## Managing Content
+### Skills
+Habilidades categorizadas (frontend, backend, devops, tools).
 
-1.  Navigate to `/admin` and log in with the password you set.
-2.  You will see forms to add, edit, and delete projects and experiences.
-3.  Fill out the forms and submit to add new content to your portfolio.
+### Contact Messages
+Mensagens recebidas pelo formulário de contato.
 
-## Extending the Project
+### Analytics
+Page views, estatísticas de visitantes, geolocalização.
 
-The project is structured to be easily extensible. You can add new sections to the main page or new models to the database by following these steps:
+## Instalação
 
-1.  Define a new model in `prisma/schema.prisma`.
-2.  Run `npx prisma migrate dev` to update the database.
-3.  Create new API routes in `src/app/api` to manage the new data.
-4.  Create new components in `src/components` to display the new data.
-5.  Add the new components to the main page or create new pages.
+```bash
+# 1. Instalar dependências
+npm install
+
+# 2. Configurar banco de dados
+npx prisma migrate dev
+
+# 3. Configurar senha do admin
+node scripts/hash-password.mjs SUA_SENHA
+
+# 4. Configurar variáveis de ambiente
+cp .env.example .env
+# Editar .env com PASSWORD_HASH e JWT_SECRET
+
+# 5. Iniciar desenvolvimento
+npm run dev
+```
+
+## Variáveis de Ambiente
+
+```env
+# Database
+DATABASE_URL=postgresql://myportfolio_user:myportfolio_pass123@localhost:5432/myportfolio
+
+# Auth
+PASSWORD_HASH=hash-gerado-pelo-script
+JWT_SECRET=sua-chave-secreta-longa
+
+# Email (opcional)
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=seu@email.com
+SMTP_PASS=app-password
+
+# AI (opcional)
+ANTHROPIC_API_KEY=sk-ant-xxx
+```
+
+## Uso
+
+### Acessar Portfolio
+```
+http://localhost:3000
+```
+
+### Acessar Admin
+```
+http://localhost:3000/admin
+```
+
+Use a senha configurada no `.env` para fazer login.
+
+### Gerenciar Conteúdo
+
+No painel admin você pode:
+- Adicionar/editar/remover projetos
+- Gerenciar experiências profissionais
+- Categorizar skills
+- Ver mensagens de contato
+- Configurar informações do site
+- Ver analytics
+
+## Comandos
+
+```bash
+# Desenvolvimento
+npm run dev
+
+# Build
+npm run build
+
+# Produção
+npm start
+
+# Testes
+npm test
+
+# Prisma
+npx prisma studio     # Interface visual do banco
+npx prisma migrate dev # Criar migration
+npx prisma db push    # Push schema
+```
+
+## Scripts Úteis
+
+```bash
+# Gerar hash de senha
+node scripts/hash-password.mjs NOVA_SENHA
+
+# Sync com GitHub
+node scripts/sync-github.mjs
+
+# Sync skills do currículo
+node scripts/sync-resume.mjs
+```
+
+## Licença
+
+MIT
