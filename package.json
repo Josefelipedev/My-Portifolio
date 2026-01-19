@@ -9,9 +9,9 @@
     "hono": "^4.11.4"
   },
   "scripts": {
-    "dev": "next dev -p 3010",
+    "dev": "next dev",
     "build": "next build",
-    "start": "next start -p 3010",
+    "start": "next start",
     "lint": "next lint",
     "test": "vitest",
     "test:run": "vitest run",
