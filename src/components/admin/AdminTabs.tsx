@@ -11,7 +11,7 @@ interface Project {
   description: string;
   readme: string | null;
   technologies: string;
-  repoUrl: string;
+  repoUrl: string | null;
   demoUrl: string | null;
   githubId: number | null;
   source: string;
