@@ -17,7 +17,14 @@
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit",
-    "sync:resume": "npx tsx scripts/sync-resume-skills.ts"
+    "sync:resume": "npx tsx scripts/sync-resume-skills.ts",
+    "db:generate": "prisma generate",
+    "db:push": "prisma db push",
+    "db:migrate": "prisma migrate dev",
+    "db:migrate:deploy": "prisma migrate deploy",
+    "db:studio": "prisma studio",
+    "db:seed": "prisma db seed",
+    "db:reset": "prisma migrate reset"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",
