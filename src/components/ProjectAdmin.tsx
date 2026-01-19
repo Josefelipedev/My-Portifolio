@@ -29,7 +29,7 @@ interface AIAnalysisResult {
 }
 
 export default function ProjectAdmin({ projects: initialProjects }: { projects: Project[] }) {
-  const [projects] = useState<Project[]>(initialProjects);
+  const [projects, setProjects] = useState<Project[]>(initialProjects);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -174,32 +174,62 @@ export default function ProjectAdmin({ projects: initialProjects }: { projects: 
 
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this project?')) return;
+
+    // Optimistic update
+    setProjects(prev => prev.filter(p => p.id !== id));
+
     const res = await fetch(`/api/projects/${id}`, { method: 'DELETE' });
-    if (res.ok) {
-      router.refresh();
+    if (!res.ok) {
+      // Revert on error
+      setProjects(initialProjects);
     }
+    router.refresh();
   };
 
   const handleToggleFeatured = async (project: Project) => {
+    const newFeatured = !project.featured;
+
+    // Optimistic update
+    setProjects(prev => prev.map(p =>
+      p.id === project.id ? { ...p, featured: newFeatured } : p
+    ));
+
     const res = await fetch(`/api/projects/${project.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ featured: !project.featured }),
+      body: JSON.stringify({ featured: newFeatured }),
     });
-    if (res.ok) {
-      router.refresh();
+    if (!res.ok) {
+      // Revert on error
+      setProjects(initialProjects);
     }
+    router.refresh();
   };
 
   const handleSetRank = async (project: Project, newRank: number | null) => {
+    // Optimistic update - update UI immediately
+    setProjects(prev => prev.map(p => {
+      // Remove rank from project that had this rank before
+      if (newRank && p.rank === newRank && p.id !== project.id) {
+        return { ...p, rank: null };
+      }
+      // Update the target project
+      if (p.id === project.id) {
+        return { ...p, rank: newRank, featured: newRank ? true : p.featured };
+      }
+      return p;
+    }));
+
     const res = await fetch(`/api/projects/${project.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ rank: newRank }),
     });
-    if (res.ok) {
-      router.refresh();
+    if (!res.ok) {
+      // Revert on error
+      setProjects(initialProjects);
     }
+    router.refresh();
   };
 
   const getRankBadge = (r: number | null) => {
