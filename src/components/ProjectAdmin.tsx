@@ -57,7 +57,7 @@ export default function ProjectAdmin({ projects: initialProjects }: { projects: 
         description,
         readme: readme || null,
         technologies,
-        repoUrl,
+        repoUrl: repoUrl.trim() || null,
         demoUrl: demoUrl || null,
         isPrivate,
         rank: rank || null,
