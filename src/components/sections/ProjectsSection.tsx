@@ -8,7 +8,7 @@ interface Project {
   title: string;
   description: string;
   technologies: string;
-  repoUrl: string;
+  repoUrl: string | null;
   demoUrl: string | null;
   imageUrl: string | null;
   stars: number | null;

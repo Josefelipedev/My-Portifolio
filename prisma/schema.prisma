@@ -15,7 +15,7 @@ model Project {
   description  String    @db.Text
   readme       String?   @db.Text // Full README content in markdown
   technologies String    // Comma-separated list of technologies
-  repoUrl      String
+  repoUrl      String?   // Optional for private repos
   demoUrl      String?
 
   // GitHub integration fields

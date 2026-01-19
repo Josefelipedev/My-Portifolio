@@ -10,7 +10,7 @@ interface Project {
   description: string;
   readme: string | null;
   technologies: string;
-  repoUrl: string;
+  repoUrl: string | null;
   demoUrl: string | null;
   githubId: number | null;
   source: string;
@@ -138,7 +138,7 @@ export default function ProjectAdmin({ projects: initialProjects }: { projects: 
     setDescription(project.description);
     setReadme(project.readme || '');
     setTechnologies(project.technologies);
-    setRepoUrl(project.repoUrl);
+    setRepoUrl(project.repoUrl || '');
     setDemoUrl(project.demoUrl || '');
     setShowReadme(!!project.readme);
     setIsPrivate(project.isPrivate);
@@ -387,9 +387,11 @@ export default function ProjectAdmin({ projects: initialProjects }: { projects: 
                         ))}
                       </div>
                       <div className="flex items-center gap-4 text-xs text-zinc-500">
-                        <a href={project.repoUrl} target="_blank" rel="noopener noreferrer" className="hover:text-blue-500">
-                          Repository →
-                        </a>
+                        {project.repoUrl && (
+                          <a href={project.repoUrl} target="_blank" rel="noopener noreferrer" className="hover:text-blue-500">
+                            Repository →
+                          </a>
+                        )}
                         {project.demoUrl && (
                           <a href={project.demoUrl} target="_blank" rel="noopener noreferrer" className="hover:text-blue-500">
                             Demo →
@@ -465,14 +467,16 @@ export default function ProjectAdmin({ projects: initialProjects }: { projects: 
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Repository URL *</label>
+                  <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                    Repository URL {!isPrivate && '*'}
+                  </label>
                   <input
                     type="text"
-                    placeholder="https://github.com/..."
+                    placeholder={isPrivate ? "Optional for private repos" : "https://github.com/..."}
                     value={repoUrl}
                     onChange={(e) => setRepoUrl(e.target.value)}
                     className="w-full p-2.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
-                    required
+                    required={!isPrivate}
                   />
                 </div>
                 <div>
