@@ -42,8 +42,8 @@ export async function POST(request: Request) {
       }
     }
 
-    // Parse repo URL to get owner and repo name
-    const repoInfo = extractOwnerAndRepo(project.repoUrl);
+    // Parse repo URL to get owner and repo name (only if repoUrl exists)
+    const repoInfo = project.repoUrl ? extractOwnerAndRepo(project.repoUrl) : null;
 
     let readme: string | null = null;
     let languages: string[] = [];
