@@ -17,12 +17,22 @@ interface Project {
   aiSummary: string | null;
   stars: number | null;
   featured: boolean;
+  rank: number | null;
+  isPrivate: boolean;
+}
+
+interface AIAnalysisResult {
+  suggestedTitle: string;
+  suggestedDescription: string;
+  detectedTechnologies: string[];
+  aiSummary: string;
 }
 
 export default function ProjectAdmin({ projects: initialProjects }: { projects: Project[] }) {
   const [projects] = useState<Project[]>(initialProjects);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -32,6 +42,9 @@ export default function ProjectAdmin({ projects: initialProjects }: { projects: 
   const [demoUrl, setDemoUrl] = useState('');
   const [showReadme, setShowReadme] = useState(false);
   const [expandedProject, setExpandedProject] = useState<string | null>(null);
+  const [isPrivate, setIsPrivate] = useState(false);
+  const [rank, setRank] = useState<number | null>(null);
+  const [aiAnalysis, setAiAnalysis] = useState<AIAnalysisResult | null>(null);
   const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -45,7 +58,11 @@ export default function ProjectAdmin({ projects: initialProjects }: { projects: 
         readme: readme || null,
         technologies,
         repoUrl,
-        demoUrl: demoUrl || null
+        demoUrl: demoUrl || null,
+        isPrivate,
+        rank: rank || null,
+        featured: rank ? true : undefined,
+        aiSummary: aiAnalysis?.aiSummary || null,
       };
 
       if (editingProject) {
@@ -74,6 +91,47 @@ export default function ProjectAdmin({ projects: initialProjects }: { projects: 
     }
   };
 
+  const handleAnalyzeReadme = async () => {
+    if (!readme.trim() || readme.trim().length < 50) {
+      alert('Please enter at least 50 characters of README content');
+      return;
+    }
+
+    setIsAnalyzing(true);
+    try {
+      const res = await fetch('/api/projects/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ readme, title, repoUrl }),
+      });
+
+      if (res.ok) {
+        const analysis = await res.json();
+        setAiAnalysis(analysis);
+      } else {
+        const err = await res.json();
+        alert(err.error || 'Failed to analyze README');
+      }
+    } catch {
+      alert('Failed to analyze README');
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const applyAiSuggestions = () => {
+    if (!aiAnalysis) return;
+    if (aiAnalysis.suggestedTitle && !title) {
+      setTitle(aiAnalysis.suggestedTitle);
+    }
+    if (aiAnalysis.suggestedDescription) {
+      setDescription(aiAnalysis.suggestedDescription);
+    }
+    if (aiAnalysis.detectedTechnologies.length > 0) {
+      setTechnologies(aiAnalysis.detectedTechnologies.join(', '));
+    }
+  };
+
   const openEditModal = (project: Project) => {
     setEditingProject(project);
     setTitle(project.title);
@@ -83,6 +141,9 @@ export default function ProjectAdmin({ projects: initialProjects }: { projects: 
     setRepoUrl(project.repoUrl);
     setDemoUrl(project.demoUrl || '');
     setShowReadme(!!project.readme);
+    setIsPrivate(project.isPrivate);
+    setRank(project.rank);
+    setAiAnalysis(null);
     setIsModalOpen(true);
   };
 
@@ -106,6 +167,9 @@ export default function ProjectAdmin({ projects: initialProjects }: { projects: 
     setRepoUrl('');
     setDemoUrl('');
     setShowReadme(false);
+    setIsPrivate(false);
+    setRank(null);
+    setAiAnalysis(null);
   };
 
   const handleDelete = async (id: string) => {
@@ -125,6 +189,27 @@ export default function ProjectAdmin({ projects: initialProjects }: { projects: 
     if (res.ok) {
       router.refresh();
     }
+  };
+
+  const handleSetRank = async (project: Project, newRank: number | null) => {
+    const res = await fetch(`/api/projects/${project.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rank: newRank }),
+    });
+    if (res.ok) {
+      router.refresh();
+    }
+  };
+
+  const getRankBadge = (r: number | null) => {
+    if (!r) return null;
+    const badges = {
+      1: { text: '1st', color: 'bg-amber-400 text-amber-900' },
+      2: { text: '2nd', color: 'bg-zinc-300 text-zinc-800' },
+      3: { text: '3rd', color: 'bg-amber-600 text-amber-100' },
+    } as const;
+    return badges[r as 1 | 2 | 3];
   };
 
   return (
@@ -177,12 +262,22 @@ export default function ProjectAdmin({ projects: initialProjects }: { projects: 
                         {project.title}
                       </span>
                       <div className="flex items-center gap-1 flex-shrink-0">
+                        {project.rank && (
+                          <span className={`px-1.5 py-0.5 text-[10px] rounded font-bold ${getRankBadge(project.rank)?.color}`}>
+                            {getRankBadge(project.rank)?.text}
+                          </span>
+                        )}
+                        {project.isPrivate && (
+                          <span className="px-1.5 py-0.5 bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 text-[10px] rounded">
+                            Private
+                          </span>
+                        )}
                         {project.source === 'github' && (
                           <span className="px-1.5 py-0.5 bg-zinc-100 dark:bg-zinc-700 text-[10px] rounded text-zinc-600 dark:text-zinc-400">
                             GH
                           </span>
                         )}
-                        {project.featured && (
+                        {project.featured && !project.rank && (
                           <span className="px-1.5 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 text-[10px] rounded">
                             ★
                           </span>
@@ -203,6 +298,18 @@ export default function ProjectAdmin({ projects: initialProjects }: { projects: 
 
                   {/* Actions */}
                   <div className="flex items-center gap-1 ml-2">
+                    {/* Rank selector */}
+                    <select
+                      value={project.rank || ''}
+                      onChange={(e) => handleSetRank(project, e.target.value ? Number(e.target.value) : null)}
+                      className="text-xs px-1 py-1 border border-zinc-200 dark:border-zinc-600 rounded bg-white dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300"
+                      title="Set Top 3 rank"
+                    >
+                      <option value="">-</option>
+                      <option value="1">1st</option>
+                      <option value="2">2nd</option>
+                      <option value="3">3rd</option>
+                    </select>
                     <button
                       onClick={() => handleToggleFeatured(project)}
                       className={`p-1.5 rounded transition-colors ${
@@ -297,6 +404,24 @@ export default function ProjectAdmin({ projects: initialProjects }: { projects: 
 
             {/* Modal Body */}
             <form onSubmit={handleSubmit} className="p-4 space-y-4">
+              {/* Private repo checkbox */}
+              <div className="flex items-center gap-3 p-3 bg-zinc-50 dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-700">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={isPrivate}
+                    onChange={(e) => setIsPrivate(e.target.checked)}
+                    className="w-4 h-4 rounded border-zinc-300 text-blue-500 focus:ring-blue-500"
+                  />
+                  <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                    Private Repository
+                  </span>
+                </label>
+                <span className="text-xs text-zinc-500">
+                  (for repos not public on GitHub)
+                </span>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Title *</label>
@@ -355,7 +480,33 @@ export default function ProjectAdmin({ projects: initialProjects }: { projects: 
                 />
               </div>
 
-              {/* README Toggle */}
+              {/* Top 3 Rank selector */}
+              <div className="flex items-center gap-4 p-3 bg-zinc-50 dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-700">
+                <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                  Top 3 Position:
+                </label>
+                <div className="flex gap-2">
+                  {[null, 1, 2, 3].map((r) => (
+                    <button
+                      key={r ?? 'none'}
+                      type="button"
+                      onClick={() => setRank(r)}
+                      className={`px-3 py-1 text-sm rounded-lg border transition-colors ${
+                        rank === r
+                          ? 'bg-blue-500 text-white border-blue-500'
+                          : 'bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-600 hover:border-blue-300'
+                      }`}
+                    >
+                      {r === null ? 'None' : r === 1 ? '1st' : r === 2 ? '2nd' : '3rd'}
+                    </button>
+                  ))}
+                </div>
+                <span className="text-xs text-zinc-500 ml-auto">
+                  (Top 3 appear larger at the top)
+                </span>
+              </div>
+
+              {/* README Toggle with AI Analysis */}
               <div>
                 <button
                   type="button"
@@ -370,17 +521,91 @@ export default function ProjectAdmin({ projects: initialProjects }: { projects: 
                   >
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
-                  {showReadme ? 'Hide README' : 'Add README (optional)'}
+                  {showReadme ? 'Hide README' : 'Add README (optional - for AI analysis)'}
                 </button>
 
                 {showReadme && (
-                  <textarea
-                    placeholder="Paste your README content here (Markdown supported)"
-                    value={readme}
-                    onChange={(e) => setReadme(e.target.value)}
-                    className="w-full p-2.5 mt-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none resize-none font-mono text-sm"
-                    rows={8}
-                  />
+                  <div className="mt-2 space-y-2">
+                    <textarea
+                      placeholder="Paste your README content here (Markdown supported)"
+                      value={readme}
+                      onChange={(e) => {
+                        setReadme(e.target.value);
+                        setAiAnalysis(null);
+                      }}
+                      className="w-full p-2.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none resize-none font-mono text-sm"
+                      rows={8}
+                    />
+
+                    {/* AI Analysis Button */}
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handleAnalyzeReadme}
+                        disabled={isAnalyzing || readme.trim().length < 50}
+                        className="flex items-center gap-2 px-4 py-2 bg-purple-500 text-white text-sm font-medium rounded-lg hover:bg-purple-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {isAnalyzing ? (
+                          <>
+                            <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                            </svg>
+                            Analyzing...
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                            </svg>
+                            Analyze with AI
+                          </>
+                        )}
+                      </button>
+                      {readme.trim().length < 50 && (
+                        <span className="text-xs text-zinc-500">
+                          (Need at least 50 characters)
+                        </span>
+                      )}
+                    </div>
+
+                    {/* AI Analysis Results */}
+                    {aiAnalysis && (
+                      <div className="p-4 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg space-y-3">
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-sm font-semibold text-purple-700 dark:text-purple-300">
+                            AI Suggestions
+                          </h4>
+                          <button
+                            type="button"
+                            onClick={applyAiSuggestions}
+                            className="px-3 py-1 bg-purple-500 text-white text-xs font-medium rounded hover:bg-purple-600 transition-colors"
+                          >
+                            Apply All
+                          </button>
+                        </div>
+
+                        <div className="space-y-2 text-sm">
+                          <div>
+                            <span className="font-medium text-zinc-700 dark:text-zinc-300">Title: </span>
+                            <span className="text-zinc-600 dark:text-zinc-400">{aiAnalysis.suggestedTitle}</span>
+                          </div>
+                          <div>
+                            <span className="font-medium text-zinc-700 dark:text-zinc-300">Description: </span>
+                            <span className="text-zinc-600 dark:text-zinc-400">{aiAnalysis.suggestedDescription}</span>
+                          </div>
+                          <div>
+                            <span className="font-medium text-zinc-700 dark:text-zinc-300">Technologies: </span>
+                            <span className="text-zinc-600 dark:text-zinc-400">{aiAnalysis.detectedTechnologies.join(', ')}</span>
+                          </div>
+                          <div>
+                            <span className="font-medium text-zinc-700 dark:text-zinc-300">Summary: </span>
+                            <span className="text-zinc-600 dark:text-zinc-400">{aiAnalysis.aiSummary}</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
 

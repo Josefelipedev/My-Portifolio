@@ -7,7 +7,9 @@ export async function GET() {
   try {
     const projects = await prisma.project.findMany({
       orderBy: [
+        { rank: 'asc' },
         { featured: 'desc' },
+        { stars: 'desc' },
         { createdAt: 'desc' },
       ],
     });
@@ -27,8 +29,21 @@ export async function POST(request: Request) {
     }
 
     const data = await request.json();
+    const { rank, ...projectData } = data;
+
+    // If rank is being set (1, 2, or 3), remove it from any other project
+    if (rank && rank >= 1 && rank <= 3) {
+      await prisma.project.updateMany({
+        where: { rank },
+        data: { rank: null },
+      });
+      projectData.rank = rank;
+      // Auto-set featured when setting rank
+      projectData.featured = true;
+    }
+
     const project = await prisma.project.create({
-      data,
+      data: projectData,
     });
 
     return success(project, 201);

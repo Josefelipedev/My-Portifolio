@@ -27,12 +27,17 @@ model Project {
   stars        Int?
   featured     Boolean   @default(false)
 
+  // Top 3 and private repo support
+  rank         Int?      // 1, 2, 3 for top 3 featured (null = not featured)
+  isPrivate    Boolean   @default(false) // mark if it's a private repo
+
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
   @@index([createdAt])
   @@index([featured])
   @@index([source])
+  @@index([rank])
 }
 
 model Experience {

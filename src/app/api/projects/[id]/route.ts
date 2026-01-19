@@ -25,9 +25,31 @@ export async function PUT(
   }
   const { id } = await params;
   const data = await request.json();
+  const { rank, ...updateData } = data;
+
+  // If rank is being set (1, 2, or 3), remove it from any other project
+  if (rank !== undefined) {
+    if (rank && rank >= 1 && rank <= 3) {
+      // Remove this rank from any other project
+      await prisma.project.updateMany({
+        where: {
+          rank,
+          id: { not: id }
+        },
+        data: { rank: null },
+      });
+      updateData.rank = rank;
+      // Auto-set featured when setting rank
+      updateData.featured = true;
+    } else {
+      // Setting rank to null (removing from top 3)
+      updateData.rank = null;
+    }
+  }
+
   const project = await prisma.project.update({
     where: { id },
-    data,
+    data: updateData,
   });
   return NextResponse.json(project);
 }

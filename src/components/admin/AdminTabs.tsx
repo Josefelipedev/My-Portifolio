@@ -18,6 +18,8 @@ interface Project {
   aiSummary: string | null;
   stars: number | null;
   featured: boolean;
+  rank: number | null;
+  isPrivate: boolean;
 }
 
 interface AdminTabsProps {

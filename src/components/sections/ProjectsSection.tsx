@@ -1,18 +1,44 @@
 import { SectionWrapper } from '../ui/SectionWrapper';
 import { GradientText } from '../ui/GradientText';
-import { SkillBadge } from '../ui/SkillBadge';
 import prisma from '@/lib/prisma';
 import ProjectCard from './ProjectCard';
 
-async function getProjects() {
+interface Project {
+  id: string;
+  title: string;
+  description: string;
+  technologies: string;
+  repoUrl: string;
+  demoUrl: string | null;
+  imageUrl: string | null;
+  stars: number | null;
+  featured: boolean;
+  source: string;
+  aiSummary: string | null;
+  rank: number | null;
+  isPrivate: boolean;
+}
+
+async function getProjects(): Promise<Project[]> {
   const projects = await prisma.project.findMany({
-    orderBy: [{ featured: 'desc' }, { stars: 'desc' }, { createdAt: 'desc' }],
+    orderBy: [
+      { rank: 'asc' },
+      { featured: 'desc' },
+      { stars: 'desc' },
+      { createdAt: 'desc' },
+    ],
   });
   return projects;
 }
 
 export async function ProjectsSection() {
   const projects = await getProjects();
+
+  // Separate top 3 (ranked) projects from the rest
+  const topProjects = projects
+    .filter((p) => p.rank !== null)
+    .sort((a, b) => (a.rank ?? 99) - (b.rank ?? 99));
+  const otherProjects = projects.filter((p) => p.rank === null);
 
   return (
     <SectionWrapper id="projects">
@@ -41,10 +67,34 @@ export async function ProjectsSection() {
           </p>
         </div>
       ) : (
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {projects.map((project, index) => (
-            <ProjectCard key={project.id} project={project} index={index} />
-          ))}
+        <div className="space-y-12">
+          {/* Top 3 Featured Projects - Larger Cards */}
+          {topProjects.length > 0 && (
+            <div className="space-y-6">
+              {topProjects.map((project, index) => (
+                <ProjectCard
+                  key={project.id}
+                  project={project}
+                  index={index}
+                  variant="featured"
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Other Projects - Standard Grid */}
+          {otherProjects.length > 0 && (
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {otherProjects.map((project, index) => (
+                <ProjectCard
+                  key={project.id}
+                  project={project}
+                  index={topProjects.length + index}
+                  variant="default"
+                />
+              ))}
+            </div>
+          )}
         </div>
       )}
     </SectionWrapper>
