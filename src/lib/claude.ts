@@ -173,6 +173,65 @@ export function getCurrentAIProvider(): { provider: AIProvider; model: string } 
   return getAIConfig();
 }
 
+// README analysis for project creation
+export interface ReadmeAnalysisResult {
+  suggestedTitle: string;
+  suggestedDescription: string;
+  detectedTechnologies: string[];
+  aiSummary: string;
+}
+
+export async function analyzeReadmeForProject(
+  readme: string,
+  title?: string
+): Promise<ReadmeAnalysisResult> {
+  const prompt = `You are analyzing a project README to extract information for a developer portfolio.
+
+${title ? `Project Name: ${title}` : 'Project name not provided - suggest one based on the README.'}
+
+README Content:
+${readme.slice(0, 6000)}
+
+Based on this README, provide a JSON response with the following structure:
+{
+  "suggestedTitle": "A concise, professional project title (use the provided name if appropriate, or suggest a better one)",
+  "suggestedDescription": "A brief 1-2 sentence description for a portfolio card (max 200 chars)",
+  "detectedTechnologies": ["Array", "of", "technologies", "mentioned"],
+  "aiSummary": "A compelling 2-3 sentence summary highlighting what makes this project interesting, its key features, and technical achievements. Write in third person."
+}
+
+IMPORTANT:
+- For technologies, extract programming languages, frameworks, libraries, databases, and tools mentioned
+- Keep the description concise and suitable for a card preview
+- Make the aiSummary engaging and professional
+- Only include technologies that are actually mentioned or clearly implied
+- Common technologies to look for: React, Vue, Angular, Next.js, Node.js, Express, TypeScript, JavaScript, Python, Go, Rust, PostgreSQL, MongoDB, Redis, Docker, Kubernetes, AWS, etc.
+
+Respond ONLY with the JSON object. No other text.`;
+
+  const response = await callAI(prompt, 1000);
+
+  try {
+    const jsonMatch = response.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      throw new Error('No JSON object found in response');
+    }
+    const result = JSON.parse(jsonMatch[0]) as ReadmeAnalysisResult;
+
+    return {
+      suggestedTitle: String(result.suggestedTitle || title || '').trim(),
+      suggestedDescription: String(result.suggestedDescription || '').trim().slice(0, 500),
+      detectedTechnologies: Array.isArray(result.detectedTechnologies)
+        ? result.detectedTechnologies.map((t) => String(t).trim()).filter(Boolean)
+        : [],
+      aiSummary: String(result.aiSummary || '').trim(),
+    };
+  } catch (parseError) {
+    console.error('Failed to parse AI response for README analysis:', response);
+    throw new Error('Failed to analyze README. Please try again.');
+  }
+}
+
 interface SkillsSuggestionInput {
   projects: { title: string; technologies: string; description: string }[];
   experiences: { title: string; technologies: string; description: string }[];
