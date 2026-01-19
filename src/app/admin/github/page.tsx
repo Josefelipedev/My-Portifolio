@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 
 interface GitHubRepo {
@@ -18,12 +18,29 @@ interface GitHubRepo {
   isImported: boolean;
 }
 
+interface Toast {
+  id: number;
+  type: 'success' | 'error';
+  message: string;
+}
+
 export default function GitHubAdminPage() {
   const [repos, setRepos] = useState<GitHubRepo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [importing, setImporting] = useState<number | null>(null);
+  const [importing, setImporting] = useState<Set<number>>(new Set());
   const [generateSummary, setGenerateSummary] = useState(true);
+  const [toasts, setToasts] = useState<Toast[]>([]);
+  const [selectedRepos, setSelectedRepos] = useState<Set<number>>(new Set());
+
+  const showToast = useCallback((type: 'success' | 'error', message: string) => {
+    const id = Date.now();
+    setToasts(prev => [...prev, { id, type, message }]);
+    // Auto-remove after 4 seconds
+    setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id));
+    }, 4000);
+  }, []);
 
   useEffect(() => {
     fetchRepos();
@@ -49,7 +66,7 @@ export default function GitHubAdminPage() {
 
   const handleImport = async (repo: GitHubRepo) => {
     try {
-      setImporting(repo.id);
+      setImporting(prev => new Set(prev).add(repo.id));
       const response = await fetch('/api/github/import', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -70,16 +87,87 @@ export default function GitHubAdminPage() {
         prev.map((r) => (r.id === repo.id ? { ...r, isImported: true } : r))
       );
 
-      alert(`Successfully imported "${repo.name}"${generateSummary ? ' with AI summary!' : '!'}`);
+      showToast('success', `"${repo.name}" imported${generateSummary ? ' with AI summary' : ''}!`);
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to import');
+      showToast('error', err instanceof Error ? err.message : 'Failed to import');
     } finally {
-      setImporting(null);
+      setImporting(prev => {
+        const next = new Set(prev);
+        next.delete(repo.id);
+        return next;
+      });
     }
   };
 
+  const handleImportSelected = async () => {
+    const reposToImport = repos.filter(r => selectedRepos.has(r.id) && !r.isImported);
+
+    for (const repo of reposToImport) {
+      await handleImport(repo);
+    }
+
+    setSelectedRepos(new Set());
+  };
+
+  const toggleSelectRepo = (id: number) => {
+    setSelectedRepos(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const selectAllNotImported = () => {
+    const notImported = repos.filter(r => !r.isImported).map(r => r.id);
+    setSelectedRepos(new Set(notImported));
+  };
+
+  const clearSelection = () => {
+    setSelectedRepos(new Set());
+  };
+
+  const notImportedCount = repos.filter(r => !r.isImported).length;
+  const selectedCount = selectedRepos.size;
+
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-900 p-8">
+      {/* Toast Notifications */}
+      <div className="fixed top-4 right-4 z-50 flex flex-col gap-2">
+        {toasts.map(toast => (
+          <div
+            key={toast.id}
+            className={`px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 animate-slide-in ${
+              toast.type === 'success'
+                ? 'bg-green-500 text-white'
+                : 'bg-red-500 text-white'
+            }`}
+          >
+            {toast.type === 'success' ? (
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            ) : (
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            )}
+            <span className="text-sm font-medium">{toast.message}</span>
+            <button
+              onClick={() => setToasts(prev => prev.filter(t => t.id !== toast.id))}
+              className="ml-2 hover:opacity-80"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        ))}
+      </div>
+
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
@@ -101,22 +189,58 @@ export default function GitHubAdminPage() {
 
         {/* Options */}
         <div className="bg-white dark:bg-zinc-800 rounded-xl p-4 mb-6 border border-zinc-200 dark:border-zinc-700">
-          <label className="flex items-center gap-3 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={generateSummary}
-              onChange={(e) => setGenerateSummary(e.target.checked)}
-              className="w-5 h-5 rounded border-zinc-300 text-blue-500 focus:ring-blue-500"
-            />
-            <div>
-              <span className="font-medium text-zinc-900 dark:text-zinc-100">
-                Generate AI Summary
-              </span>
-              <p className="text-sm text-zinc-500">
-                Use Claude AI to generate a professional description for imported projects
-              </p>
-            </div>
-          </label>
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={generateSummary}
+                onChange={(e) => setGenerateSummary(e.target.checked)}
+                className="w-5 h-5 rounded border-zinc-300 text-blue-500 focus:ring-blue-500"
+              />
+              <div>
+                <span className="font-medium text-zinc-900 dark:text-zinc-100">
+                  Generate AI Summary
+                </span>
+                <p className="text-sm text-zinc-500">
+                  Use AI to generate professional descriptions
+                </p>
+              </div>
+            </label>
+
+            {/* Bulk actions */}
+            {!loading && repos.length > 0 && (
+              <div className="flex items-center gap-2">
+                {selectedCount > 0 ? (
+                  <>
+                    <span className="text-sm text-zinc-500">
+                      {selectedCount} selected
+                    </span>
+                    <button
+                      onClick={clearSelection}
+                      className="px-3 py-1.5 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100"
+                    >
+                      Clear
+                    </button>
+                    <button
+                      onClick={handleImportSelected}
+                      disabled={importing.size > 0}
+                      className="px-4 py-1.5 bg-blue-500 text-white text-sm font-medium rounded-lg hover:bg-blue-600 disabled:opacity-50 transition-colors"
+                    >
+                      Import Selected ({selectedCount})
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={selectAllNotImported}
+                    disabled={notImportedCount === 0}
+                    className="px-3 py-1.5 text-sm text-blue-500 hover:text-blue-600 disabled:opacity-50"
+                  >
+                    Select All ({notImportedCount})
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Error */}
@@ -154,18 +278,31 @@ export default function GitHubAdminPage() {
                 className={`bg-white dark:bg-zinc-800 rounded-xl p-5 border transition-all ${
                   repo.isImported
                     ? 'border-green-300 dark:border-green-700 bg-green-50/50 dark:bg-green-900/10'
+                    : selectedRepos.has(repo.id)
+                    ? 'border-blue-400 dark:border-blue-600 bg-blue-50/50 dark:bg-blue-900/10'
                     : 'border-zinc-200 dark:border-zinc-700 hover:border-blue-300 dark:hover:border-blue-700'
                 }`}
               >
                 {/* Header */}
                 <div className="flex items-start justify-between mb-3">
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-zinc-900 dark:text-zinc-100 truncate">
-                      {repo.name}
-                    </h3>
-                    {repo.language && (
-                      <span className="text-xs text-zinc-500">{repo.language}</span>
+                  <div className="flex items-start gap-3 flex-1 min-w-0">
+                    {/* Checkbox for selection */}
+                    {!repo.isImported && (
+                      <input
+                        type="checkbox"
+                        checked={selectedRepos.has(repo.id)}
+                        onChange={() => toggleSelectRepo(repo.id)}
+                        className="w-4 h-4 mt-1 rounded border-zinc-300 text-blue-500 focus:ring-blue-500"
+                      />
                     )}
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-zinc-900 dark:text-zinc-100 truncate">
+                        {repo.name}
+                      </h3>
+                      {repo.language && (
+                        <span className="text-xs text-zinc-500">{repo.language}</span>
+                      )}
+                    </div>
                   </div>
                   <div className="flex items-center gap-2 text-sm text-zinc-500">
                     <span className="flex items-center gap-1">
@@ -213,10 +350,10 @@ export default function GitHubAdminPage() {
                   ) : (
                     <button
                       onClick={() => handleImport(repo)}
-                      disabled={importing === repo.id}
+                      disabled={importing.has(repo.id)}
                       className="flex-1 px-3 py-2 bg-blue-500 text-white text-sm font-medium rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
                     >
-                      {importing === repo.id ? (
+                      {importing.has(repo.id) ? (
                         <>
                           <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
@@ -265,6 +402,23 @@ export default function GitHubAdminPage() {
           </div>
         )}
       </div>
+
+      {/* CSS for toast animation */}
+      <style jsx>{`
+        @keyframes slide-in {
+          from {
+            transform: translateX(100%);
+            opacity: 0;
+          }
+          to {
+            transform: translateX(0);
+            opacity: 1;
+          }
+        }
+        .animate-slide-in {
+          animation: slide-in 0.3s ease-out;
+        }
+      `}</style>
     </div>
   );
 }
