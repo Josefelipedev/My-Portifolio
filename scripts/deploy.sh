@@ -39,6 +39,10 @@ npm install --production=false
 log "Generating Prisma client..."
 npx prisma generate
 
+# Push schema to database
+log "Pushing schema to database..."
+npx prisma db push --skip-generate
+
 # Build application
 log "Building application..."
 npm run build
