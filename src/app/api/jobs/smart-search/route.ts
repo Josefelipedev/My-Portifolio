@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { readFile } from 'fs/promises';
 import path from 'path';
-import { smartJobSearch, type ResumeData, getApiStatus } from '@/lib/job-search';
+import { smartJobSearch, type ResumeData, type JobSource, getApiStatus } from '@/lib/job-search';
 import { isAuthenticated } from '@/lib/auth';
 import { error, withCacheHeaders } from '@/lib/api-utils';
 
@@ -20,13 +20,20 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url);
     const country = (searchParams.get('country') || 'all') as 'br' | 'pt' | 'remote' | 'all';
+    const source = (searchParams.get('source') || 'all') as JobSource;
     const limit = searchParams.get('limit') ? parseInt(searchParams.get('limit')!) : 50;
+    const maxAgeDays = searchParams.get('maxAgeDays') ? parseInt(searchParams.get('maxAgeDays')!) : 0;
 
     // Load resume data
     const resume = await loadResumeData();
 
-    // Perform smart search based on resume
-    const result = await smartJobSearch(resume, country, limit);
+    // Perform smart search based on resume with options
+    const result = await smartJobSearch(resume, {
+      country,
+      source,
+      limit,
+      maxAgeDays,
+    });
 
     const response = NextResponse.json({
       jobs: result.jobs,
@@ -34,6 +41,7 @@ export async function GET(request: Request) {
       keywords: result.keywords,
       resumeName: resume.personalInfo?.name || 'Unknown',
       skillsUsed: resume.skills?.slice(0, 5).map(s => s.name) || [],
+      params: { country, source, limit, maxAgeDays },
       apis: getApiStatus(),
     });
 

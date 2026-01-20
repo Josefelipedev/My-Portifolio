@@ -22,6 +22,21 @@ export interface JobSearchParams {
   country?: string; // 'br' | 'pt' | 'us' | 'remote' | etc
   category?: string;
   limit?: number;
+  maxAgeDays?: number; // Filter jobs older than X days (0 = no filter)
+}
+
+// Filter jobs by age (days)
+export function filterJobsByAge(jobs: JobListing[], maxAgeDays: number): JobListing[] {
+  if (!maxAgeDays || maxAgeDays <= 0) return jobs;
+
+  const now = new Date();
+  const cutoffDate = new Date(now.getTime() - maxAgeDays * 24 * 60 * 60 * 1000);
+
+  return jobs.filter(job => {
+    if (!job.postedAt) return true; // Keep jobs without date (we don't know how old they are)
+    const jobDate = new Date(job.postedAt);
+    return jobDate >= cutoffDate;
+  });
 }
 
 // ==========================================
@@ -514,7 +529,12 @@ export async function searchJobs(params: JobSearchParams, source: JobSource = 'a
   }
 
   const results = await Promise.all(searches);
-  const allJobs = results.flat();
+  let allJobs = results.flat();
+
+  // Filter by age if specified
+  if (params.maxAgeDays && params.maxAgeDays > 0) {
+    allJobs = filterJobsByAge(allJobs, params.maxAgeDays);
+  }
 
   // Sort by date (newest first)
   allJobs.sort((a, b) => {
@@ -843,28 +863,67 @@ export function generateSearchQueries(keywords: string[]): string[] {
   return Array.from(new Set(queries));
 }
 
+export interface SmartSearchOptions {
+  country?: 'br' | 'pt' | 'remote' | 'all';
+  source?: JobSource;
+  limit?: number;
+  maxAgeDays?: number;
+}
+
 export async function smartJobSearch(
   resume: ResumeData,
-  country: 'br' | 'pt' | 'remote' | 'all' = 'all',
-  limit: number = 50
+  options: SmartSearchOptions = {}
 ): Promise<SmartSearchResult> {
+  const {
+    country = 'all',
+    source = 'all',
+    limit = 50,
+    maxAgeDays = 0,
+  } = options;
+
   const keywords = extractKeywordsFromResume(resume);
   const queries = generateSearchQueries(keywords);
 
-  // Search with top keywords in parallel
-  const searchPromises = queries.slice(0, 3).map(query =>
-    searchJobs({ keyword: query, country, limit: Math.ceil(limit / 3) }, 'all')
-  );
+  // Search with top keywords in parallel using the selected source
+  const searchPromises: Promise<JobListing[]>[] = [];
 
-  // Also search Net-Empregos for Portugal
-  if (country === 'pt' || country === 'all') {
+  if (source === 'all') {
+    // Search all sources with top keywords
     searchPromises.push(
-      searchNetEmpregos({ keyword: keywords[0] || 'developer', limit: 20 })
+      ...queries.slice(0, 3).map(query =>
+        searchJobs({ keyword: query, country, limit: Math.ceil(limit / 3) }, 'all')
+      )
+    );
+
+    // Also search Net-Empregos for Portugal
+    if (country === 'pt' || country === 'all') {
+      searchPromises.push(
+        searchNetEmpregos({ keyword: keywords[0] || 'developer', limit: 20 })
+      );
+    }
+  } else if (source === 'netempregos') {
+    // Only Net-Empregos
+    searchPromises.push(
+      ...queries.slice(0, 3).map(query =>
+        searchNetEmpregos({ keyword: query, limit: Math.ceil(limit / 3) })
+      )
+    );
+  } else {
+    // Specific source selected
+    searchPromises.push(
+      ...queries.slice(0, 3).map(query =>
+        searchJobs({ keyword: query, country, limit: Math.ceil(limit / 3) }, source)
+      )
     );
   }
 
   const results = await Promise.all(searchPromises);
-  const allJobs = results.flat();
+  let allJobs = results.flat();
+
+  // Filter by age if specified
+  if (maxAgeDays > 0) {
+    allJobs = filterJobsByAge(allJobs, maxAgeDays);
+  }
 
   // Deduplicate by external ID
   const seen = new Set<string>();

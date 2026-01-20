@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import {
   searchJobs,
   searchJobsByCountry,
+  filterJobsByAge,
   getApiStatus,
   type JobSource,
   type JobSearchParams,
@@ -22,6 +23,7 @@ export async function GET(request: Request) {
     const location = searchParams.get('location') || undefined;
     const category = searchParams.get('category') || undefined;
     const limit = searchParams.get('limit') ? parseInt(searchParams.get('limit')!) : 50;
+    const maxAgeDays = searchParams.get('maxAgeDays') ? parseInt(searchParams.get('maxAgeDays')!) : 0;
 
     // Check for API status endpoint
     if (searchParams.get('status') === 'true') {
@@ -41,14 +43,19 @@ export async function GET(request: Request) {
       );
     } else {
       // Use general search with source filter
-      const params: JobSearchParams = { keyword, location, category, limit, country };
+      const params: JobSearchParams = { keyword, location, category, limit, country, maxAgeDays };
       jobs = await searchJobs(params, source);
+    }
+
+    // Apply age filter if specified (for country-specific search that doesn't use params)
+    if (maxAgeDays > 0 && country && country !== 'all') {
+      jobs = filterJobsByAge(jobs, maxAgeDays);
     }
 
     const response = NextResponse.json({
       jobs,
       total: jobs.length,
-      params: { keyword, source, country, location, category, limit },
+      params: { keyword, source, country, location, category, limit, maxAgeDays },
       apis: getApiStatus(),
     });
 
