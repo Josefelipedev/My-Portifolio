@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 
 interface JobListing {
   id: string;
-  source: 'remoteok' | 'remotive' | 'arbeitnow' | 'adzuna' | 'jooble' | 'jsearch' | 'netempregos';
+  source: 'remoteok' | 'remotive' | 'arbeitnow' | 'adzuna' | 'jooble' | 'jsearch' | 'netempregos' | 'vagascombr';
   title: string;
   company: string;
   companyLogo?: string;
@@ -36,6 +36,7 @@ const SOURCE_LABELS: Record<string, { label: string; color: string }> = {
   jooble: { label: 'Jooble', color: 'bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-400' },
   jsearch: { label: 'JSearch', color: 'bg-pink-100 dark:bg-pink-900/30 text-pink-700 dark:text-pink-400' },
   netempregos: { label: 'Net-Empregos', color: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400' },
+  vagascombr: { label: 'Vagas.com.br', color: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400' },
 };
 
 const COUNTRY_OPTIONS = [
@@ -58,6 +59,7 @@ const SOURCE_OPTIONS = [
   { value: 'remotive', label: 'Remotive', region: 'Remote' },
   { value: 'arbeitnow', label: 'Arbeitnow', region: 'EU' },
   { value: 'netempregos', label: 'Net-Empregos', region: 'PT' },
+  { value: 'vagascombr', label: 'Vagas.com.br', region: 'BR' },
   { value: 'adzuna', label: 'Adzuna', region: 'PT/BR' },
   { value: 'jooble', label: 'Jooble', region: 'Global' },
   { value: 'jsearch', label: 'JSearch', region: 'Global' },
@@ -114,12 +116,44 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
     return `${selectedSources.size} fontes`;
   };
 
-  // Fetch API status on mount
+  // Fetch API status on mount and auto-run AI search
   useEffect(() => {
     fetch('/api/jobs/search?status=true')
       .then(res => res.json())
       .then(data => setApiStatus(data.apis || []))
       .catch(() => {});
+
+    // Auto-run AI search based on profile on first load
+    const runInitialSearch = async () => {
+      try {
+        setLoading(true);
+        setIsSmartSearch(true);
+
+        const params = new URLSearchParams({
+          country,
+          source: getSourceParam(),
+          limit: '50',
+          maxAgeDays,
+        });
+        const response = await fetch(`/api/jobs/smart-search?${params}`);
+        const data = await response.json();
+
+        if (response.ok) {
+          setJobs(data.jobs);
+          setSmartSearchKeywords(data.keywords || []);
+          if (data.apis) {
+            setApiStatus(data.apis);
+          }
+        }
+      } catch {
+        // Silently fail on initial load
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    runInitialSearch();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Close dropdown when clicking outside

@@ -2,7 +2,7 @@
 
 export interface JobListing {
   id: string;
-  source: 'remoteok' | 'remotive' | 'arbeitnow' | 'adzuna' | 'jooble' | 'jsearch' | 'netempregos';
+  source: 'remoteok' | 'remotive' | 'arbeitnow' | 'adzuna' | 'jooble' | 'jsearch' | 'netempregos' | 'vagascombr';
   title: string;
   company: string;
   companyLogo?: string;
@@ -501,7 +501,7 @@ export async function searchJSearch(params: JobSearchParams): Promise<JobListing
 // Combined Search Functions
 // ==========================================
 
-export type JobSource = 'all' | 'remoteok' | 'remotive' | 'arbeitnow' | 'adzuna' | 'jooble' | 'jsearch' | 'netempregos';
+export type JobSource = 'all' | 'remoteok' | 'remotive' | 'arbeitnow' | 'adzuna' | 'jooble' | 'jsearch' | 'netempregos' | 'vagascombr';
 
 // Accept single source or array of sources
 export async function searchJobs(params: JobSearchParams, source: JobSource | JobSource[] = 'all'): Promise<JobListing[]> {
@@ -531,6 +531,9 @@ export async function searchJobs(params: JobSearchParams, source: JobSource | Jo
   }
   if (sources.includes('netempregos') || (isAll && (params.country === 'pt' || !params.country))) {
     searches.push(searchNetEmpregos(params));
+  }
+  if (sources.includes('vagascombr') || (isAll && (params.country === 'br' || !params.country))) {
+    searches.push(searchVagasComBr(params));
   }
 
   const results = await Promise.all(searches);
@@ -624,6 +627,7 @@ export function getApiStatus(): { name: string; configured: boolean; needsKey: b
     { name: 'Remotive', configured: true, needsKey: false },
     { name: 'Arbeitnow', configured: true, needsKey: false },
     { name: 'Net-Empregos', configured: true, needsKey: false },
+    { name: 'Vagas.com.br', configured: true, needsKey: false },
     { name: 'Adzuna', configured: !!(process.env.ADZUNA_APP_ID && process.env.ADZUNA_APP_KEY), needsKey: true },
     { name: 'Jooble', configured: !!process.env.JOOBLE_API_KEY, needsKey: true },
     { name: 'JSearch', configured: !!process.env.RAPIDAPI_KEY, needsKey: true },
@@ -780,6 +784,107 @@ function parseNetEmpregosDate(dateStr: string): Date | undefined {
   }
 
   return undefined;
+}
+
+// ==========================================
+// Vagas.com.br Web Scraping (Brazil)
+// ==========================================
+
+interface VagasComBrJob {
+  title: string;
+  company: string;
+  location: string;
+  url: string;
+  level: string;
+}
+
+export async function searchVagasComBr(params: JobSearchParams): Promise<JobListing[]> {
+  try {
+    const keyword = encodeURIComponent(params.keyword || 'desenvolvedor');
+    const url = `https://www.vagas.com.br/vagas-de-${keyword.replace(/%20/g, '-')}`;
+
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
+      },
+      next: { revalidate: 300 },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Vagas.com.br fetch error: ${response.status}`);
+    }
+
+    const html = await response.text();
+    const jobs = parseVagasComBrHTML(html);
+
+    return jobs.slice(0, params.limit || 50).map((job, index) => ({
+      id: `vagascombr-${Date.now()}-${index}`,
+      source: 'vagascombr' as const,
+      title: job.title,
+      company: job.company || 'Empresa confidencial',
+      description: job.level ? `Nivel: ${job.level}` : '',
+      url: job.url.startsWith('http') ? job.url : `https://www.vagas.com.br${job.url}`,
+      location: job.location || 'Brasil',
+      jobType: 'On-site',
+      tags: job.level ? [job.level] : [],
+      postedAt: undefined,
+      country: 'br',
+    }));
+  } catch (error) {
+    console.error('Vagas.com.br scraping error:', error);
+    return [];
+  }
+}
+
+function parseVagasComBrHTML(html: string): VagasComBrJob[] {
+  const jobs: VagasComBrJob[] = [];
+
+  // Pattern: <a class="link-detalhes-vaga" data-id-vaga="ID" title="TITULO" href="/vagas/vID/slug">
+  const jobPattern = /<a[^>]*class="link-detalhes-vaga"[^>]*data-id-vaga="(\d+)"[^>]*title="([^"]+)"[^>]*href="([^"]+)"/gi;
+
+  let match;
+  while ((match = jobPattern.exec(html)) !== null) {
+    const vagaId = match[1];
+    const title = cleanHtmlText(match[2]);
+    const url = match[3];
+
+    if (title && title.length > 3) {
+      // Find company and level in surrounding context
+      const contextStart = Math.max(0, match.index);
+      const contextEnd = Math.min(html.length, match.index + 1000);
+      const context = html.substring(contextStart, contextEnd);
+
+      // Extract company from <span class="emprVaga">COMPANY</span>
+      const companyMatch = context.match(/<span[^>]*class="emprVaga"[^>]*>\s*([^<]+)/i);
+      const company = companyMatch ? cleanHtmlText(companyMatch[1]) : '';
+
+      // Extract level from <span class="nivelVaga">LEVEL</span>
+      const levelMatch = context.match(/<span[^>]*class="nivelVaga"[^>]*>\s*([^<]+)/i);
+      const level = levelMatch ? cleanHtmlText(levelMatch[1]) : '';
+
+      // Extract location from <span class="vaga-local">LOCATION</span>
+      const locationMatch = context.match(/<span[^>]*class="vaga-local"[^>]*>\s*([^<]+)/i);
+      const location = locationMatch ? cleanHtmlText(locationMatch[1]) : 'Brasil';
+
+      jobs.push({
+        title,
+        company,
+        location,
+        url,
+        level,
+      });
+    }
+  }
+
+  // Deduplicate by URL
+  const seen = new Set<string>();
+  return jobs.filter(job => {
+    if (seen.has(job.url)) return false;
+    seen.add(job.url);
+    return true;
+  });
 }
 
 // ==========================================
