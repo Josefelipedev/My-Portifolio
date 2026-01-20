@@ -1,10 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 interface JobListing {
   id: string;
-  source: 'remoteok' | 'remotive';
+  source: 'remoteok' | 'remotive' | 'arbeitnow' | 'adzuna' | 'jooble' | 'jsearch';
   title: string;
   company: string;
   companyLogo?: string;
@@ -15,21 +15,55 @@ interface JobListing {
   salary?: string;
   tags?: string[];
   postedAt?: string;
+  country?: string;
+}
+
+interface ApiStatus {
+  name: string;
+  configured: boolean;
+  needsKey: boolean;
 }
 
 interface JobSearchProps {
   onJobSaved: () => void;
 }
 
+const SOURCE_LABELS: Record<string, { label: string; color: string }> = {
+  remoteok: { label: 'RemoteOK', color: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' },
+  remotive: { label: 'Remotive', color: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400' },
+  arbeitnow: { label: 'Arbeitnow', color: 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400' },
+  adzuna: { label: 'Adzuna', color: 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400' },
+  jooble: { label: 'Jooble', color: 'bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-400' },
+  jsearch: { label: 'JSearch', color: 'bg-pink-100 dark:bg-pink-900/30 text-pink-700 dark:text-pink-400' },
+};
+
+const COUNTRY_OPTIONS = [
+  { value: 'all', label: 'All Countries', flag: '🌍' },
+  { value: 'remote', label: 'Remote Only', flag: '🏠' },
+  { value: 'pt', label: 'Portugal', flag: '🇵🇹' },
+  { value: 'br', label: 'Brazil', flag: '🇧🇷' },
+];
+
 export default function JobSearch({ onJobSaved }: JobSearchProps) {
   const [keyword, setKeyword] = useState('');
-  const [source, setSource] = useState<'all' | 'remoteok' | 'remotive'>('all');
+  const [country, setCountry] = useState('all');
+  const [source, setSource] = useState('all');
   const [jobs, setJobs] = useState<JobListing[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState<string | null>(null);
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [apiStatus, setApiStatus] = useState<ApiStatus[]>([]);
+  const [showApiStatus, setShowApiStatus] = useState(false);
+
+  // Fetch API status on mount
+  useEffect(() => {
+    fetch('/api/jobs/search?status=true')
+      .then(res => res.json())
+      .then(data => setApiStatus(data.apis || []))
+      .catch(() => {});
+  }, []);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,7 +73,12 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
       setLoading(true);
       setError(null);
 
-      const params = new URLSearchParams({ keyword, source, limit: '50' });
+      const params = new URLSearchParams({
+        keyword,
+        country,
+        source,
+        limit: '50',
+      });
       const response = await fetch(`/api/jobs/search?${params}`);
       const data = await response.json();
 
@@ -48,6 +87,9 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
       }
 
       setJobs(data.jobs);
+      if (data.apis) {
+        setApiStatus(data.apis);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Search failed');
     } finally {
@@ -113,11 +155,57 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
     return tmp.textContent || tmp.innerText || '';
   };
 
+  const configuredApis = apiStatus.filter(api => api.configured).length;
+  const totalApis = apiStatus.length;
+
   return (
     <div>
+      {/* API Status Banner */}
+      <div className="mb-4">
+        <button
+          onClick={() => setShowApiStatus(!showApiStatus)}
+          className="text-sm text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 flex items-center gap-2"
+        >
+          <span className={`w-2 h-2 rounded-full ${configuredApis === totalApis ? 'bg-green-500' : 'bg-yellow-500'}`} />
+          {configuredApis}/{totalApis} APIs configured
+          <svg className={`w-4 h-4 transition-transform ${showApiStatus ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+
+        {showApiStatus && (
+          <div className="mt-2 p-3 bg-zinc-50 dark:bg-zinc-800/50 rounded-lg border border-zinc-200 dark:border-zinc-700">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+              {apiStatus.map(api => (
+                <div key={api.name} className="flex items-center gap-2 text-sm">
+                  {api.configured ? (
+                    <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  ) : (
+                    <svg className="w-4 h-4 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                  )}
+                  <span className={api.configured ? 'text-zinc-700 dark:text-zinc-300' : 'text-zinc-400'}>
+                    {api.name}
+                  </span>
+                  {api.needsKey && !api.configured && (
+                    <span className="text-xs text-amber-500">(needs key)</span>
+                  )}
+                </div>
+              ))}
+            </div>
+            <p className="mt-2 text-xs text-zinc-500">
+              Add API keys to .env: ADZUNA_APP_ID, ADZUNA_APP_KEY, JOOBLE_API_KEY, RAPIDAPI_KEY
+            </p>
+          </div>
+        )}
+      </div>
+
       {/* Search Form */}
       <form onSubmit={handleSearch} className="mb-6">
-        <div className="flex gap-3">
+        <div className="flex flex-col md:flex-row gap-3">
           <div className="flex-1">
             <input
               type="text"
@@ -128,13 +216,28 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
             />
           </div>
           <select
+            value={country}
+            onChange={(e) => setCountry(e.target.value)}
+            className="px-4 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
+          >
+            {COUNTRY_OPTIONS.map(opt => (
+              <option key={opt.value} value={opt.value}>
+                {opt.flag} {opt.label}
+              </option>
+            ))}
+          </select>
+          <select
             value={source}
-            onChange={(e) => setSource(e.target.value as typeof source)}
+            onChange={(e) => setSource(e.target.value)}
             className="px-4 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
           >
             <option value="all">All Sources</option>
             <option value="remoteok">RemoteOK</option>
             <option value="remotive">Remotive</option>
+            <option value="arbeitnow">Arbeitnow (EU)</option>
+            <option value="adzuna">Adzuna (PT/BR)</option>
+            <option value="jooble">Jooble</option>
+            <option value="jsearch">JSearch</option>
           </select>
           <button
             type="submit"
@@ -211,14 +314,8 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
                         </p>
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0">
-                        <span
-                          className={`px-2 py-1 text-xs rounded ${
-                            job.source === 'remoteok'
-                              ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
-                              : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
-                          }`}
-                        >
-                          {job.source === 'remoteok' ? 'RemoteOK' : 'Remotive'}
+                        <span className={`px-2 py-1 text-xs rounded ${SOURCE_LABELS[job.source]?.color || 'bg-zinc-100 text-zinc-600'}`}>
+                          {SOURCE_LABELS[job.source]?.label || job.source}
                         </span>
                       </div>
                     </div>
@@ -248,6 +345,14 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
                         </svg>
                         {formatDate(job.postedAt)}
                       </span>
+                      {job.country && job.country !== 'remote' && (
+                        <span className="flex items-center gap-1">
+                          {job.country === 'pt' && '🇵🇹'}
+                          {job.country === 'br' && '🇧🇷'}
+                          {job.country === 'eu' && '🇪🇺'}
+                          {job.country.toUpperCase()}
+                        </span>
+                      )}
                     </div>
 
                     {/* Tags */}
@@ -341,7 +446,7 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
             </svg>
           </div>
           <p className="text-zinc-600 dark:text-zinc-400">
-            No jobs found for &quot;{keyword}&quot;. Try a different search term.
+            No jobs found for &quot;{keyword}&quot;. Try a different search term or source.
           </p>
         </div>
       )}
@@ -355,10 +460,10 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
             </svg>
           </div>
           <p className="text-zinc-600 dark:text-zinc-400 mb-2">
-            Search for remote jobs from RemoteOK and Remotive.
+            Search for jobs from multiple sources.
           </p>
           <p className="text-sm text-zinc-500 dark:text-zinc-500">
-            Enter a keyword like &quot;React&quot;, &quot;Python&quot;, or &quot;DevOps&quot; to get started.
+            Select a country to search for local jobs in Portugal or Brazil.
           </p>
         </div>
       )}
