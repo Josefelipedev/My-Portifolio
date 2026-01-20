@@ -50,7 +50,7 @@ export function AboutClient({ readme, user }: AboutClientProps) {
         <div className="flex justify-center">
           <div className="relative">
             {/* Glow effect */}
-            <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full blur-2xl opacity-30 animate-pulse-glow" />
+            <div className="absolute inset-0 bg-gradient-to-r from-red-500 to-purple-500 rounded-full blur-2xl opacity-30 animate-pulse-glow" />
 
             {/* Avatar container */}
             <div className="relative w-64 h-64 sm:w-80 sm:h-80 rounded-full overflow-hidden border-4 border-white dark:border-zinc-800 shadow-2xl">
@@ -61,7 +61,7 @@ export function AboutClient({ readme, user }: AboutClientProps) {
                   className="w-full h-full object-cover"
                 />
               ) : (
-                <div className="w-full h-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center">
+                <div className="w-full h-full bg-gradient-to-br from-red-500 to-purple-500 flex items-center justify-center">
                   <span className="text-6xl text-white font-bold">
                     {displayName.charAt(0)}
                   </span>
@@ -135,7 +135,7 @@ export function AboutClient({ readme, user }: AboutClientProps) {
                       href={href}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-blue-400 hover:text-blue-300 underline"
+                      className="text-red-400 hover:text-red-300 underline"
                     >
                       {children}
                     </a>
@@ -152,7 +152,7 @@ export function AboutClient({ readme, user }: AboutClientProps) {
                     </code>
                   ),
                   blockquote: ({ children }) => (
-                    <blockquote className="border-l-4 border-blue-500 pl-4 italic text-zinc-400 my-4">
+                    <blockquote className="border-l-4 border-red-500 pl-4 italic text-zinc-400 my-4">
                       {children}
                     </blockquote>
                   ),
@@ -170,7 +170,7 @@ export function AboutClient({ readme, user }: AboutClientProps) {
           {/* CTA Button */}
           <a
             href="#contact"
-            className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-500 text-white font-medium rounded-full hover:shadow-lg hover:shadow-blue-500/30 transition-all duration-300 hover:-translate-y-1"
+            className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-red-500 to-purple-500 text-white font-medium rounded-full hover:shadow-lg hover:shadow-red-500/30 transition-all duration-300 hover:-translate-y-1"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />

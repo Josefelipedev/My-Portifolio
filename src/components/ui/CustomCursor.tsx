@@ -87,7 +87,7 @@ export default function CustomCursor() {
         }}
       >
         <div
-          className={`rounded-full border-2 border-blue-500/50 transition-all duration-200 ${
+          className={`rounded-full border-2 border-red-500/50 transition-all duration-200 ${
             isPointer ? 'w-10 h-10' : 'w-8 h-8'
           } ${isClicking ? 'scale-75' : 'scale-100'}`}
         />

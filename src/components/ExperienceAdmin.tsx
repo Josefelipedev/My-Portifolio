@@ -147,7 +147,7 @@ export default function ExperienceAdmin({ experiences: initialExperiences }: { e
                   <div className="flex items-center gap-1 ml-2">
                     <button
                       onClick={() => openEditModal(experience)}
-                      className="p-1.5 text-zinc-400 hover:text-blue-500 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded transition-colors"
+                      className="p-1.5 text-zinc-400 hover:text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition-colors"
                       title="Edit experience"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

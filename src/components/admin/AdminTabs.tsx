@@ -38,7 +38,7 @@ export default function AdminTabs({ projects, experiences }: AdminTabsProps) {
           onClick={() => setActiveTab('projects')}
           className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
             activeTab === 'projects'
-              ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+              ? 'border-red-500 text-red-600 dark:text-red-400'
               : 'border-transparent text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
           }`}
         >

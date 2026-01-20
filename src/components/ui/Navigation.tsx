@@ -114,7 +114,7 @@ export function Navigation() {
           {/* Logo */}
           <button
             onClick={() => scrollToSection('#hero')}
-            className="px-4 py-2 text-lg font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent hover:from-blue-300 hover:to-purple-300 transition-all"
+            className="px-4 py-2 text-lg font-bold bg-gradient-to-r from-red-400 to-purple-400 bg-clip-text text-transparent hover:from-red-300 hover:to-purple-300 transition-all"
           >
             JF
           </button>
@@ -136,7 +136,7 @@ export function Navigation() {
               `}
             >
               {activeSection === item.href.slice(1) && (
-                <span className="absolute inset-0 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-xl border border-blue-500/30" />
+                <span className="absolute inset-0 bg-gradient-to-r from-red-500/20 to-purple-500/20 rounded-xl border border-red-500/30" />
               )}
               <span className="relative">{item.label}</span>
             </button>
@@ -203,7 +203,7 @@ export function Navigation() {
           <div className="absolute top-full mt-2 right-0 w-56 py-2 bg-slate-900/95 backdrop-blur-xl rounded-2xl border border-slate-700/50 shadow-2xl animate-in fade-in slide-in-from-top-2 duration-200">
             {/* Logo in mobile menu */}
             <div className="px-4 py-3 border-b border-slate-700/50 mb-2">
-              <span className="text-lg font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
+              <span className="text-lg font-bold bg-gradient-to-r from-red-400 to-purple-400 bg-clip-text text-transparent">
                 Jose Felipe
               </span>
             </div>
@@ -215,13 +215,13 @@ export function Navigation() {
                   w-full px-4 py-3 text-left text-sm font-medium
                   transition-all duration-200 flex items-center gap-3
                   ${activeSection === item.href.slice(1)
-                    ? 'text-blue-400 bg-blue-500/10'
+                    ? 'text-red-400 bg-red-500/10'
                     : 'text-zinc-400 hover:text-white hover:bg-slate-800/50'
                   }
                 `}
               >
                 {activeSection === item.href.slice(1) && (
-                  <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
                 )}
                 {item.label}
               </button>

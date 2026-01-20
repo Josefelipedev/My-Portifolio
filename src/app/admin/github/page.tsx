@@ -195,7 +195,7 @@ export default function GitHubAdminPage() {
                 type="checkbox"
                 checked={generateSummary}
                 onChange={(e) => setGenerateSummary(e.target.checked)}
-                className="w-5 h-5 rounded border-zinc-300 text-blue-500 focus:ring-blue-500"
+                className="w-5 h-5 rounded border-zinc-300 text-red-500 focus:ring-red-500"
               />
               <div>
                 <span className="font-medium text-zinc-900 dark:text-zinc-100">
@@ -224,7 +224,7 @@ export default function GitHubAdminPage() {
                     <button
                       onClick={handleImportSelected}
                       disabled={importing.size > 0}
-                      className="px-4 py-1.5 bg-blue-500 text-white text-sm font-medium rounded-lg hover:bg-blue-600 disabled:opacity-50 transition-colors"
+                      className="px-4 py-1.5 bg-red-500 text-white text-sm font-medium rounded-lg hover:bg-red-600 disabled:opacity-50 transition-colors"
                     >
                       Import Selected ({selectedCount})
                     </button>
@@ -233,7 +233,7 @@ export default function GitHubAdminPage() {
                   <button
                     onClick={selectAllNotImported}
                     disabled={notImportedCount === 0}
-                    className="px-3 py-1.5 text-sm text-blue-500 hover:text-blue-600 disabled:opacity-50"
+                    className="px-3 py-1.5 text-sm text-red-500 hover:text-red-600 disabled:opacity-50"
                   >
                     Select All ({notImportedCount})
                   </button>
@@ -279,8 +279,8 @@ export default function GitHubAdminPage() {
                   repo.isImported
                     ? 'border-green-300 dark:border-green-700 bg-green-50/50 dark:bg-green-900/10'
                     : selectedRepos.has(repo.id)
-                    ? 'border-blue-400 dark:border-blue-600 bg-blue-50/50 dark:bg-blue-900/10'
-                    : 'border-zinc-200 dark:border-zinc-700 hover:border-blue-300 dark:hover:border-blue-700'
+                    ? 'border-red-400 dark:border-red-600 bg-red-50/50 dark:bg-red-900/10'
+                    : 'border-zinc-200 dark:border-zinc-700 hover:border-red-300 dark:hover:border-red-700'
                 }`}
               >
                 {/* Header */}
@@ -292,7 +292,7 @@ export default function GitHubAdminPage() {
                         type="checkbox"
                         checked={selectedRepos.has(repo.id)}
                         onChange={() => toggleSelectRepo(repo.id)}
-                        className="w-4 h-4 mt-1 rounded border-zinc-300 text-blue-500 focus:ring-blue-500"
+                        className="w-4 h-4 mt-1 rounded border-zinc-300 text-red-500 focus:ring-red-500"
                       />
                     )}
                     <div className="flex-1 min-w-0">
@@ -325,7 +325,7 @@ export default function GitHubAdminPage() {
                     {repo.topics.slice(0, 3).map((topic) => (
                       <span
                         key={topic}
-                        className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-xs rounded-full"
+                        className="px-2 py-0.5 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-xs rounded-full"
                       >
                         {topic}
                       </span>
@@ -351,7 +351,7 @@ export default function GitHubAdminPage() {
                     <button
                       onClick={() => handleImport(repo)}
                       disabled={importing.has(repo.id)}
-                      className="flex-1 px-3 py-2 bg-blue-500 text-white text-sm font-medium rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                      className="flex-1 px-3 py-2 bg-red-500 text-white text-sm font-medium rounded-lg hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
                     >
                       {importing.has(repo.id) ? (
                         <>

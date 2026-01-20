@@ -221,7 +221,7 @@ export default function SkillsAdminPage() {
                 setEditingId(null);
                 setFormData({ name: '', category: 'frontend', level: 3, iconUrl: '' });
               }}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white font-medium rounded-lg hover:bg-blue-600 transition-colors"
+              className="flex items-center gap-2 px-4 py-2 bg-red-500 text-white font-medium rounded-lg hover:bg-red-600 transition-colors"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -370,7 +370,7 @@ export default function SkillsAdminPage() {
                   <button
                     type="submit"
                     disabled={saving === 'form'}
-                    className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 transition-colors"
+                    className="flex-1 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50 transition-colors"
                   >
                     {saving === 'form' ? 'Saving...' : editingId ? 'Update' : 'Add'}
                   </button>
@@ -418,7 +418,7 @@ export default function SkillsAdminPage() {
                               key={level}
                               className={`w-2 h-2 rounded-full ${
                                 level <= skill.level
-                                  ? 'bg-blue-500'
+                                  ? 'bg-red-500'
                                   : 'bg-zinc-200 dark:bg-zinc-700'
                               }`}
                             />

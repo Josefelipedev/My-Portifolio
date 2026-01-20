@@ -168,7 +168,7 @@ export default function GitHubOrgsPage() {
               <button
                 key={org.id}
                 onClick={() => fetchOrgRepos(org)}
-                className="bg-white dark:bg-zinc-800 rounded-xl p-5 border border-zinc-200 dark:border-zinc-700 hover:border-blue-300 dark:hover:border-blue-700 transition-all text-left"
+                className="bg-white dark:bg-zinc-800 rounded-xl p-5 border border-zinc-200 dark:border-zinc-700 hover:border-red-300 dark:hover:border-red-700 transition-all text-left"
               >
                 <div className="flex items-center gap-4">
                   <img
@@ -251,7 +251,7 @@ export default function GitHubOrgsPage() {
                   type="checkbox"
                   checked={generateSummary}
                   onChange={(e) => setGenerateSummary(e.target.checked)}
-                  className="w-5 h-5 rounded border-zinc-300 text-blue-500 focus:ring-blue-500"
+                  className="w-5 h-5 rounded border-zinc-300 text-red-500 focus:ring-red-500"
                 />
                 <div>
                   <span className="font-medium text-zinc-900 dark:text-zinc-100">
@@ -286,7 +286,7 @@ export default function GitHubOrgsPage() {
                     className={`bg-white dark:bg-zinc-800 rounded-xl p-5 border transition-all ${
                       repo.isImported
                         ? 'border-green-300 dark:border-green-700 bg-green-50/50 dark:bg-green-900/10'
-                        : 'border-zinc-200 dark:border-zinc-700 hover:border-blue-300 dark:hover:border-blue-700'
+                        : 'border-zinc-200 dark:border-zinc-700 hover:border-red-300 dark:hover:border-red-700'
                     }`}
                   >
                     {/* Header */}
@@ -320,7 +320,7 @@ export default function GitHubOrgsPage() {
                         {repo.topics.slice(0, 3).map((topic) => (
                           <span
                             key={topic}
-                            className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-xs rounded-full"
+                            className="px-2 py-0.5 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-xs rounded-full"
                           >
                             {topic}
                           </span>
@@ -346,7 +346,7 @@ export default function GitHubOrgsPage() {
                         <button
                           onClick={() => handleImport(repo)}
                           disabled={importing === repo.id}
-                          className="flex-1 px-3 py-2 bg-blue-500 text-white text-sm font-medium rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                          className="flex-1 px-3 py-2 bg-red-500 text-white text-sm font-medium rounded-lg hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
                         >
                           {importing === repo.id ? (
                             <>

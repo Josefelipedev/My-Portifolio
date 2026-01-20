@@ -369,20 +369,20 @@ export default function ResumeAdminPage() {
         <div className="flex items-center justify-center mb-8">
           <div className="flex items-center gap-2">
             <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
-              viewMode === 'upload' ? 'bg-blue-500 text-white' : 'bg-green-500 text-white'
+              viewMode === 'upload' ? 'bg-red-500 text-white' : 'bg-green-500 text-white'
             }`}>
               {viewMode === 'upload' ? '1' : '✓'}
             </div>
-            <div className={`w-8 md:w-12 h-1 rounded ${viewMode !== 'upload' ? 'bg-blue-500' : 'bg-zinc-300 dark:bg-zinc-700'}`} />
+            <div className={`w-8 md:w-12 h-1 rounded ${viewMode !== 'upload' ? 'bg-red-500' : 'bg-zinc-300 dark:bg-zinc-700'}`} />
             <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
-              viewMode === 'analysis' ? 'bg-blue-500 text-white' :
+              viewMode === 'analysis' ? 'bg-red-500 text-white' :
               viewMode === 'comparison' ? 'bg-green-500 text-white' : 'bg-zinc-300 dark:bg-zinc-700 text-zinc-500'
             }`}>
               {viewMode === 'comparison' ? '✓' : '2'}
             </div>
-            <div className={`w-8 md:w-12 h-1 rounded ${viewMode === 'comparison' ? 'bg-blue-500' : 'bg-zinc-300 dark:bg-zinc-700'}`} />
+            <div className={`w-8 md:w-12 h-1 rounded ${viewMode === 'comparison' ? 'bg-red-500' : 'bg-zinc-300 dark:bg-zinc-700'}`} />
             <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
-              viewMode === 'comparison' ? 'bg-blue-500 text-white' : 'bg-zinc-300 dark:bg-zinc-700 text-zinc-500'
+              viewMode === 'comparison' ? 'bg-red-500 text-white' : 'bg-zinc-300 dark:bg-zinc-700 text-zinc-500'
             }`}>
               3
             </div>
@@ -405,8 +405,8 @@ export default function ResumeAdminPage() {
         {viewMode === 'upload' && (
           <div className="bg-white dark:bg-zinc-800 rounded-xl p-6 md:p-8 border border-zinc-200 dark:border-zinc-700 mb-8">
             <div className="text-center">
-              <div className="w-16 h-16 md:w-20 md:h-20 mx-auto mb-4 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
-                <svg className="w-8 h-8 md:w-10 md:h-10 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="w-16 h-16 md:w-20 md:h-20 mx-auto mb-4 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center">
+                <svg className="w-8 h-8 md:w-10 md:h-10 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
               </div>
@@ -428,7 +428,7 @@ export default function ResumeAdminPage() {
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   disabled={analyzing}
-                  className="px-6 py-3 bg-blue-500 text-white font-medium rounded-lg hover:bg-blue-600 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+                  className="px-6 py-3 bg-red-500 text-white font-medium rounded-lg hover:bg-red-600 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
@@ -472,7 +472,7 @@ export default function ResumeAdminPage() {
                     Step 2: Review Extracted Data
                   </h2>
                   <p className="text-sm text-zinc-500">
-                    Provider: <span className="text-blue-500">{provider}</span>
+                    Provider: <span className="text-red-500">{provider}</span>
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-3">
@@ -485,7 +485,7 @@ export default function ResumeAdminPage() {
                   <button
                     onClick={handleCompare}
                     disabled={comparing}
-                    className="px-4 py-2 bg-blue-500 text-white font-medium rounded-lg hover:bg-blue-600 disabled:opacity-50 transition-colors flex items-center gap-2"
+                    className="px-4 py-2 bg-red-500 text-white font-medium rounded-lg hover:bg-red-600 disabled:opacity-50 transition-colors flex items-center gap-2"
                   >
                     {comparing ? 'Comparing...' : 'Compare with Database'}
                   </button>
@@ -530,7 +530,7 @@ export default function ResumeAdminPage() {
               </h2>
               <div className="flex flex-wrap gap-2">
                 {analysis.skills.map((skill, idx) => (
-                  <span key={idx} className="px-3 py-1.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-lg text-sm">
+                  <span key={idx} className="px-3 py-1.5 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded-lg text-sm">
                     {skill.name} ({getLevelLabel(skill.level)})
                   </span>
                 ))}
@@ -613,7 +613,7 @@ export default function ResumeAdminPage() {
                 <div className="flex gap-2">
                   <button
                     onClick={() => setEditableExperiences(prev => prev.map(e => ({ ...e, included: true })))}
-                    className="text-xs px-2 py-1 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded"
+                    className="text-xs px-2 py-1 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
                   >
                     Select All
                   </button>
@@ -675,7 +675,7 @@ export default function ResumeAdminPage() {
                 <div className="flex gap-2">
                   <button
                     onClick={() => setEditableSkills(prev => prev.map(s => ({ ...s, included: true })))}
-                    className="text-xs px-2 py-1 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded"
+                    className="text-xs px-2 py-1 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
                   >
                     Select All
                   </button>
@@ -798,7 +798,7 @@ export default function ResumeAdminPage() {
                 </button>
                 <button
                   onClick={() => updateExperience(editingExperience)}
-                  className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+                  className="flex-1 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
                 >
                   Save
                 </button>
@@ -860,7 +860,7 @@ export default function ResumeAdminPage() {
                 </button>
                 <button
                   onClick={() => updateSkill(editingSkill)}
-                  className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+                  className="flex-1 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
                 >
                   Save
                 </button>

@@ -251,7 +251,7 @@ export default function ProjectAdmin({ projects: initialProjects }: { projects: 
         </h2>
         <button
           onClick={openAddModal}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white text-sm font-medium rounded-lg hover:bg-blue-600 transition-colors"
+          className="flex items-center gap-2 px-4 py-2 bg-red-500 text-white text-sm font-medium rounded-lg hover:bg-red-600 transition-colors"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -355,7 +355,7 @@ export default function ProjectAdmin({ projects: initialProjects }: { projects: 
                     </button>
                     <button
                       onClick={() => openEditModal(project)}
-                      className="p-1.5 text-zinc-400 hover:text-blue-500 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded transition-colors"
+                      className="p-1.5 text-zinc-400 hover:text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition-colors"
                       title="Edit project"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -388,12 +388,12 @@ export default function ProjectAdmin({ projects: initialProjects }: { projects: 
                       </div>
                       <div className="flex items-center gap-4 text-xs text-zinc-500">
                         {project.repoUrl && (
-                          <a href={project.repoUrl} target="_blank" rel="noopener noreferrer" className="hover:text-blue-500">
+                          <a href={project.repoUrl} target="_blank" rel="noopener noreferrer" className="hover:text-red-500">
                             Repository →
                           </a>
                         )}
                         {project.demoUrl && (
-                          <a href={project.demoUrl} target="_blank" rel="noopener noreferrer" className="hover:text-blue-500">
+                          <a href={project.demoUrl} target="_blank" rel="noopener noreferrer" className="hover:text-red-500">
                             Demo →
                           </a>
                         )}
@@ -443,7 +443,7 @@ export default function ProjectAdmin({ projects: initialProjects }: { projects: 
                     type="checkbox"
                     checked={isPrivate}
                     onChange={(e) => setIsPrivate(e.target.checked)}
-                    className="w-4 h-4 rounded border-zinc-300 text-blue-500 focus:ring-blue-500"
+                    className="w-4 h-4 rounded border-zinc-300 text-red-500 focus:ring-red-500"
                   />
                   <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
                     Private Repository
@@ -462,7 +462,7 @@ export default function ProjectAdmin({ projects: initialProjects }: { projects: 
                     placeholder="Project name"
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
-                    className="w-full p-2.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+                    className="w-full p-2.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg focus:ring-2 focus:ring-red-500 outline-none text-sm"
                     required
                   />
                 </div>
@@ -475,7 +475,7 @@ export default function ProjectAdmin({ projects: initialProjects }: { projects: 
                     placeholder={isPrivate ? "Optional for private repos" : "https://github.com/..."}
                     value={repoUrl}
                     onChange={(e) => setRepoUrl(e.target.value)}
-                    className="w-full p-2.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+                    className="w-full p-2.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg focus:ring-2 focus:ring-red-500 outline-none text-sm"
                     required={!isPrivate}
                   />
                 </div>
@@ -486,7 +486,7 @@ export default function ProjectAdmin({ projects: initialProjects }: { projects: 
                     placeholder="https://..."
                     value={demoUrl}
                     onChange={(e) => setDemoUrl(e.target.value)}
-                    className="w-full p-2.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+                    className="w-full p-2.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg focus:ring-2 focus:ring-red-500 outline-none text-sm"
                   />
                 </div>
                 <div>
@@ -496,7 +496,7 @@ export default function ProjectAdmin({ projects: initialProjects }: { projects: 
                     placeholder="React, Node.js, TypeScript"
                     value={technologies}
                     onChange={(e) => setTechnologies(e.target.value)}
-                    className="w-full p-2.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+                    className="w-full p-2.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg focus:ring-2 focus:ring-red-500 outline-none text-sm"
                     required
                   />
                 </div>
@@ -508,7 +508,7 @@ export default function ProjectAdmin({ projects: initialProjects }: { projects: 
                   placeholder="Brief description of the project"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  className="w-full p-2.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none resize-none text-sm"
+                  className="w-full p-2.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg focus:ring-2 focus:ring-red-500 outline-none resize-none text-sm"
                   rows={2}
                   required
                 />
@@ -527,8 +527,8 @@ export default function ProjectAdmin({ projects: initialProjects }: { projects: 
                       onClick={() => setRank(r)}
                       className={`px-3 py-1 text-sm rounded-lg border transition-colors ${
                         rank === r
-                          ? 'bg-blue-500 text-white border-blue-500'
-                          : 'bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-600 hover:border-blue-300'
+                          ? 'bg-red-500 text-white border-red-500'
+                          : 'bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-600 hover:border-red-300'
                       }`}
                     >
                       {r === null ? 'None' : r === 1 ? '1st' : r === 2 ? '2nd' : '3rd'}
@@ -567,7 +567,7 @@ export default function ProjectAdmin({ projects: initialProjects }: { projects: 
                         setReadme(e.target.value);
                         setAiAnalysis(null);
                       }}
-                      className="w-full p-2.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none resize-none font-mono text-sm"
+                      className="w-full p-2.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg focus:ring-2 focus:ring-red-500 outline-none resize-none font-mono text-sm"
                       rows={8}
                     />
 
@@ -656,7 +656,7 @@ export default function ProjectAdmin({ projects: initialProjects }: { projects: 
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className="px-4 py-2 bg-blue-500 text-white text-sm font-medium rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 flex items-center gap-2"
+                  className="px-4 py-2 bg-red-500 text-white text-sm font-medium rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50 flex items-center gap-2"
                 >
                   {isLoading && (
                     <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">

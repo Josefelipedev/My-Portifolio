@@ -43,7 +43,7 @@ export async function ExperiencesSection() {
       ) : (
         <div className="relative">
           {/* Timeline line */}
-          <div className="absolute left-0 md:left-1/2 top-0 bottom-0 w-0.5 bg-gradient-to-b from-blue-500 to-purple-500 transform md:-translate-x-1/2" />
+          <div className="absolute left-0 md:left-1/2 top-0 bottom-0 w-0.5 bg-gradient-to-b from-red-500 to-purple-500 transform md:-translate-x-1/2" />
 
           {/* Timeline items */}
           <div className="space-y-12">
@@ -56,7 +56,7 @@ export async function ExperiencesSection() {
                 style={{ animationDelay: `${index * 150}ms` }}
               >
                 {/* Timeline dot */}
-                <div className="absolute left-0 md:left-1/2 w-4 h-4 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full transform -translate-x-1.5 md:-translate-x-2 ring-4 ring-white dark:ring-zinc-900" />
+                <div className="absolute left-0 md:left-1/2 w-4 h-4 bg-gradient-to-r from-red-500 to-purple-500 rounded-full transform -translate-x-1.5 md:-translate-x-2 ring-4 ring-white dark:ring-zinc-900" />
 
                 {/* Date (visible on mobile) */}
                 <div className="md:hidden pl-8 text-sm text-zinc-500">
@@ -72,7 +72,7 @@ export async function ExperiencesSection() {
                         {exp.title}
                       </h3>
                       {exp.company && (
-                        <p className="text-blue-500 font-medium">{exp.company}</p>
+                        <p className="text-red-500 font-medium">{exp.company}</p>
                       )}
                       <div className="flex items-center gap-2 mt-1 text-sm text-zinc-500">
                         {/* Date (hidden on mobile, visible on desktop) */}
@@ -108,7 +108,7 @@ export async function ExperiencesSection() {
                         <ul className="space-y-1">
                           {exp.responsibilities.split(',').map((resp, i) => (
                             <li key={i} className="flex items-start gap-2 text-sm text-zinc-600 dark:text-zinc-400">
-                              <svg className="w-4 h-4 text-blue-500 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <svg className="w-4 h-4 text-red-500 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                               </svg>
                               <span>{resp.trim()}</span>
