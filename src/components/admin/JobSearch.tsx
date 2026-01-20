@@ -45,10 +45,19 @@ const COUNTRY_OPTIONS = [
   { value: 'br', label: 'Brazil', flag: '🇧🇷' },
 ];
 
+const DATE_FILTER_OPTIONS = [
+  { value: '0', label: 'Todas as datas' },
+  { value: '7', label: 'Ultimos 7 dias' },
+  { value: '15', label: 'Ultimos 15 dias' },
+  { value: '30', label: 'Ultimo mes' },
+  { value: '60', label: 'Ultimos 2 meses' },
+];
+
 export default function JobSearch({ onJobSaved }: JobSearchProps) {
   const [keyword, setKeyword] = useState('');
   const [country, setCountry] = useState('all');
   const [source, setSource] = useState('all');
+  const [maxAgeDays, setMaxAgeDays] = useState('0');
   const [jobs, setJobs] = useState<JobListing[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -83,6 +92,7 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
         country,
         source,
         limit: '50',
+        maxAgeDays,
       });
       const response = await fetch(`/api/jobs/search?${params}`);
       const data = await response.json();
@@ -110,7 +120,9 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
 
       const params = new URLSearchParams({
         country,
+        source,
         limit: '50',
+        maxAgeDays,
       });
       const response = await fetch(`/api/jobs/smart-search?${params}`);
       const data = await response.json();
@@ -273,6 +285,18 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
             <option value="adzuna">Adzuna (PT/BR)</option>
             <option value="jooble">Jooble</option>
             <option value="jsearch">JSearch</option>
+          </select>
+          <select
+            value={maxAgeDays}
+            onChange={(e) => setMaxAgeDays(e.target.value)}
+            className="px-4 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
+            title="Filtrar por data"
+          >
+            {DATE_FILTER_OPTIONS.map(opt => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
           </select>
           <button
             type="submit"
