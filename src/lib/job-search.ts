@@ -894,8 +894,9 @@ function parseVagasComBrHTML(html: string): VagasComBrJob[] {
       const levelMatch = context.match(/<span[^>]*class="nivelVaga"[^>]*>\s*([^<]+)/i);
       const level = levelMatch ? cleanHtmlText(levelMatch[1]) : '';
 
-      // Extract location from <span class="vaga-local">LOCATION</span>
-      const locationMatch = context.match(/<span[^>]*class="vaga-local"[^>]*>\s*([^<]+)/i);
+      // Extract location from <div class="vaga-local"> (may contain icon before text)
+      const locationMatch = context.match(/<div[^>]*class="vaga-local"[^>]*>[\s\S]*?<\/i>\s*([^<]+)/i) ||
+                           context.match(/<div[^>]*class="vaga-local"[^>]*>\s*([^<]+)/i);
       const location = locationMatch ? cleanHtmlText(locationMatch[1]) : 'Brasil';
 
       jobs.push({
