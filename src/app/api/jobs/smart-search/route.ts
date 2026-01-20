@@ -20,7 +20,11 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url);
     const country = (searchParams.get('country') || 'all') as 'br' | 'pt' | 'remote' | 'all';
-    const source = (searchParams.get('source') || 'all') as JobSource;
+    // Support multiple sources (comma-separated) or single source
+    const sourceParam = searchParams.get('source') || 'all';
+    const source = sourceParam.includes(',')
+      ? sourceParam.split(',').filter(Boolean) as JobSource[]
+      : sourceParam as JobSource;
     const limit = searchParams.get('limit') ? parseInt(searchParams.get('limit')!) : 50;
     const maxAgeDays = searchParams.get('maxAgeDays') ? parseInt(searchParams.get('maxAgeDays')!) : 0;
 

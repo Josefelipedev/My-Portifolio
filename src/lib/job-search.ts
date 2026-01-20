@@ -503,28 +503,33 @@ export async function searchJSearch(params: JobSearchParams): Promise<JobListing
 
 export type JobSource = 'all' | 'remoteok' | 'remotive' | 'arbeitnow' | 'adzuna' | 'jooble' | 'jsearch' | 'netempregos';
 
-export async function searchJobs(params: JobSearchParams, source: JobSource = 'all'): Promise<JobListing[]> {
+// Accept single source or array of sources
+export async function searchJobs(params: JobSearchParams, source: JobSource | JobSource[] = 'all'): Promise<JobListing[]> {
   const searches: Promise<JobListing[]>[] = [];
 
-  if (source === 'all' || source === 'remoteok') {
+  // Convert to array for easier handling
+  const sources = Array.isArray(source) ? source : [source];
+  const isAll = sources.includes('all');
+
+  if (isAll || sources.includes('remoteok')) {
     searches.push(searchRemoteOK(params));
   }
-  if (source === 'all' || source === 'remotive') {
+  if (isAll || sources.includes('remotive')) {
     searches.push(searchRemotive(params));
   }
-  if (source === 'all' || source === 'arbeitnow') {
+  if (isAll || sources.includes('arbeitnow')) {
     searches.push(searchArbeitnow(params));
   }
-  if (source === 'all' || source === 'adzuna') {
+  if (isAll || sources.includes('adzuna')) {
     searches.push(searchAdzuna(params));
   }
-  if (source === 'all' || source === 'jooble') {
+  if (isAll || sources.includes('jooble')) {
     searches.push(searchJooble(params));
   }
-  if (source === 'all' || source === 'jsearch') {
+  if (isAll || sources.includes('jsearch')) {
     searches.push(searchJSearch(params));
   }
-  if (source === 'netempregos' || (source === 'all' && (params.country === 'pt' || !params.country))) {
+  if (sources.includes('netempregos') || (isAll && (params.country === 'pt' || !params.country))) {
     searches.push(searchNetEmpregos(params));
   }
 
@@ -701,36 +706,30 @@ export async function searchNetEmpregos(params: JobSearchParams): Promise<JobLis
 function parseNetEmpregosHTML(html: string): NetEmpregosJob[] {
   const jobs: NetEmpregosJob[] = [];
 
-  // Match job listings using regex patterns
-  // Looking for the main job listing divs/links
-  const jobPattern = /<a[^>]*href="(\/emprego-[^"]+)"[^>]*>[\s\S]*?<div[^>]*class="[^"]*titulo[^"]*"[^>]*>([\s\S]*?)<\/div>[\s\S]*?<div[^>]*class="[^"]*empresa[^"]*"[^>]*>([\s\S]*?)<\/div>[\s\S]*?<div[^>]*class="[^"]*local[^"]*"[^>]*>([\s\S]*?)<\/div>/gi;
+  // New pattern: <h2><a class="oferta-link" href="/ID/TITLE/">TITLE</a></h2>
+  // Pattern for job items with h2 titles
+  const jobPattern = /<h2[^>]*>[\s\S]*?<a[^>]*class="oferta-link"[^>]*href=["']?([^"'\s>]+)["']?[^>]*>([^<]+)<\/a>/gi;
 
-  // Alternative simpler pattern for job cards
-  const simplePattern = /<div[^>]*class="[^"]*oferta[^"]*"[^>]*>[\s\S]*?<a[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>[\s\S]*?<span[^>]*class="[^"]*empresa[^"]*"[^>]*>([\s\S]*?)<\/span>[\s\S]*?<span[^>]*class="[^"]*local[^"]*"[^>]*>([\s\S]*?)<\/span>/gi;
-
-  // Try to extract using href and title patterns
-  const hrefPattern = /href="(\/emprego-[^"]+)"[^>]*title="([^"]+)"/gi;
   let match;
-
-  while ((match = hrefPattern.exec(html)) !== null) {
-    const url = match[1];
+  while ((match = jobPattern.exec(html)) !== null) {
+    const url = match[1].replace(/^=/, ''); // Remove leading = if present
     const title = cleanHtmlText(match[2]);
 
-    if (title && title.length > 5) {
-      // Try to find company and location near this job
-      const contextStart = Math.max(0, match.index - 200);
-      const contextEnd = Math.min(html.length, match.index + 500);
+    if (title && title.length > 3) {
+      // Find the job-item container around this match to extract company and location
+      const contextStart = Math.max(0, match.index - 100);
+      const contextEnd = Math.min(html.length, match.index + 800);
       const context = html.substring(contextStart, contextEnd);
 
-      // Extract company
-      const companyMatch = context.match(/class="[^"]*empresa[^"]*"[^>]*>([^<]+)</i);
+      // Extract company from <li><i class="flaticon-work"></i> COMPANY</li>
+      const companyMatch = context.match(/flaticon-work[^>]*><\/i>\s*([^<]+)</i);
       const company = companyMatch ? cleanHtmlText(companyMatch[1]) : '';
 
-      // Extract location
-      const localMatch = context.match(/class="[^"]*local[^"]*"[^>]*>([^<]+)</i);
+      // Extract location from <i class="flaticon-location"></i> LOCATION
+      const localMatch = context.match(/flaticon-location[^>]*><\/i>\s*([^<]+)</i);
       const location = localMatch ? cleanHtmlText(localMatch[1]) : 'Portugal';
 
-      // Extract date
+      // Extract date - look for patterns like "há X dias" or date format
       const dateMatch = context.match(/(\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4})/);
       const date = dateMatch ? dateMatch[1] : '';
 
@@ -738,7 +737,7 @@ function parseNetEmpregosHTML(html: string): NetEmpregosJob[] {
         title,
         company,
         location,
-        url,
+        url: url.startsWith('/') ? url : `/${url}`,
         description: '',
         date,
       });
@@ -865,7 +864,7 @@ export function generateSearchQueries(keywords: string[]): string[] {
 
 export interface SmartSearchOptions {
   country?: 'br' | 'pt' | 'remote' | 'all';
-  source?: JobSource;
+  source?: JobSource | JobSource[];
   limit?: number;
   maxAgeDays?: number;
 }
@@ -884,10 +883,14 @@ export async function smartJobSearch(
   const keywords = extractKeywordsFromResume(resume);
   const queries = generateSearchQueries(keywords);
 
-  // Search with top keywords in parallel using the selected source
+  // Convert source to array for easier handling
+  const sources = Array.isArray(source) ? source : [source];
+  const isAll = sources.includes('all');
+
+  // Search with top keywords in parallel using the selected source(s)
   const searchPromises: Promise<JobListing[]>[] = [];
 
-  if (source === 'all') {
+  if (isAll) {
     // Search all sources with top keywords
     searchPromises.push(
       ...queries.slice(0, 3).map(query =>
@@ -901,18 +904,11 @@ export async function smartJobSearch(
         searchNetEmpregos({ keyword: keywords[0] || 'developer', limit: 20 })
       );
     }
-  } else if (source === 'netempregos') {
-    // Only Net-Empregos
-    searchPromises.push(
-      ...queries.slice(0, 3).map(query =>
-        searchNetEmpregos({ keyword: query, limit: Math.ceil(limit / 3) })
-      )
-    );
   } else {
-    // Specific source selected
+    // Specific source(s) selected - use the array directly
     searchPromises.push(
       ...queries.slice(0, 3).map(query =>
-        searchJobs({ keyword: query, country, limit: Math.ceil(limit / 3) }, source)
+        searchJobs({ keyword: query, country, limit: Math.ceil(limit / 3) }, sources)
       )
     );
   }
