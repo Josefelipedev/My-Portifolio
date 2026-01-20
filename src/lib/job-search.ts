@@ -1,4 +1,105 @@
 // Job Search Library - Integration with multiple job APIs
+import Together from 'together-ai';
+
+// ==========================================
+// AI-powered HTML Job Extraction
+// ==========================================
+
+interface AIExtractedJob {
+  title: string;
+  company: string;
+  location: string;
+  url: string;
+  level?: string;
+  description?: string;
+}
+
+// Get Together AI client for job extraction
+let togetherClientForJobs: Together | null = null;
+
+function getTogetherClientForJobs(): Together | null {
+  if (!togetherClientForJobs) {
+    const apiKey = process.env.TOGETHER_API_KEY;
+    if (!apiKey) {
+      return null;
+    }
+    togetherClientForJobs = new Together({ apiKey });
+  }
+  return togetherClientForJobs;
+}
+
+// Extract jobs from HTML using AI
+async function extractJobsWithAI(
+  html: string,
+  siteName: string,
+  baseUrl: string
+): Promise<AIExtractedJob[]> {
+  const client = getTogetherClientForJobs();
+  if (!client) {
+    console.log('AI extraction: No Together API key configured, using regex fallback');
+    return [];
+  }
+
+  try {
+    // Clean HTML - remove scripts, styles, and excessive whitespace
+    const cleanedHtml = html
+      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+      .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
+      .replace(/<!--[\s\S]*?-->/g, '')
+      .replace(/\s+/g, ' ')
+      .slice(0, 15000); // Limit to ~15k chars for AI context
+
+    const prompt = `You are a job listing extractor. Analyze this HTML from ${siteName} and extract job listings.
+
+HTML Content:
+${cleanedHtml}
+
+Extract job listings and return a JSON array with this structure:
+[
+  {
+    "title": "Job title",
+    "company": "Company name",
+    "location": "City/Location",
+    "url": "Job URL (relative or absolute)",
+    "level": "Experience level if available (Junior, Pleno, Senior)",
+    "description": "Brief description if available"
+  }
+]
+
+IMPORTANT:
+- Extract ALL visible job listings from the HTML
+- For URLs, include the path as found (e.g., "/vagas/v123/job-title")
+- If company is not found, use empty string
+- If location is not found, use "Brasil" for Vagas.com.br or "Portugal" for Net-Empregos
+- Return ONLY the JSON array, no other text
+- If no jobs found, return empty array []
+
+Respond with ONLY the JSON array.`;
+
+    const response = await client.chat.completions.create({
+      model: process.env.TOGETHER_MODEL || 'meta-llama/Llama-3.3-70B-Instruct-Turbo',
+      messages: [{ role: 'user', content: prompt }],
+      max_tokens: 4000,
+      temperature: 0.1, // Low temperature for consistent extraction
+    });
+
+    const content = response.choices[0]?.message?.content?.trim() || '[]';
+
+    // Extract JSON array from response
+    const jsonMatch = content.match(/\[[\s\S]*\]/);
+    if (!jsonMatch) {
+      console.log('AI extraction: No JSON array found in response');
+      return [];
+    }
+
+    const jobs = JSON.parse(jsonMatch[0]) as AIExtractedJob[];
+    console.log(`AI extraction: Found ${jobs.length} jobs from ${siteName}`);
+    return jobs;
+  } catch (error) {
+    console.error('AI extraction error:', error);
+    return [];
+  }
+}
 
 export interface JobListing {
   id: string;
@@ -652,12 +753,14 @@ function formatNumber(num: number): string {
 // ==========================================
 
 export function getApiStatus(): { name: string; configured: boolean; needsKey: boolean }[] {
+  const hasAIExtraction = !!process.env.TOGETHER_API_KEY;
   return [
     { name: 'RemoteOK', configured: true, needsKey: false },
     { name: 'Remotive', configured: true, needsKey: false },
     { name: 'Arbeitnow', configured: true, needsKey: false },
     { name: 'Net-Empregos', configured: true, needsKey: false },
     { name: 'Vagas.com.br', configured: true, needsKey: false },
+    { name: 'AI Extraction', configured: hasAIExtraction, needsKey: true },
     { name: 'Adzuna', configured: !!(process.env.ADZUNA_APP_ID && process.env.ADZUNA_APP_KEY), needsKey: true },
     { name: 'Jooble', configured: !!process.env.JOOBLE_API_KEY, needsKey: true },
     { name: 'JSearch', configured: !!process.env.RAPIDAPI_KEY, needsKey: true },
@@ -716,7 +819,26 @@ export async function searchNetEmpregos(params: JobSearchParams): Promise<JobLis
     }
 
     const html = await response.text();
-    const jobs = parseNetEmpregosHTML(html);
+
+    // Try AI extraction first
+    let jobs: NetEmpregosJob[] = [];
+    const aiJobs = await extractJobsWithAI(html, 'Net-Empregos', 'https://www.net-empregos.com');
+
+    if (aiJobs.length > 0) {
+      // Use AI-extracted jobs
+      jobs = aiJobs.map(job => ({
+        title: job.title,
+        company: job.company,
+        location: job.location || 'Portugal',
+        url: job.url,
+        description: job.description || '',
+        date: '',
+      }));
+    } else {
+      // Fallback to regex parsing
+      console.log('Net-Empregos: AI extraction failed, using regex fallback');
+      jobs = parseNetEmpregosHTML(html);
+    }
 
     return jobs.slice(0, params.limit || 50).map((job, index) => ({
       id: `netempregos-${Date.now()}-${index}`,
@@ -847,7 +969,25 @@ export async function searchVagasComBr(params: JobSearchParams): Promise<JobList
     }
 
     const html = await response.text();
-    const jobs = parseVagasComBrHTML(html);
+
+    // Try AI extraction first
+    let jobs: VagasComBrJob[] = [];
+    const aiJobs = await extractJobsWithAI(html, 'Vagas.com.br', 'https://www.vagas.com.br');
+
+    if (aiJobs.length > 0) {
+      // Use AI-extracted jobs
+      jobs = aiJobs.map(job => ({
+        title: job.title,
+        company: job.company,
+        location: job.location || 'Brasil',
+        url: job.url,
+        level: job.level || '',
+      }));
+    } else {
+      // Fallback to regex parsing
+      console.log('Vagas.com.br: AI extraction failed, using regex fallback');
+      jobs = parseVagasComBrHTML(html);
+    }
 
     return jobs.slice(0, params.limit || 50).map((job, index) => ({
       id: `vagascombr-${Date.now()}-${index}`,
