@@ -18,7 +18,11 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url);
     const keyword = searchParams.get('keyword') || undefined;
-    const source = (searchParams.get('source') || 'all') as JobSource;
+    // Support multiple sources (comma-separated) or single source
+    const sourceParam = searchParams.get('source') || 'all';
+    const source = sourceParam.includes(',')
+      ? sourceParam.split(',').filter(Boolean) as JobSource[]
+      : sourceParam as JobSource;
     const country = searchParams.get('country') || undefined; // 'br' | 'pt' | 'remote' | 'all'
     const location = searchParams.get('location') || undefined;
     const category = searchParams.get('category') || undefined;

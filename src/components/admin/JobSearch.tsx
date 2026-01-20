@@ -53,10 +53,20 @@ const DATE_FILTER_OPTIONS = [
   { value: '60', label: 'Ultimos 2 meses' },
 ];
 
+const SOURCE_OPTIONS = [
+  { value: 'remoteok', label: 'RemoteOK', region: 'Remote' },
+  { value: 'remotive', label: 'Remotive', region: 'Remote' },
+  { value: 'arbeitnow', label: 'Arbeitnow', region: 'EU' },
+  { value: 'netempregos', label: 'Net-Empregos', region: 'PT' },
+  { value: 'adzuna', label: 'Adzuna', region: 'PT/BR' },
+  { value: 'jooble', label: 'Jooble', region: 'Global' },
+  { value: 'jsearch', label: 'JSearch', region: 'Global' },
+];
+
 export default function JobSearch({ onJobSaved }: JobSearchProps) {
   const [keyword, setKeyword] = useState('');
   const [country, setCountry] = useState('all');
-  const [source, setSource] = useState('all');
+  const [selectedSources, setSelectedSources] = useState<Set<string>>(new Set(['all']));
   const [maxAgeDays, setMaxAgeDays] = useState('0');
   const [jobs, setJobs] = useState<JobListing[]>([]);
   const [loading, setLoading] = useState(false);
@@ -68,6 +78,41 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
   const [showApiStatus, setShowApiStatus] = useState(false);
   const [smartSearchKeywords, setSmartSearchKeywords] = useState<string[]>([]);
   const [isSmartSearch, setIsSmartSearch] = useState(false);
+  const [showSourceDropdown, setShowSourceDropdown] = useState(false);
+
+  const toggleSource = (source: string) => {
+    setSelectedSources(prev => {
+      const newSet = new Set(prev);
+      if (source === 'all') {
+        // If selecting 'all', clear everything and add 'all'
+        return new Set(['all']);
+      }
+      // Remove 'all' when selecting specific sources
+      newSet.delete('all');
+      if (newSet.has(source)) {
+        newSet.delete(source);
+        // If nothing selected, default to 'all'
+        if (newSet.size === 0) return new Set(['all']);
+      } else {
+        newSet.add(source);
+      }
+      return newSet;
+    });
+  };
+
+  const getSourceParam = () => {
+    if (selectedSources.has('all')) return 'all';
+    return Array.from(selectedSources).join(',');
+  };
+
+  const getSourceLabel = () => {
+    if (selectedSources.has('all')) return 'Todas as fontes';
+    if (selectedSources.size === 1) {
+      const source = Array.from(selectedSources)[0];
+      return SOURCE_OPTIONS.find(s => s.value === source)?.label || source;
+    }
+    return `${selectedSources.size} fontes`;
+  };
 
   // Fetch API status on mount
   useEffect(() => {
@@ -76,6 +121,20 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
       .then(data => setApiStatus(data.apis || []))
       .catch(() => {});
   }, []);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('[data-source-dropdown]')) {
+        setShowSourceDropdown(false);
+      }
+    };
+    if (showSourceDropdown) {
+      document.addEventListener('click', handleClickOutside);
+    }
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [showSourceDropdown]);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -90,7 +149,7 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
       const params = new URLSearchParams({
         keyword,
         country,
-        source,
+        source: getSourceParam(),
         limit: '50',
         maxAgeDays,
       });
@@ -120,7 +179,7 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
 
       const params = new URLSearchParams({
         country,
-        source,
+        source: getSourceParam(),
         limit: '50',
         maxAgeDays,
       });
@@ -272,20 +331,52 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
               </option>
             ))}
           </select>
-          <select
-            value={source}
-            onChange={(e) => setSource(e.target.value)}
-            className="px-4 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
-          >
-            <option value="all">All Sources</option>
-            <option value="remoteok">RemoteOK</option>
-            <option value="remotive">Remotive</option>
-            <option value="arbeitnow">Arbeitnow (EU)</option>
-            <option value="netempregos">Net-Empregos (PT)</option>
-            <option value="adzuna">Adzuna (PT/BR)</option>
-            <option value="jooble">Jooble</option>
-            <option value="jsearch">JSearch</option>
-          </select>
+          {/* Multi-select Source Dropdown */}
+          <div className="relative" data-source-dropdown>
+            <button
+              type="button"
+              onClick={() => setShowSourceDropdown(!showSourceDropdown)}
+              className="px-4 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 flex items-center gap-2 min-w-[140px]"
+            >
+              <span className="truncate">{getSourceLabel()}</span>
+              <svg className={`w-4 h-4 transition-transform ${showSourceDropdown ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            {showSourceDropdown && (
+              <div className="absolute z-50 mt-1 w-56 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg">
+                <div className="p-2">
+                  {/* All Sources Option */}
+                  <label className="flex items-center gap-2 px-2 py-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={selectedSources.has('all')}
+                      onChange={() => toggleSource('all')}
+                      className="w-4 h-4 rounded border-zinc-300 text-red-500 focus:ring-red-500"
+                    />
+                    <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">Todas as fontes</span>
+                  </label>
+                  <div className="border-t border-zinc-200 dark:border-zinc-700 my-1" />
+                  {/* Individual Sources */}
+                  {SOURCE_OPTIONS.map(opt => (
+                    <label key={opt.value} className="flex items-center gap-2 px-2 py-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={selectedSources.has(opt.value)}
+                        onChange={() => toggleSource(opt.value)}
+                        disabled={selectedSources.has('all')}
+                        className="w-4 h-4 rounded border-zinc-300 text-red-500 focus:ring-red-500 disabled:opacity-50"
+                      />
+                      <span className={`text-sm ${selectedSources.has('all') ? 'text-zinc-400' : 'text-zinc-900 dark:text-zinc-100'}`}>
+                        {opt.label}
+                      </span>
+                      <span className="text-xs text-zinc-400 ml-auto">{opt.region}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
           <select
             value={maxAgeDays}
             onChange={(e) => setMaxAgeDays(e.target.value)}
