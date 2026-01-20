@@ -1,5 +1,8 @@
 'use client';
 
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+
 interface AnalyticsData {
   overview: {
     totalVisits: number;
@@ -27,10 +30,88 @@ interface AnalyticsData {
 }
 
 export default function AnalyticsClient({ data }: { data: AnalyticsData }) {
+  const router = useRouter();
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
   const maxVisits = Math.max(...data.visitsByDay.map((d) => d.count), 1);
+
+  const handleReset = async () => {
+    setIsResetting(true);
+    try {
+      const res = await fetch('/api/analytics', { method: 'DELETE' });
+      if (res.ok) {
+        setShowResetModal(false);
+        router.refresh();
+      } else {
+        alert('Failed to reset analytics');
+      }
+    } catch {
+      alert('Error resetting analytics');
+    } finally {
+      setIsResetting(false);
+    }
+  };
 
   return (
     <>
+      {/* Reset Confirmation Modal */}
+      {showResetModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-zinc-800 rounded-xl p-6 max-w-md w-full mx-4 shadow-2xl">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-full">
+                <svg className="w-6 h-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Reset Analytics</h3>
+            </div>
+            <p className="text-zinc-600 dark:text-zinc-400 mb-6">
+              Are you sure you want to reset all analytics data? This action cannot be undone and will delete all visitor statistics.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setShowResetModal(false)}
+                disabled={isResetting}
+                className="px-4 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-700 rounded-lg hover:bg-zinc-200 dark:hover:bg-zinc-600 transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleReset}
+                disabled={isResetting}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center gap-2"
+              >
+                {isResetting ? (
+                  <>
+                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                    Resetting...
+                  </>
+                ) : (
+                  'Reset All Data'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Header with Reset Button */}
+      <div className="flex justify-end mb-4">
+        <button
+          onClick={() => setShowResetModal(true)}
+          className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors border border-red-200 dark:border-red-800"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+          </svg>
+          Reset Analytics
+        </button>
+      </div>
+
       {/* Overview Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <StatCard title="Total Visits" value={data.overview.totalVisits} color="blue" />
