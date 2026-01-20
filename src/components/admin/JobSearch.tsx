@@ -64,6 +64,25 @@ const SOURCE_OPTIONS = [
   { value: 'jsearch', label: 'JSearch', region: 'Global' },
 ];
 
+// Popular search terms for developers
+const POPULAR_SEARCH_TERMS = [
+  { term: 'Full Stack', category: 'role' },
+  { term: 'Frontend', category: 'role' },
+  { term: 'Backend', category: 'role' },
+  { term: 'React', category: 'tech' },
+  { term: 'Node.js', category: 'tech' },
+  { term: 'Python', category: 'tech' },
+  { term: 'Java', category: 'tech' },
+  { term: 'DevOps', category: 'role' },
+  { term: 'TypeScript', category: 'tech' },
+  { term: 'PHP', category: 'tech' },
+  { term: 'Laravel', category: 'tech' },
+  { term: 'Flutter', category: 'tech' },
+  { term: 'Mobile', category: 'role' },
+  { term: 'Data Engineer', category: 'role' },
+  { term: 'AWS', category: 'tech' },
+];
+
 export default function JobSearch({ onJobSaved }: JobSearchProps) {
   const [keyword, setKeyword] = useState('');
   const [selectedCountries, setSelectedCountries] = useState<Set<string>>(new Set(['all']));
@@ -557,6 +576,54 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
           </button>
         </div>
       </form>
+
+      {/* Search Suggestions */}
+      <div className="mb-6 p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-xl border border-zinc-200 dark:border-zinc-700">
+        <div className="flex items-center gap-2 mb-3">
+          <svg className="w-5 h-5 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+          </svg>
+          <span className="font-medium text-zinc-700 dark:text-zinc-300">Sugestões de busca</span>
+        </div>
+
+        {/* Resume-based suggestions */}
+        {smartSearchKeywords.length > 0 && (
+          <div className="mb-3">
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-2">📄 Baseado no seu currículo:</p>
+            <div className="flex flex-wrap gap-2">
+              {smartSearchKeywords.slice(0, 8).map((kw, i) => (
+                <button
+                  key={`resume-${i}`}
+                  onClick={() => setKeyword(kw)}
+                  className="px-3 py-1 bg-purple-100 dark:bg-purple-800/50 text-purple-700 dark:text-purple-300 text-sm rounded-full hover:bg-purple-200 dark:hover:bg-purple-700/50 transition-colors"
+                >
+                  {kw}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Popular terms */}
+        <div>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-2">🔥 Termos populares:</p>
+          <div className="flex flex-wrap gap-2">
+            {POPULAR_SEARCH_TERMS.map((item, i) => (
+              <button
+                key={`popular-${i}`}
+                onClick={() => setKeyword(item.term)}
+                className={`px-3 py-1 text-sm rounded-full transition-colors ${
+                  item.category === 'role'
+                    ? 'bg-blue-100 dark:bg-blue-800/50 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-700/50'
+                    : 'bg-green-100 dark:bg-green-800/50 text-green-700 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-700/50'
+                }`}
+              >
+                {item.term}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
 
       {/* Smart Search Keywords */}
       {isSmartSearch && smartSearchKeywords.length > 0 && (
