@@ -19,7 +19,8 @@ export async function GET(request: Request) {
     }
 
     const { searchParams } = new URL(request.url);
-    const country = (searchParams.get('country') || 'all') as 'br' | 'pt' | 'remote' | 'all';
+    // Support multiple countries (comma-separated) or single country
+    const country = searchParams.get('country') || 'all';
     // Support multiple sources (comma-separated) or single source
     const sourceParam = searchParams.get('source') || 'all';
     const source = sourceParam.includes(',')

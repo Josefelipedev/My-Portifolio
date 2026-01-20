@@ -40,10 +40,9 @@ const SOURCE_LABELS: Record<string, { label: string; color: string }> = {
 };
 
 const COUNTRY_OPTIONS = [
-  { value: 'all', label: 'All Countries', flag: '🌍' },
-  { value: 'remote', label: 'Remote Only', flag: '🏠' },
+  { value: 'remote', label: 'Remote', flag: '🏠' },
   { value: 'pt', label: 'Portugal', flag: '🇵🇹' },
-  { value: 'br', label: 'Brazil', flag: '🇧🇷' },
+  { value: 'br', label: 'Brasil', flag: '🇧🇷' },
 ];
 
 const DATE_FILTER_OPTIONS = [
@@ -67,7 +66,7 @@ const SOURCE_OPTIONS = [
 
 export default function JobSearch({ onJobSaved }: JobSearchProps) {
   const [keyword, setKeyword] = useState('');
-  const [country, setCountry] = useState('all');
+  const [selectedCountries, setSelectedCountries] = useState<Set<string>>(new Set(['all']));
   const [selectedSources, setSelectedSources] = useState<Set<string>>(new Set(['all']));
   const [maxAgeDays, setMaxAgeDays] = useState('0');
   const [jobs, setJobs] = useState<JobListing[]>([]);
@@ -81,19 +80,51 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
   const [smartSearchKeywords, setSmartSearchKeywords] = useState<string[]>([]);
   const [isSmartSearch, setIsSmartSearch] = useState(false);
   const [showSourceDropdown, setShowSourceDropdown] = useState(false);
+  const [showCountryDropdown, setShowCountryDropdown] = useState(false);
 
+  // Country multi-select functions
+  const toggleCountry = (country: string) => {
+    setSelectedCountries(prev => {
+      const newSet = new Set(prev);
+      if (country === 'all') {
+        return new Set(['all']);
+      }
+      newSet.delete('all');
+      if (newSet.has(country)) {
+        newSet.delete(country);
+        if (newSet.size === 0) return new Set(['all']);
+      } else {
+        newSet.add(country);
+      }
+      return newSet;
+    });
+  };
+
+  const getCountryParam = () => {
+    if (selectedCountries.has('all')) return 'all';
+    return Array.from(selectedCountries).join(',');
+  };
+
+  const getCountryLabel = () => {
+    if (selectedCountries.has('all')) return 'Todos os paises';
+    if (selectedCountries.size === 1) {
+      const country = Array.from(selectedCountries)[0];
+      const opt = COUNTRY_OPTIONS.find(c => c.value === country);
+      return opt ? `${opt.flag} ${opt.label}` : country;
+    }
+    return `${selectedCountries.size} paises`;
+  };
+
+  // Source multi-select functions
   const toggleSource = (source: string) => {
     setSelectedSources(prev => {
       const newSet = new Set(prev);
       if (source === 'all') {
-        // If selecting 'all', clear everything and add 'all'
         return new Set(['all']);
       }
-      // Remove 'all' when selecting specific sources
       newSet.delete('all');
       if (newSet.has(source)) {
         newSet.delete(source);
-        // If nothing selected, default to 'all'
         if (newSet.size === 0) return new Set(['all']);
       } else {
         newSet.add(source);
@@ -130,7 +161,7 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
         setIsSmartSearch(true);
 
         const params = new URLSearchParams({
-          country,
+          country: getCountryParam(),
           source: getSourceParam(),
           limit: '50',
           maxAgeDays,
@@ -156,19 +187,22 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Close dropdown when clicking outside
+  // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
       if (!target.closest('[data-source-dropdown]')) {
         setShowSourceDropdown(false);
       }
+      if (!target.closest('[data-country-dropdown]')) {
+        setShowCountryDropdown(false);
+      }
     };
-    if (showSourceDropdown) {
+    if (showSourceDropdown || showCountryDropdown) {
       document.addEventListener('click', handleClickOutside);
     }
     return () => document.removeEventListener('click', handleClickOutside);
-  }, [showSourceDropdown]);
+  }, [showSourceDropdown, showCountryDropdown]);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -182,7 +216,7 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
 
       const params = new URLSearchParams({
         keyword,
-        country,
+        country: getCountryParam(),
         source: getSourceParam(),
         limit: '50',
         maxAgeDays,
@@ -212,7 +246,7 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
       setIsSmartSearch(true);
 
       const params = new URLSearchParams({
-        country,
+        country: getCountryParam(),
         source: getSourceParam(),
         limit: '50',
         maxAgeDays,
@@ -354,17 +388,51 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
               className="w-full px-4 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:ring-2 focus:ring-red-500 focus:border-red-500"
             />
           </div>
-          <select
-            value={country}
-            onChange={(e) => setCountry(e.target.value)}
-            className="px-4 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
-          >
-            {COUNTRY_OPTIONS.map(opt => (
-              <option key={opt.value} value={opt.value}>
-                {opt.flag} {opt.label}
-              </option>
-            ))}
-          </select>
+          {/* Multi-select Country Dropdown */}
+          <div className="relative" data-country-dropdown>
+            <button
+              type="button"
+              onClick={() => setShowCountryDropdown(!showCountryDropdown)}
+              className="px-4 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 flex items-center gap-2 min-w-[160px]"
+            >
+              <span className="truncate">{getCountryLabel()}</span>
+              <svg className={`w-4 h-4 transition-transform ${showCountryDropdown ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            {showCountryDropdown && (
+              <div className="absolute z-50 mt-1 w-48 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg">
+                <div className="p-2">
+                  {/* All Countries Option */}
+                  <label className="flex items-center gap-2 px-2 py-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={selectedCountries.has('all')}
+                      onChange={() => toggleCountry('all')}
+                      className="w-4 h-4 rounded border-zinc-300 text-red-500 focus:ring-red-500"
+                    />
+                    <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">🌍 Todos os paises</span>
+                  </label>
+                  <div className="border-t border-zinc-200 dark:border-zinc-700 my-1" />
+                  {/* Individual Countries */}
+                  {COUNTRY_OPTIONS.map(opt => (
+                    <label key={opt.value} className="flex items-center gap-2 px-2 py-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={selectedCountries.has(opt.value)}
+                        onChange={() => toggleCountry(opt.value)}
+                        disabled={selectedCountries.has('all')}
+                        className="w-4 h-4 rounded border-zinc-300 text-red-500 focus:ring-red-500 disabled:opacity-50"
+                      />
+                      <span className={`text-sm ${selectedCountries.has('all') ? 'text-zinc-400' : 'text-zinc-900 dark:text-zinc-100'}`}>
+                        {opt.flag} {opt.label}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
           {/* Multi-select Source Dropdown */}
           <div className="relative" data-source-dropdown>
             <button

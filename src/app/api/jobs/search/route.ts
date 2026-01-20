@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server';
 import {
   searchJobs,
-  searchJobsByCountry,
-  filterJobsByAge,
   getApiStatus,
   type JobSource,
   type JobSearchParams,
@@ -23,7 +21,8 @@ export async function GET(request: Request) {
     const source = sourceParam.includes(',')
       ? sourceParam.split(',').filter(Boolean) as JobSource[]
       : sourceParam as JobSource;
-    const country = searchParams.get('country') || undefined; // 'br' | 'pt' | 'remote' | 'all'
+    // Support multiple countries (comma-separated) or single country
+    const country = searchParams.get('country') || 'all';
     const location = searchParams.get('location') || undefined;
     const category = searchParams.get('category') || undefined;
     const limit = searchParams.get('limit') ? parseInt(searchParams.get('limit')!) : 50;
@@ -36,25 +35,9 @@ export async function GET(request: Request) {
       });
     }
 
-    let jobs;
-
-    // If country is specified, use country-specific search
-    if (country && country !== 'all') {
-      jobs = await searchJobsByCountry(
-        keyword || 'developer',
-        country as 'br' | 'pt' | 'remote',
-        limit
-      );
-    } else {
-      // Use general search with source filter
-      const params: JobSearchParams = { keyword, location, category, limit, country, maxAgeDays };
-      jobs = await searchJobs(params, source);
-    }
-
-    // Apply age filter if specified (for country-specific search that doesn't use params)
-    if (maxAgeDays > 0 && country && country !== 'all') {
-      jobs = filterJobsByAge(jobs, maxAgeDays);
-    }
+    // Use general search which now handles multiple countries
+    const params: JobSearchParams = { keyword, location, category, limit, country, maxAgeDays };
+    const jobs = await searchJobs(params, source);
 
     const response = NextResponse.json({
       jobs,
