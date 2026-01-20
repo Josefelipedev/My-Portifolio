@@ -2,7 +2,7 @@
 
 export interface JobListing {
   id: string;
-  source: 'remoteok' | 'remotive' | 'arbeitnow' | 'adzuna' | 'jooble' | 'jsearch';
+  source: 'remoteok' | 'remotive' | 'arbeitnow' | 'adzuna' | 'jooble' | 'jsearch' | 'netempregos';
   title: string;
   company: string;
   companyLogo?: string;
@@ -486,7 +486,7 @@ export async function searchJSearch(params: JobSearchParams): Promise<JobListing
 // Combined Search Functions
 // ==========================================
 
-export type JobSource = 'all' | 'remoteok' | 'remotive' | 'arbeitnow' | 'adzuna' | 'jooble' | 'jsearch';
+export type JobSource = 'all' | 'remoteok' | 'remotive' | 'arbeitnow' | 'adzuna' | 'jooble' | 'jsearch' | 'netempregos';
 
 export async function searchJobs(params: JobSearchParams, source: JobSource = 'all'): Promise<JobListing[]> {
   const searches: Promise<JobListing[]>[] = [];
@@ -508,6 +508,9 @@ export async function searchJobs(params: JobSearchParams, source: JobSource = 'a
   }
   if (source === 'all' || source === 'jsearch') {
     searches.push(searchJSearch(params));
+  }
+  if (source === 'netempregos' || (source === 'all' && (params.country === 'pt' || !params.country))) {
+    searches.push(searchNetEmpregos(params));
   }
 
   const results = await Promise.all(searches);
@@ -595,6 +598,7 @@ export function getApiStatus(): { name: string; configured: boolean; needsKey: b
     { name: 'RemoteOK', configured: true, needsKey: false },
     { name: 'Remotive', configured: true, needsKey: false },
     { name: 'Arbeitnow', configured: true, needsKey: false },
+    { name: 'Net-Empregos', configured: true, needsKey: false },
     { name: 'Adzuna', configured: !!(process.env.ADZUNA_APP_ID && process.env.ADZUNA_APP_KEY), needsKey: true },
     { name: 'Jooble', configured: !!process.env.JOOBLE_API_KEY, needsKey: true },
     { name: 'JSearch', configured: !!process.env.RAPIDAPI_KEY, needsKey: true },
@@ -620,3 +624,274 @@ export const remotiveCategories = [
 ] as const;
 
 export type RemotiveCategory = typeof remotiveCategories[number];
+
+// ==========================================
+// Net-Empregos Web Scraping (Portugal)
+// ==========================================
+
+interface NetEmpregosJob {
+  title: string;
+  company: string;
+  location: string;
+  url: string;
+  description: string;
+  date: string;
+}
+
+export async function searchNetEmpregos(params: JobSearchParams): Promise<JobListing[]> {
+  try {
+    const keyword = encodeURIComponent(params.keyword || 'developer');
+    const url = `https://www.net-empregos.com/pesquisa-empregos.asp?chaves=${keyword}&categoria=0`;
+
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'pt-PT,pt;q=0.9,en-US;q=0.8,en;q=0.7',
+      },
+      next: { revalidate: 300 },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Net-Empregos fetch error: ${response.status}`);
+    }
+
+    const html = await response.text();
+    const jobs = parseNetEmpregosHTML(html);
+
+    return jobs.slice(0, params.limit || 50).map((job, index) => ({
+      id: `netempregos-${Date.now()}-${index}`,
+      source: 'netempregos' as const,
+      title: job.title,
+      company: job.company || 'Empresa não identificada',
+      description: job.description || '',
+      url: job.url.startsWith('http') ? job.url : `https://www.net-empregos.com${job.url}`,
+      location: job.location || 'Portugal',
+      jobType: 'On-site',
+      tags: [],
+      postedAt: parseNetEmpregosDate(job.date),
+      country: 'pt',
+    }));
+  } catch (error) {
+    console.error('Net-Empregos scraping error:', error);
+    return [];
+  }
+}
+
+function parseNetEmpregosHTML(html: string): NetEmpregosJob[] {
+  const jobs: NetEmpregosJob[] = [];
+
+  // Match job listings using regex patterns
+  // Looking for the main job listing divs/links
+  const jobPattern = /<a[^>]*href="(\/emprego-[^"]+)"[^>]*>[\s\S]*?<div[^>]*class="[^"]*titulo[^"]*"[^>]*>([\s\S]*?)<\/div>[\s\S]*?<div[^>]*class="[^"]*empresa[^"]*"[^>]*>([\s\S]*?)<\/div>[\s\S]*?<div[^>]*class="[^"]*local[^"]*"[^>]*>([\s\S]*?)<\/div>/gi;
+
+  // Alternative simpler pattern for job cards
+  const simplePattern = /<div[^>]*class="[^"]*oferta[^"]*"[^>]*>[\s\S]*?<a[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>[\s\S]*?<span[^>]*class="[^"]*empresa[^"]*"[^>]*>([\s\S]*?)<\/span>[\s\S]*?<span[^>]*class="[^"]*local[^"]*"[^>]*>([\s\S]*?)<\/span>/gi;
+
+  // Try to extract using href and title patterns
+  const hrefPattern = /href="(\/emprego-[^"]+)"[^>]*title="([^"]+)"/gi;
+  let match;
+
+  while ((match = hrefPattern.exec(html)) !== null) {
+    const url = match[1];
+    const title = cleanHtmlText(match[2]);
+
+    if (title && title.length > 5) {
+      // Try to find company and location near this job
+      const contextStart = Math.max(0, match.index - 200);
+      const contextEnd = Math.min(html.length, match.index + 500);
+      const context = html.substring(contextStart, contextEnd);
+
+      // Extract company
+      const companyMatch = context.match(/class="[^"]*empresa[^"]*"[^>]*>([^<]+)</i);
+      const company = companyMatch ? cleanHtmlText(companyMatch[1]) : '';
+
+      // Extract location
+      const localMatch = context.match(/class="[^"]*local[^"]*"[^>]*>([^<]+)</i);
+      const location = localMatch ? cleanHtmlText(localMatch[1]) : 'Portugal';
+
+      // Extract date
+      const dateMatch = context.match(/(\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4})/);
+      const date = dateMatch ? dateMatch[1] : '';
+
+      jobs.push({
+        title,
+        company,
+        location,
+        url,
+        description: '',
+        date,
+      });
+    }
+  }
+
+  // Deduplicate by URL
+  const seen = new Set<string>();
+  return jobs.filter(job => {
+    if (seen.has(job.url)) return false;
+    seen.add(job.url);
+    return true;
+  });
+}
+
+function cleanHtmlText(text: string): string {
+  return text
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#039;/g, "'")
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function parseNetEmpregosDate(dateStr: string): Date | undefined {
+  if (!dateStr) return undefined;
+
+  // Try to parse common Portuguese date formats (DD-MM-YYYY or DD/MM/YYYY)
+  const match = dateStr.match(/(\d{1,2})[-\/](\d{1,2})[-\/](\d{2,4})/);
+  if (match) {
+    const day = parseInt(match[1], 10);
+    const month = parseInt(match[2], 10) - 1;
+    let year = parseInt(match[3], 10);
+    if (year < 100) year += 2000;
+    return new Date(year, month, day);
+  }
+
+  return undefined;
+}
+
+// ==========================================
+// Smart Job Search with AI (Resume-based)
+// ==========================================
+
+export interface ResumeData {
+  personalInfo: {
+    name: string;
+    email: string;
+  };
+  skills: Array<{
+    name: string;
+    level: number;
+    category: string;
+  }>;
+  experience: Array<{
+    title: string;
+    company: string;
+    responsibilities: string[];
+  }>;
+  certifications: Array<{
+    name: string;
+  }>;
+}
+
+export interface SmartSearchResult {
+  jobs: JobListing[];
+  keywords: string[];
+  matchScore?: number;
+}
+
+export function extractKeywordsFromResume(resume: ResumeData): string[] {
+  const keywords = new Set<string>();
+
+  // Extract from skills (prioritize higher level skills)
+  const sortedSkills = [...resume.skills].sort((a, b) => b.level - a.level);
+  for (const skill of sortedSkills) {
+    keywords.add(skill.name.toLowerCase());
+  }
+
+  // Extract technology keywords from job titles
+  const titleKeywords = ['developer', 'engineer', 'programmer', 'full-stack', 'fullstack',
+    'backend', 'frontend', 'mobile', 'devops', 'data', 'software'];
+  for (const exp of resume.experience) {
+    for (const kw of titleKeywords) {
+      if (exp.title.toLowerCase().includes(kw)) {
+        keywords.add(kw);
+      }
+    }
+  }
+
+  // Extract from certifications
+  for (const cert of resume.certifications) {
+    const certKeywords = cert.name.match(/\b(java|react|node|python|docker|kubernetes|aws|azure|php|laravel|flutter|dart|typescript|javascript|angular|vue|go|rust|c#|\.net|sql|mongodb|postgresql|redis)\b/gi);
+    if (certKeywords) {
+      certKeywords.forEach(kw => keywords.add(kw.toLowerCase()));
+    }
+  }
+
+  return Array.from(keywords);
+}
+
+export function generateSearchQueries(keywords: string[]): string[] {
+  const queries: string[] = [];
+
+  // Top skills as individual queries
+  const topKeywords = keywords.slice(0, 5);
+  queries.push(...topKeywords);
+
+  // Combinations
+  if (topKeywords.length >= 2) {
+    queries.push(`${topKeywords[0]} ${topKeywords[1]}`);
+  }
+
+  // Common developer search terms
+  const roleQueries = ['full-stack developer', 'backend developer', 'frontend developer', 'software engineer'];
+  queries.push(...roleQueries.slice(0, 2));
+
+  return Array.from(new Set(queries));
+}
+
+export async function smartJobSearch(
+  resume: ResumeData,
+  country: 'br' | 'pt' | 'remote' | 'all' = 'all',
+  limit: number = 50
+): Promise<SmartSearchResult> {
+  const keywords = extractKeywordsFromResume(resume);
+  const queries = generateSearchQueries(keywords);
+
+  // Search with top keywords in parallel
+  const searchPromises = queries.slice(0, 3).map(query =>
+    searchJobs({ keyword: query, country, limit: Math.ceil(limit / 3) }, 'all')
+  );
+
+  // Also search Net-Empregos for Portugal
+  if (country === 'pt' || country === 'all') {
+    searchPromises.push(
+      searchNetEmpregos({ keyword: keywords[0] || 'developer', limit: 20 })
+    );
+  }
+
+  const results = await Promise.all(searchPromises);
+  const allJobs = results.flat();
+
+  // Deduplicate by external ID
+  const seen = new Set<string>();
+  const uniqueJobs = allJobs.filter(job => {
+    if (seen.has(job.id)) return false;
+    seen.add(job.id);
+    return true;
+  });
+
+  // Sort by relevance (jobs matching more keywords first)
+  const scoredJobs = uniqueJobs.map(job => {
+    let score = 0;
+    const jobText = `${job.title} ${job.description} ${job.tags?.join(' ') || ''}`.toLowerCase();
+
+    for (const keyword of keywords) {
+      if (jobText.includes(keyword.toLowerCase())) {
+        score += 1;
+      }
+    }
+
+    return { job, score };
+  });
+
+  scoredJobs.sort((a, b) => b.score - a.score);
+
+  return {
+    jobs: scoredJobs.slice(0, limit).map(s => s.job),
+    keywords,
+  };
+}
