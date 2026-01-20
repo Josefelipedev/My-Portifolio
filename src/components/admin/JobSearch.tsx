@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 
 interface JobListing {
   id: string;
-  source: 'remoteok' | 'remotive' | 'arbeitnow' | 'adzuna' | 'jooble' | 'jsearch';
+  source: 'remoteok' | 'remotive' | 'arbeitnow' | 'adzuna' | 'jooble' | 'jsearch' | 'netempregos';
   title: string;
   company: string;
   companyLogo?: string;
@@ -35,6 +35,7 @@ const SOURCE_LABELS: Record<string, { label: string; color: string }> = {
   adzuna: { label: 'Adzuna', color: 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400' },
   jooble: { label: 'Jooble', color: 'bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-400' },
   jsearch: { label: 'JSearch', color: 'bg-pink-100 dark:bg-pink-900/30 text-pink-700 dark:text-pink-400' },
+  netempregos: { label: 'Net-Empregos', color: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400' },
 };
 
 const COUNTRY_OPTIONS = [
@@ -56,6 +57,8 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [apiStatus, setApiStatus] = useState<ApiStatus[]>([]);
   const [showApiStatus, setShowApiStatus] = useState(false);
+  const [smartSearchKeywords, setSmartSearchKeywords] = useState<string[]>([]);
+  const [isSmartSearch, setIsSmartSearch] = useState(false);
 
   // Fetch API status on mount
   useEffect(() => {
@@ -72,6 +75,8 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
     try {
       setLoading(true);
       setError(null);
+      setIsSmartSearch(false);
+      setSmartSearchKeywords([]);
 
       const params = new URLSearchParams({
         keyword,
@@ -92,6 +97,35 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Search failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSmartSearch = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      setIsSmartSearch(true);
+
+      const params = new URLSearchParams({
+        country,
+        limit: '50',
+      });
+      const response = await fetch(`/api/jobs/smart-search?${params}`);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to perform smart search');
+      }
+
+      setJobs(data.jobs);
+      setSmartSearchKeywords(data.keywords || []);
+      if (data.apis) {
+        setApiStatus(data.apis);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Smart search failed');
     } finally {
       setLoading(false);
     }
@@ -235,6 +269,7 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
             <option value="remoteok">RemoteOK</option>
             <option value="remotive">Remotive</option>
             <option value="arbeitnow">Arbeitnow (EU)</option>
+            <option value="netempregos">Net-Empregos (PT)</option>
             <option value="adzuna">Adzuna (PT/BR)</option>
             <option value="jooble">Jooble</option>
             <option value="jsearch">JSearch</option>
@@ -244,7 +279,7 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
             disabled={loading || !keyword.trim()}
             className="px-6 py-2 bg-red-500 text-white font-medium rounded-lg hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
           >
-            {loading ? (
+            {loading && !isSmartSearch ? (
               <>
                 <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
@@ -261,8 +296,60 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
               </>
             )}
           </button>
+          <button
+            type="button"
+            onClick={handleSmartSearch}
+            disabled={loading}
+            className="px-6 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-medium rounded-lg hover:from-purple-600 hover:to-pink-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2"
+            title="Busca inteligente baseada no seu curriculo"
+          >
+            {loading && isSmartSearch ? (
+              <>
+                <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                AI Search...
+              </>
+            ) : (
+              <>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                </svg>
+                AI Search
+              </>
+            )}
+          </button>
         </div>
       </form>
+
+      {/* Smart Search Keywords */}
+      {isSmartSearch && smartSearchKeywords.length > 0 && (
+        <div className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border border-purple-200 dark:border-purple-800 rounded-xl p-4 mb-6">
+          <div className="flex items-center gap-2 mb-2">
+            <svg className="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+            </svg>
+            <span className="font-medium text-purple-700 dark:text-purple-300">Busca Inteligente Ativa</span>
+          </div>
+          <p className="text-sm text-purple-600 dark:text-purple-400 mb-2">
+            Keywords extraidas do seu curriculo:
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {smartSearchKeywords.slice(0, 10).map((kw, i) => (
+              <span
+                key={i}
+                className="px-2 py-1 bg-purple-100 dark:bg-purple-800/50 text-purple-700 dark:text-purple-300 text-xs rounded-full"
+              >
+                {kw}
+              </span>
+            ))}
+            {smartSearchKeywords.length > 10 && (
+              <span className="text-xs text-purple-500">+{smartSearchKeywords.length - 10} mais</span>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Error */}
       {error && (
