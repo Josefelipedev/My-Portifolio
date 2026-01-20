@@ -218,3 +218,55 @@ model PageView {
   @@index([page])
   @@index([ipAddress])
 }
+
+// ==========================================
+// Job Search & Application Tracker
+// ==========================================
+
+model SavedJob {
+  id            String    @id @default(cuid())
+  externalId    String    @unique
+  source        String    // "remoteok" | "remotive"
+  title         String
+  company       String
+  companyLogo   String?
+  description   String    @db.Text
+  url           String
+  location      String?
+  jobType       String?
+  salary        String?
+  tags          String?   // Comma-separated
+  postedAt      DateTime?
+  notes         String?   @db.Text
+  savedAt       DateTime  @default(now())
+
+  application   JobApplication?
+
+  @@index([source])
+  @@index([savedAt])
+}
+
+model JobApplication {
+  id            String    @id @default(cuid())
+  savedJobId    String?   @unique
+  savedJob      SavedJob? @relation(fields: [savedJobId], references: [id], onDelete: SetNull)
+
+  title         String
+  company       String
+  url           String?
+  location      String?
+  salary        String?
+  status        String    @default("saved") // "saved" | "applied" | "interview" | "offer" | "rejected"
+  appliedAt     DateTime?
+  notes         String?   @db.Text
+  timeline      String?   @db.Text  // JSON array of status changes
+  nextStep      String?
+  nextStepDate  DateTime?
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([status])
+  @@index([createdAt])
+  @@index([appliedAt])
+}
