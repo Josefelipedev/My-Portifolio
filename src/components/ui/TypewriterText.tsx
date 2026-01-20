@@ -61,7 +61,7 @@ export default function TypewriterText({
   return (
     <span className={className}>
       {displayText}
-      <span className="animate-pulse text-blue-500">|</span>
+      <span className="animate-pulse text-red-500">|</span>
     </span>
   );
 }

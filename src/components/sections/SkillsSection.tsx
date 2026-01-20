@@ -113,7 +113,7 @@ export async function SkillsSection() {
           >
             {/* Category header */}
             <div className="flex items-center gap-3 mb-6">
-              <div className="p-2 bg-gradient-to-br from-blue-500/10 to-purple-500/10 rounded-lg text-blue-500">
+              <div className="p-2 bg-gradient-to-br from-red-500/10 to-purple-500/10 rounded-lg text-red-500">
                 {group.icon}
               </div>
               <h3 className="text-xl font-semibold">{group.label}</h3>
@@ -132,7 +132,7 @@ export async function SkillsSection() {
                   {/* Progress bar */}
                   <div className="h-2 bg-zinc-200 dark:bg-zinc-700 rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full transition-all duration-1000 ease-out"
+                      className="h-full bg-gradient-to-r from-red-500 to-purple-500 rounded-full transition-all duration-1000 ease-out"
                       style={{ width: `${(skill.level / 5) * 100}%` }}
                     />
                   </div>

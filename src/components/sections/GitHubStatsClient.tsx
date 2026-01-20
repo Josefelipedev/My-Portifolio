@@ -227,7 +227,7 @@ export function GitHubStatsClient({ stats }: Props) {
         {/* Stats Grid - Only show non-zero values */}
         {(() => {
           const statItems = [
-            { icon: <RepoIcon />, label: t.github.repos, value: stats.stats.totalRepos, color: 'from-blue-500 to-cyan-500' },
+            { icon: <RepoIcon />, label: t.github.repos, value: stats.stats.totalRepos, color: 'from-red-500 to-cyan-500' },
             { icon: <StarIcon />, label: t.github.stars, value: stats.stats.totalStars, color: 'from-yellow-500 to-orange-500' },
             { icon: <ForkIcon />, label: t.github.forks, value: stats.stats.totalForks, color: 'from-purple-500 to-pink-500' },
             { icon: <CommitIcon />, label: t.github.commits, value: stats.stats.totalCommits, color: 'from-emerald-500 to-teal-500' },

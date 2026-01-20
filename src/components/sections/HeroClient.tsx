@@ -40,7 +40,7 @@ export default function HeroClient({ githubUrl, linkedinUrl, email }: HeroClient
             speed={80}
             deleteSpeed={40}
             delayBetween={2500}
-            className="bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 bg-clip-text text-transparent"
+            className="bg-gradient-to-r from-red-500 via-purple-500 to-pink-500 bg-clip-text text-transparent"
           />
         </h2>
 
@@ -53,7 +53,7 @@ export default function HeroClient({ githubUrl, linkedinUrl, email }: HeroClient
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4 animate-fade-in-up delay-400">
           <a
             href="#projects"
-            className="group relative px-8 py-4 bg-gradient-to-r from-blue-500 to-purple-500 text-white font-medium rounded-full overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:shadow-blue-500/30"
+            className="group relative px-8 py-4 bg-gradient-to-r from-red-500 to-purple-500 text-white font-medium rounded-full overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:shadow-red-500/30"
           >
             <span className="relative z-10">
               {language === 'pt' ? 'Ver Meus Projetos' : 'View My Work'}
@@ -62,7 +62,7 @@ export default function HeroClient({ githubUrl, linkedinUrl, email }: HeroClient
           </a>
           <a
             href="#contact"
-            className="group px-8 py-4 border-2 border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 font-medium rounded-full hover:border-blue-500 dark:hover:border-blue-500 hover:text-blue-500 dark:hover:text-blue-400 transition-all duration-300 hover:-translate-y-1"
+            className="group px-8 py-4 border-2 border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 font-medium rounded-full hover:border-red-500 dark:hover:border-red-500 hover:text-red-500 dark:hover:text-red-400 transition-all duration-300 hover:-translate-y-1"
           >
             {t.hero.cta}
           </a>
@@ -75,7 +75,7 @@ export default function HeroClient({ githubUrl, linkedinUrl, email }: HeroClient
               href={githubUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="group p-3 rounded-full bg-zinc-100 dark:bg-zinc-800 hover:bg-gradient-to-r hover:from-blue-500 hover:to-purple-500 transition-all duration-300 hover:scale-110 hover:shadow-lg hover:shadow-blue-500/25"
+              className="group p-3 rounded-full bg-zinc-100 dark:bg-zinc-800 hover:bg-gradient-to-r hover:from-red-500 hover:to-purple-500 transition-all duration-300 hover:scale-110 hover:shadow-lg hover:shadow-red-500/25"
               aria-label="GitHub"
             >
               <svg className="w-6 h-6 text-zinc-600 dark:text-zinc-400 group-hover:text-white transition-colors" fill="currentColor" viewBox="0 0 24 24">
@@ -88,7 +88,7 @@ export default function HeroClient({ githubUrl, linkedinUrl, email }: HeroClient
               href={linkedinUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="group p-3 rounded-full bg-zinc-100 dark:bg-zinc-800 hover:bg-gradient-to-r hover:from-blue-500 hover:to-purple-500 transition-all duration-300 hover:scale-110 hover:shadow-lg hover:shadow-blue-500/25"
+              className="group p-3 rounded-full bg-zinc-100 dark:bg-zinc-800 hover:bg-gradient-to-r hover:from-red-500 hover:to-purple-500 transition-all duration-300 hover:scale-110 hover:shadow-lg hover:shadow-red-500/25"
               aria-label="LinkedIn"
             >
               <svg className="w-6 h-6 text-zinc-600 dark:text-zinc-400 group-hover:text-white transition-colors" fill="currentColor" viewBox="0 0 24 24">
@@ -99,7 +99,7 @@ export default function HeroClient({ githubUrl, linkedinUrl, email }: HeroClient
           {email && (
             <a
               href={`mailto:${email}`}
-              className="group p-3 rounded-full bg-zinc-100 dark:bg-zinc-800 hover:bg-gradient-to-r hover:from-blue-500 hover:to-purple-500 transition-all duration-300 hover:scale-110 hover:shadow-lg hover:shadow-blue-500/25"
+              className="group p-3 rounded-full bg-zinc-100 dark:bg-zinc-800 hover:bg-gradient-to-r hover:from-red-500 hover:to-purple-500 transition-all duration-300 hover:scale-110 hover:shadow-lg hover:shadow-red-500/25"
               aria-label="Email"
             >
               <svg className="w-6 h-6 text-zinc-600 dark:text-zinc-400 group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">

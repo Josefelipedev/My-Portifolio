@@ -48,7 +48,7 @@ export default function AnalyticsClient({ data }: { data: AnalyticsData }) {
             {data.visitsByDay.map((day) => (
               <div key={day.date} className="flex-1 flex flex-col items-center gap-1">
                 <div
-                  className="w-full bg-blue-500 rounded-t transition-all"
+                  className="w-full bg-red-500 rounded-t transition-all"
                   style={{ height: `${(day.count / maxVisits) * 100}%`, minHeight: day.count > 0 ? '4px' : '0' }}
                 />
                 <span className="text-[10px] text-zinc-500">{new Date(day.date).toLocaleDateString('en', { weekday: 'short' })}</span>
@@ -225,7 +225,7 @@ export default function AnalyticsClient({ data }: { data: AnalyticsData }) {
                     <td className="px-4 py-2 text-zinc-600 dark:text-zinc-400">{visit.page}</td>
                     <td className="px-4 py-2">
                       <span className={`px-2 py-0.5 text-xs rounded ${
-                        visit.device === 'mobile' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400' :
+                        visit.device === 'mobile' ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400' :
                         visit.device === 'tablet' ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400' :
                         'bg-zinc-100 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400'
                       }`}>
@@ -247,7 +247,7 @@ export default function AnalyticsClient({ data }: { data: AnalyticsData }) {
 
 function StatCard({ title, value, color }: { title: string; value: number; color: string }) {
   const colorClasses = {
-    blue: 'text-blue-500',
+    blue: 'text-red-500',
     purple: 'text-purple-500',
     green: 'text-green-500',
     amber: 'text-amber-500',

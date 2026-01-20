@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 
 interface Card3DProps {
   children: React.ReactNode;
@@ -13,9 +13,19 @@ export default function Card3D({ children, className = '', glareEnabled = true }
   const [transform, setTransform] = useState('');
   const [glarePosition, setGlarePosition] = useState({ x: 50, y: 50 });
   const [isHovering, setIsHovering] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768 || 'ontouchstart' in window);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!cardRef.current) return;
+    if (!cardRef.current || isMobile) return;
 
     const rect = cardRef.current.getBoundingClientRect();
     const x = e.clientX - rect.left;
@@ -40,20 +50,22 @@ export default function Card3D({ children, className = '', glareEnabled = true }
   };
 
   const handleMouseEnter = () => {
-    setIsHovering(true);
+    if (!isMobile) {
+      setIsHovering(true);
+    }
   };
 
   return (
     <div
       ref={cardRef}
       className={`relative transition-transform duration-200 ease-out ${className}`}
-      style={{ transform }}
+      style={{ transform: isMobile ? undefined : transform }}
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
       onMouseEnter={handleMouseEnter}
     >
       {children}
-      {glareEnabled && isHovering && (
+      {glareEnabled && isHovering && !isMobile && (
         <div
           className="absolute inset-0 pointer-events-none rounded-inherit overflow-hidden"
           style={{

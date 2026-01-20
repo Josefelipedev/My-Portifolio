@@ -103,7 +103,7 @@ export default function LoginPage() {
       <div className="w-full max-w-md">
         {/* Logo/Brand */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 mb-4 shadow-lg shadow-blue-500/25">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-red-500 to-purple-600 mb-4 shadow-lg shadow-red-500/25">
             <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
             </svg>
@@ -121,17 +121,17 @@ export default function LoginPage() {
           <div className="flex items-center gap-2">
             <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
               step === 'credentials'
-                ? 'bg-blue-500 text-white'
+                ? 'bg-red-500 text-white'
                 : 'bg-green-500 text-white'
             }`}>
               {step === 'credentials' ? '1' : '✓'}
             </div>
             <div className={`w-12 h-1 rounded ${
-              step === 'verification' ? 'bg-blue-500' : 'bg-slate-700'
+              step === 'verification' ? 'bg-red-500' : 'bg-slate-700'
             }`} />
             <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
               step === 'verification'
-                ? 'bg-blue-500 text-white'
+                ? 'bg-red-500 text-white'
                 : 'bg-slate-700 text-slate-400'
             }`}>
               2
@@ -155,7 +155,7 @@ export default function LoginPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   disabled={isLoading || blockedFor !== null}
-                  className="w-full px-4 py-3 bg-slate-900/50 border border-slate-600 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:opacity-50"
+                  className="w-full px-4 py-3 bg-slate-900/50 border border-slate-600 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all disabled:opacity-50"
                   autoComplete="email"
                   autoFocus
                 />
@@ -173,7 +173,7 @@ export default function LoginPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   disabled={isLoading || blockedFor !== null}
-                  className="w-full px-4 py-3 bg-slate-900/50 border border-slate-600 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:opacity-50"
+                  className="w-full px-4 py-3 bg-slate-900/50 border border-slate-600 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all disabled:opacity-50"
                   autoComplete="current-password"
                 />
               </div>
@@ -194,7 +194,7 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={isLoading || blockedFor !== null || !email || !password}
-                className="w-full py-3 px-4 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-semibold rounded-xl shadow-lg shadow-blue-500/25 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none flex items-center justify-center gap-2"
+                className="w-full py-3 px-4 bg-gradient-to-r from-red-500 to-purple-600 hover:from-red-600 hover:to-purple-700 text-white font-semibold rounded-xl shadow-lg shadow-red-500/25 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none flex items-center justify-center gap-2"
               >
                 {isLoading ? (
                   <>
@@ -222,7 +222,7 @@ export default function LoginPage() {
                   Código de Verificação
                 </label>
                 <p className="text-slate-500 text-xs text-center mb-4">
-                  Enviamos um código de 6 dígitos para <span className="text-blue-400">{email}</span>
+                  Enviamos um código de 6 dígitos para <span className="text-red-400">{email}</span>
                 </p>
                 <input
                   type="text"
@@ -231,7 +231,7 @@ export default function LoginPage() {
                   value={code}
                   onChange={(e) => handleCodeChange(e.target.value)}
                   disabled={isLoading || blockedFor !== null}
-                  className="w-full px-4 py-4 bg-slate-900/50 border border-slate-600 rounded-xl text-white text-center text-2xl font-mono tracking-[0.5em] placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:opacity-50"
+                  className="w-full px-4 py-4 bg-slate-900/50 border border-slate-600 rounded-xl text-white text-center text-2xl font-mono tracking-[0.5em] placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all disabled:opacity-50"
                   autoComplete="one-time-code"
                   autoFocus
                   maxLength={6}
@@ -257,7 +257,7 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={isLoading || blockedFor !== null || code.length !== 6}
-                className="w-full py-3 px-4 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-semibold rounded-xl shadow-lg shadow-blue-500/25 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none flex items-center justify-center gap-2"
+                className="w-full py-3 px-4 bg-gradient-to-r from-red-500 to-purple-600 hover:from-red-600 hover:to-purple-700 text-white font-semibold rounded-xl shadow-lg shadow-red-500/25 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none flex items-center justify-center gap-2"
               >
                 {isLoading ? (
                   <>
