@@ -85,16 +85,26 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
   // Country multi-select functions
   const toggleCountry = (country: string) => {
     setSelectedCountries(prev => {
-      const newSet = new Set(prev);
       if (country === 'all') {
         return new Set(['all']);
       }
-      newSet.delete('all');
+      // If "all" is selected and user clicks an individual item, select all EXCEPT that item
+      if (prev.has('all')) {
+        const allCountries = COUNTRY_OPTIONS.map(c => c.value);
+        const newSet = new Set(allCountries.filter(c => c !== country));
+        return newSet.size === 0 ? new Set(['all']) : newSet;
+      }
+      // Normal toggle
+      const newSet = new Set(prev);
       if (newSet.has(country)) {
         newSet.delete(country);
         if (newSet.size === 0) return new Set(['all']);
       } else {
         newSet.add(country);
+        // If all individual items are selected, switch to 'all'
+        if (newSet.size === COUNTRY_OPTIONS.length) {
+          return new Set(['all']);
+        }
       }
       return newSet;
     });
@@ -118,16 +128,26 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
   // Source multi-select functions
   const toggleSource = (source: string) => {
     setSelectedSources(prev => {
-      const newSet = new Set(prev);
       if (source === 'all') {
         return new Set(['all']);
       }
-      newSet.delete('all');
+      // If "all" is selected and user clicks an individual item, select all EXCEPT that item
+      if (prev.has('all')) {
+        const allSources = SOURCE_OPTIONS.map(s => s.value);
+        const newSet = new Set(allSources.filter(s => s !== source));
+        return newSet.size === 0 ? new Set(['all']) : newSet;
+      }
+      // Normal toggle
+      const newSet = new Set(prev);
       if (newSet.has(source)) {
         newSet.delete(source);
         if (newSet.size === 0) return new Set(['all']);
       } else {
         newSet.add(source);
+        // If all individual items are selected, switch to 'all'
+        if (newSet.size === SOURCE_OPTIONS.length) {
+          return new Set(['all']);
+        }
       }
       return newSet;
     });
@@ -419,12 +439,11 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
                     <label key={opt.value} className="flex items-center gap-2 px-2 py-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded cursor-pointer">
                       <input
                         type="checkbox"
-                        checked={selectedCountries.has(opt.value)}
+                        checked={selectedCountries.has(opt.value) || selectedCountries.has('all')}
                         onChange={() => toggleCountry(opt.value)}
-                        disabled={selectedCountries.has('all')}
-                        className="w-4 h-4 rounded border-zinc-300 text-red-500 focus:ring-red-500 disabled:opacity-50"
+                        className="w-4 h-4 rounded border-zinc-300 text-red-500 focus:ring-red-500"
                       />
-                      <span className={`text-sm ${selectedCountries.has('all') ? 'text-zinc-400' : 'text-zinc-900 dark:text-zinc-100'}`}>
+                      <span className="text-sm text-zinc-900 dark:text-zinc-100">
                         {opt.flag} {opt.label}
                       </span>
                     </label>
@@ -464,12 +483,11 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
                     <label key={opt.value} className="flex items-center gap-2 px-2 py-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded cursor-pointer">
                       <input
                         type="checkbox"
-                        checked={selectedSources.has(opt.value)}
+                        checked={selectedSources.has(opt.value) || selectedSources.has('all')}
                         onChange={() => toggleSource(opt.value)}
-                        disabled={selectedSources.has('all')}
-                        className="w-4 h-4 rounded border-zinc-300 text-red-500 focus:ring-red-500 disabled:opacity-50"
+                        className="w-4 h-4 rounded border-zinc-300 text-red-500 focus:ring-red-500"
                       />
-                      <span className={`text-sm ${selectedSources.has('all') ? 'text-zinc-400' : 'text-zinc-900 dark:text-zinc-100'}`}>
+                      <span className="text-sm text-zinc-900 dark:text-zinc-100">
                         {opt.label}
                       </span>
                       <span className="text-xs text-zinc-400 ml-auto">{opt.region}</span>
