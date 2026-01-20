@@ -5,26 +5,42 @@ import JobsTabs from '@/components/admin/JobsTabs';
 // Force dynamic to avoid build errors when tables don't exist yet
 export const dynamic = 'force-dynamic';
 
+async function getJobStats() {
+  try {
+    const [savedJobsCount, applicationsStats] = await Promise.all([
+      prisma.savedJob.count(),
+      prisma.jobApplication.groupBy({
+        by: ['status'],
+        _count: { status: true },
+      }),
+    ]);
+
+    const statsMap = applicationsStats.reduce(
+      (acc, item) => ({ ...acc, [item.status]: item._count.status }),
+      {} as Record<string, number>
+    );
+
+    const totalApplications =
+      (statsMap.saved || 0) +
+      (statsMap.applied || 0) +
+      (statsMap.interview || 0) +
+      (statsMap.offer || 0) +
+      (statsMap.rejected || 0);
+
+    return { savedJobsCount, statsMap, totalApplications, error: null };
+  } catch (error) {
+    console.error('Error fetching job stats:', error);
+    return {
+      savedJobsCount: 0,
+      statsMap: {} as Record<string, number>,
+      totalApplications: 0,
+      error: 'Database tables not found. Please run: npx prisma db push',
+    };
+  }
+}
+
 export default async function JobsAdminPage() {
-  const [savedJobsCount, applicationsStats] = await Promise.all([
-    prisma.savedJob.count(),
-    prisma.jobApplication.groupBy({
-      by: ['status'],
-      _count: { status: true },
-    }),
-  ]);
-
-  const statsMap = applicationsStats.reduce(
-    (acc, item) => ({ ...acc, [item.status]: item._count.status }),
-    {} as Record<string, number>
-  );
-
-  const totalApplications =
-    (statsMap.saved || 0) +
-    (statsMap.applied || 0) +
-    (statsMap.interview || 0) +
-    (statsMap.offer || 0) +
-    (statsMap.rejected || 0);
+  const { savedJobsCount, statsMap, totalApplications, error } = await getJobStats();
 
   return (
     <main className="min-h-screen bg-zinc-50 dark:bg-zinc-900 p-4 md:p-8">
@@ -44,6 +60,16 @@ export default async function JobsAdminPage() {
             Back to Admin
           </Link>
         </div>
+
+        {/* Error Banner */}
+        {error && (
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4 mb-6">
+            <p className="text-red-600 dark:text-red-400 font-medium">{error}</p>
+            <p className="text-sm text-red-500 dark:text-red-400 mt-1">
+              Run this command on your server: <code className="bg-red-100 dark:bg-red-900/50 px-2 py-0.5 rounded">npx prisma db push</code>
+            </p>
+          </div>
+        )}
 
         {/* Stats Cards */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
