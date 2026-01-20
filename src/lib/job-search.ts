@@ -503,36 +503,66 @@ export async function searchJSearch(params: JobSearchParams): Promise<JobListing
 
 export type JobSource = 'all' | 'remoteok' | 'remotive' | 'arbeitnow' | 'adzuna' | 'jooble' | 'jsearch' | 'netempregos' | 'vagascombr';
 
-// Accept single source or array of sources
+// Accept single source or array of sources, and handle multiple countries
 export async function searchJobs(params: JobSearchParams, source: JobSource | JobSource[] = 'all'): Promise<JobListing[]> {
   const searches: Promise<JobListing[]>[] = [];
 
   // Convert to array for easier handling
   const sources = Array.isArray(source) ? source : [source];
-  const isAll = sources.includes('all');
+  const isAllSources = sources.includes('all');
 
-  if (isAll || sources.includes('remoteok')) {
-    searches.push(searchRemoteOK(params));
+  // Parse countries (comma-separated string or single value)
+  const countryParam = params.country || 'all';
+  const countries = countryParam.includes(',')
+    ? countryParam.split(',').filter(Boolean)
+    : [countryParam];
+  const isAllCountries = countries.includes('all');
+
+  // Helper to check if a country should be searched
+  const shouldSearchCountry = (c: string) => isAllCountries || countries.includes(c);
+
+  // Remote sources (search if 'remote' or 'all' is selected)
+  if (shouldSearchCountry('remote')) {
+    if (isAllSources || sources.includes('remoteok')) {
+      searches.push(searchRemoteOK(params));
+    }
+    if (isAllSources || sources.includes('remotive')) {
+      searches.push(searchRemotive(params));
+    }
   }
-  if (isAll || sources.includes('remotive')) {
-    searches.push(searchRemotive(params));
+
+  // EU sources
+  if (isAllSources || sources.includes('arbeitnow')) {
+    if (shouldSearchCountry('pt') || isAllCountries) {
+      searches.push(searchArbeitnow(params));
+    }
   }
-  if (isAll || sources.includes('arbeitnow')) {
-    searches.push(searchArbeitnow(params));
+
+  // Country-specific sources (Adzuna, Jooble, JSearch)
+  // Search each selected country separately for these APIs
+  const countriesToSearch = isAllCountries ? ['pt', 'br'] : countries.filter(c => c !== 'remote' && c !== 'all');
+
+  for (const country of countriesToSearch) {
+    const countryParams = { ...params, country };
+
+    if (isAllSources || sources.includes('adzuna')) {
+      searches.push(searchAdzuna(countryParams));
+    }
+    if (isAllSources || sources.includes('jooble')) {
+      searches.push(searchJooble(countryParams));
+    }
+    if (isAllSources || sources.includes('jsearch')) {
+      searches.push(searchJSearch(countryParams));
+    }
   }
-  if (isAll || sources.includes('adzuna')) {
-    searches.push(searchAdzuna(params));
-  }
-  if (isAll || sources.includes('jooble')) {
-    searches.push(searchJooble(params));
-  }
-  if (isAll || sources.includes('jsearch')) {
-    searches.push(searchJSearch(params));
-  }
-  if (sources.includes('netempregos') || (isAll && (params.country === 'pt' || !params.country))) {
+
+  // Portugal-specific: Net-Empregos
+  if (sources.includes('netempregos') || (isAllSources && shouldSearchCountry('pt'))) {
     searches.push(searchNetEmpregos(params));
   }
-  if (sources.includes('vagascombr') || (isAll && (params.country === 'br' || !params.country))) {
+
+  // Brazil-specific: Vagas.com.br
+  if (sources.includes('vagascombr') || (isAllSources && shouldSearchCountry('br'))) {
     searches.push(searchVagasComBr(params));
   }
 
@@ -968,7 +998,7 @@ export function generateSearchQueries(keywords: string[]): string[] {
 }
 
 export interface SmartSearchOptions {
-  country?: 'br' | 'pt' | 'remote' | 'all';
+  country?: string; // 'br' | 'pt' | 'remote' | 'all' or comma-separated like 'br,pt'
   source?: JobSource | JobSource[];
   limit?: number;
   maxAgeDays?: number;
@@ -990,33 +1020,23 @@ export async function smartJobSearch(
 
   // Convert source to array for easier handling
   const sources = Array.isArray(source) ? source : [source];
-  const isAll = sources.includes('all');
+  const isAllSources = sources.includes('all');
+
+  // Parse countries (comma-separated string or single value)
+  const countries = country.includes(',')
+    ? country.split(',').filter(Boolean)
+    : [country];
+  const isAllCountries = countries.includes('all');
 
   // Search with top keywords in parallel using the selected source(s)
   const searchPromises: Promise<JobListing[]>[] = [];
 
-  if (isAll) {
-    // Search all sources with top keywords
-    searchPromises.push(
-      ...queries.slice(0, 3).map(query =>
-        searchJobs({ keyword: query, country, limit: Math.ceil(limit / 3) }, 'all')
-      )
-    );
-
-    // Also search Net-Empregos for Portugal
-    if (country === 'pt' || country === 'all') {
-      searchPromises.push(
-        searchNetEmpregos({ keyword: keywords[0] || 'developer', limit: 20 })
-      );
-    }
-  } else {
-    // Specific source(s) selected - use the array directly
-    searchPromises.push(
-      ...queries.slice(0, 3).map(query =>
-        searchJobs({ keyword: query, country, limit: Math.ceil(limit / 3) }, sources)
-      )
-    );
-  }
+  // Use searchJobs which now handles multiple countries
+  searchPromises.push(
+    ...queries.slice(0, 3).map(query =>
+      searchJobs({ keyword: query, country, limit: Math.ceil(limit / 3), maxAgeDays }, isAllSources ? 'all' : sources)
+    )
+  );
 
   const results = await Promise.all(searchPromises);
   let allJobs = results.flat();
