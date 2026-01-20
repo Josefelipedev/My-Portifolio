@@ -2,6 +2,39 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { isAuthenticated } from '@/lib/auth';
 
+export async function DELETE() {
+  try {
+    if (!await isAuthenticated()) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Delete all page views
+    await prisma.pageView.deleteMany({});
+
+    // Reset site stats
+    await prisma.siteStats.upsert({
+      where: { id: 'main' },
+      update: {
+        totalVisits: 0,
+        uniqueVisits: 0,
+      },
+      create: {
+        id: 'main',
+        totalVisits: 0,
+        uniqueVisits: 0,
+      },
+    });
+
+    return NextResponse.json({ success: true, message: 'Analytics data reset successfully' });
+  } catch (error) {
+    console.error('Error resetting analytics:', error);
+    return NextResponse.json(
+      { error: 'Failed to reset analytics' },
+      { status: 500 }
+    );
+  }
+}
+
 export async function GET() {
   try {
     if (!await isAuthenticated()) {
