@@ -60,12 +60,12 @@ export async function POST(request: Request) {
         requiresVerification: false,
       });
 
-      // Set the auth cookie
+      // Set the auth cookie (14 days)
       response.cookies.set('auth_token', result.token, {
         httpOnly: true,
         secure: false, // localhost doesn't use HTTPS
         sameSite: 'lax',
-        maxAge: 24 * 60 * 60, // 24 hours
+        maxAge: 14 * 24 * 60 * 60, // 14 days
         path: '/',
       });
 

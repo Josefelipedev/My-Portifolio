@@ -4,7 +4,8 @@ import prisma from './prisma';
 import { sendVerificationCode, sendLoginAlert } from './email';
 
 const CODE_EXPIRY_MINUTES = 10;
-const SESSION_EXPIRY_HOURS = 24;
+const SESSION_EXPIRY_DAYS = 14; // Session lasts 14 days
+const SESSION_EXPIRY_HOURS = SESSION_EXPIRY_DAYS * 24;
 
 // Anonymize IP address for GDPR/LGPD compliance
 // IPv4: 192.168.1.100 -> 192.168.1.0
