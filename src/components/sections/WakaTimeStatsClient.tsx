@@ -52,19 +52,31 @@ interface WakaTimeStats {
 
 interface WakaTimeConfig {
   enabled: boolean;
+  // Weekly stats (last 7 days)
   showTotalTime: boolean;
   showDailyAverage: boolean;
   showBestDay: boolean;
   showAllTime: boolean;
-  showYearlyStats: boolean;
-  showYearSelector: boolean;
   showLanguages: boolean;
   showEditors: boolean;
   showOS: boolean;
   showProjects: boolean;
-  profileUrl: string;
+  // Yearly stats section
+  showYearlyStats: boolean;
+  showYearSelector: boolean;
   selectedYears: number[];
   yearlyStatsType: 'last365' | 'calendar';
+  // Yearly display options
+  showYearlyTotalTime: boolean;
+  showYearlyDailyAverage: boolean;
+  showYearlyBestDay: boolean;
+  showYearlyLanguages: boolean;
+  showYearlyEditors: boolean;
+  showYearlyOS: boolean;
+  showYearlyProjects: boolean;
+  // Other
+  profileUrl: string;
+  cacheYearlyData: boolean;
 }
 
 interface Props {
@@ -492,46 +504,54 @@ export function WakaTimeStatsClient({ stats, allTimeStats, yearlyStats, yearlySt
             {currentYearlyStats && (
               <>
                 {/* Yearly Stats Cards */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-                  <StatCard
-                    icon={<ClockIcon />}
-                    label={texts.yearlyTotal}
-                    value={currentYearlyStats.totalHours}
-                    colorKey="violet-purple"
-                  />
-                  <StatCard
-                    icon={<ChartIcon />}
-                    label={texts.yearlyDailyAvg}
-                    value={currentYearlyStats.dailyAverage}
-                    colorKey="fuchsia-pink"
-                  />
-                  {currentYearlyStats.bestDay && (
-                    <StatCard
-                      icon={<TrophyIcon />}
-                      label={texts.bestDay}
-                      value={currentYearlyStats.bestDay.text}
-                      subtext={new Date(currentYearlyStats.bestDay.date).toLocaleDateString(language === 'pt' ? 'pt-BR' : 'en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                      colorKey="rose-red"
-                    />
-                  )}
-                  <div className="relative group">
-                    <div
-                      className="absolute inset-0 opacity-0 group-hover:opacity-10 rounded-xl transition-opacity"
-                      style={{ background: 'linear-gradient(to right, #0ea5e9, #06b6d4)' }}
-                    />
-                    <div className="relative bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-xl p-4 hover:border-slate-600 transition-all h-full flex items-center justify-center">
-                      <div className="text-center">
-                        <p className="text-3xl font-bold text-white">{currentYearlyStats.languages.length}+</p>
-                        <p className="text-sm text-slate-400">{texts.languages}</p>
+                {(config.showYearlyTotalTime || config.showYearlyDailyAverage || config.showYearlyBestDay) && (
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                    {config.showYearlyTotalTime && (
+                      <StatCard
+                        icon={<ClockIcon />}
+                        label={texts.yearlyTotal}
+                        value={currentYearlyStats.totalHours}
+                        colorKey="violet-purple"
+                      />
+                    )}
+                    {config.showYearlyDailyAverage && (
+                      <StatCard
+                        icon={<ChartIcon />}
+                        label={texts.yearlyDailyAvg}
+                        value={currentYearlyStats.dailyAverage}
+                        colorKey="fuchsia-pink"
+                      />
+                    )}
+                    {config.showYearlyBestDay && currentYearlyStats.bestDay && (
+                      <StatCard
+                        icon={<TrophyIcon />}
+                        label={texts.bestDay}
+                        value={currentYearlyStats.bestDay.text}
+                        subtext={new Date(currentYearlyStats.bestDay.date).toLocaleDateString(language === 'pt' ? 'pt-BR' : 'en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        colorKey="rose-red"
+                      />
+                    )}
+                    {config.showYearlyLanguages && (
+                      <div className="relative group">
+                        <div
+                          className="absolute inset-0 opacity-0 group-hover:opacity-10 rounded-xl transition-opacity"
+                          style={{ background: 'linear-gradient(to right, #0ea5e9, #06b6d4)' }}
+                        />
+                        <div className="relative bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-xl p-4 hover:border-slate-600 transition-all h-full flex items-center justify-center">
+                          <div className="text-center">
+                            <p className="text-3xl font-bold text-white">{currentYearlyStats.languages.length}+</p>
+                            <p className="text-sm text-slate-400">{texts.languages}</p>
+                          </div>
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
-                </div>
+                )}
 
-                {/* Yearly Languages & Projects */}
+                {/* Yearly Details Grid */}
                 <div className="grid md:grid-cols-2 gap-8">
                   {/* Yearly Languages */}
-                  {currentYearlyStats.languages.length > 0 && (
+                  {config.showYearlyLanguages && currentYearlyStats.languages.length > 0 && (
                     <div className="bg-slate-800/30 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-6">
                       <h4 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
                         <CodeIcon />
@@ -541,8 +561,58 @@ export function WakaTimeStatsClient({ stats, allTimeStats, yearlyStats, yearlySt
                     </div>
                   )}
 
+                  {/* Yearly Editors */}
+                  {config.showYearlyEditors && currentYearlyStats.editors.length > 0 && (
+                    <div className="bg-slate-800/30 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-6">
+                      <h4 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                        <EditorIcon />
+                        {texts.editors} ({selectedYear === 'last365' ? texts.last365Days : selectedYear})
+                      </h4>
+                      <div className="space-y-4">
+                        {currentYearlyStats.editors.map((editor) => (
+                          <div key={editor.name} className="flex items-center gap-3">
+                            {getEditorIcon(editor.name)}
+                            <div className="flex-1">
+                              <ProgressItem
+                                name={editor.name}
+                                percent={editor.percent}
+                                text={editor.text}
+                                color="#8b5cf6"
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Yearly OS */}
+                  {config.showYearlyOS && currentYearlyStats.operatingSystems.length > 0 && (
+                    <div className="bg-slate-800/30 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-6">
+                      <h4 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                        <ComputerIcon />
+                        {texts.operatingSystems} ({selectedYear === 'last365' ? texts.last365Days : selectedYear})
+                      </h4>
+                      <div className="space-y-4">
+                        {currentYearlyStats.operatingSystems.map((os) => (
+                          <div key={os.name} className="flex items-center gap-3">
+                            {getOSIcon(os.name)}
+                            <div className="flex-1">
+                              <ProgressItem
+                                name={os.name}
+                                percent={os.percent}
+                                text={os.text}
+                                color="#06b6d4"
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Yearly Projects */}
-                  {currentYearlyStats.projects.length > 0 && (
+                  {config.showYearlyProjects && currentYearlyStats.projects.length > 0 && (
                     <div className="bg-slate-800/30 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-6">
                       <h4 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
                         <FolderIcon />

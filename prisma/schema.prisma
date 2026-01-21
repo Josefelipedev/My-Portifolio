@@ -324,3 +324,29 @@ model JobAlertMatch {
   @@index([alertId])
   @@index([matchedAt])
 }
+
+// ==========================================
+// WakaTime Cache
+// ==========================================
+
+model WakaTimeYearCache {
+  id                String   @id // Format: "year_2024"
+  year              Int      @unique
+  totalSeconds      Int
+  totalHours        String
+  dailyAverage      String
+  bestDayDate       String?
+  bestDaySeconds    Int?
+  bestDayText       String?
+  languages         String   @db.Text // JSON array
+  editors           String   @db.Text // JSON array
+  operatingSystems  String   @db.Text // JSON array
+  projects          String   @db.Text // JSON array
+  categories        String   @db.Text // JSON array
+  rangeStart        String
+  rangeEnd          String
+  rangeText         String
+  cachedAt          DateTime @default(now())
+
+  @@index([year])
+}

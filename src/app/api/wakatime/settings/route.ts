@@ -5,19 +5,31 @@ import { error } from '@/lib/api-utils';
 
 export interface WakaTimeConfig {
   enabled: boolean;
+  // Weekly stats (last 7 days)
   showTotalTime: boolean;
   showDailyAverage: boolean;
   showBestDay: boolean;
   showAllTime: boolean;
-  showYearlyStats: boolean;
-  showYearSelector: boolean; // Show year selection buttons at top
   showLanguages: boolean;
   showEditors: boolean;
   showOS: boolean;
   showProjects: boolean;
+  // Yearly stats section
+  showYearlyStats: boolean;
+  showYearSelector: boolean;
+  selectedYears: number[];
+  yearlyStatsType: 'last365' | 'calendar';
+  // Yearly display options
+  showYearlyTotalTime: boolean;
+  showYearlyDailyAverage: boolean;
+  showYearlyBestDay: boolean;
+  showYearlyLanguages: boolean;
+  showYearlyEditors: boolean;
+  showYearlyOS: boolean;
+  showYearlyProjects: boolean;
+  // Other
   profileUrl: string;
-  selectedYears: number[]; // Years to display (e.g., [2024, 2023])
-  yearlyStatsType: 'last365' | 'calendar'; // 'last365' = last 365 days, 'calendar' = specific years
+  cacheYearlyData: boolean; // Save yearly data in database
 }
 
 const DEFAULT_CONFIG: WakaTimeConfig = {
@@ -26,15 +38,23 @@ const DEFAULT_CONFIG: WakaTimeConfig = {
   showDailyAverage: true,
   showBestDay: true,
   showAllTime: true,
-  showYearlyStats: true,
-  showYearSelector: true,
   showLanguages: true,
   showEditors: true,
   showOS: true,
   showProjects: true,
-  profileUrl: 'https://wakatime.com/@josefelipe',
+  showYearlyStats: true,
+  showYearSelector: true,
   selectedYears: [],
   yearlyStatsType: 'last365',
+  showYearlyTotalTime: true,
+  showYearlyDailyAverage: true,
+  showYearlyBestDay: true,
+  showYearlyLanguages: true,
+  showYearlyEditors: true,
+  showYearlyOS: true,
+  showYearlyProjects: true,
+  profileUrl: 'https://wakatime.com/@josefelipedev',
+  cacheYearlyData: true,
 };
 
 // GET - Fetch WakaTime settings (public for frontend)
@@ -77,15 +97,23 @@ export async function PUT(request: Request) {
       showDailyAverage: typeof body.showDailyAverage === 'boolean' ? body.showDailyAverage : DEFAULT_CONFIG.showDailyAverage,
       showBestDay: typeof body.showBestDay === 'boolean' ? body.showBestDay : DEFAULT_CONFIG.showBestDay,
       showAllTime: typeof body.showAllTime === 'boolean' ? body.showAllTime : DEFAULT_CONFIG.showAllTime,
-      showYearlyStats: typeof body.showYearlyStats === 'boolean' ? body.showYearlyStats : DEFAULT_CONFIG.showYearlyStats,
-      showYearSelector: typeof body.showYearSelector === 'boolean' ? body.showYearSelector : DEFAULT_CONFIG.showYearSelector,
       showLanguages: typeof body.showLanguages === 'boolean' ? body.showLanguages : DEFAULT_CONFIG.showLanguages,
       showEditors: typeof body.showEditors === 'boolean' ? body.showEditors : DEFAULT_CONFIG.showEditors,
       showOS: typeof body.showOS === 'boolean' ? body.showOS : DEFAULT_CONFIG.showOS,
       showProjects: typeof body.showProjects === 'boolean' ? body.showProjects : DEFAULT_CONFIG.showProjects,
-      profileUrl: typeof body.profileUrl === 'string' ? body.profileUrl : DEFAULT_CONFIG.profileUrl,
+      showYearlyStats: typeof body.showYearlyStats === 'boolean' ? body.showYearlyStats : DEFAULT_CONFIG.showYearlyStats,
+      showYearSelector: typeof body.showYearSelector === 'boolean' ? body.showYearSelector : DEFAULT_CONFIG.showYearSelector,
       selectedYears: Array.isArray(body.selectedYears) ? body.selectedYears.filter((y: unknown) => typeof y === 'number') : DEFAULT_CONFIG.selectedYears,
       yearlyStatsType: body.yearlyStatsType === 'calendar' ? 'calendar' : 'last365',
+      showYearlyTotalTime: typeof body.showYearlyTotalTime === 'boolean' ? body.showYearlyTotalTime : DEFAULT_CONFIG.showYearlyTotalTime,
+      showYearlyDailyAverage: typeof body.showYearlyDailyAverage === 'boolean' ? body.showYearlyDailyAverage : DEFAULT_CONFIG.showYearlyDailyAverage,
+      showYearlyBestDay: typeof body.showYearlyBestDay === 'boolean' ? body.showYearlyBestDay : DEFAULT_CONFIG.showYearlyBestDay,
+      showYearlyLanguages: typeof body.showYearlyLanguages === 'boolean' ? body.showYearlyLanguages : DEFAULT_CONFIG.showYearlyLanguages,
+      showYearlyEditors: typeof body.showYearlyEditors === 'boolean' ? body.showYearlyEditors : DEFAULT_CONFIG.showYearlyEditors,
+      showYearlyOS: typeof body.showYearlyOS === 'boolean' ? body.showYearlyOS : DEFAULT_CONFIG.showYearlyOS,
+      showYearlyProjects: typeof body.showYearlyProjects === 'boolean' ? body.showYearlyProjects : DEFAULT_CONFIG.showYearlyProjects,
+      profileUrl: typeof body.profileUrl === 'string' ? body.profileUrl : DEFAULT_CONFIG.profileUrl,
+      cacheYearlyData: typeof body.cacheYearlyData === 'boolean' ? body.cacheYearlyData : DEFAULT_CONFIG.cacheYearlyData,
     };
 
     const configJson = JSON.stringify(newConfig);

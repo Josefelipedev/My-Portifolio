@@ -4,19 +4,31 @@ import prisma from '@/lib/prisma';
 
 export interface WakaTimeConfig {
   enabled: boolean;
+  // Weekly stats (last 7 days)
   showTotalTime: boolean;
   showDailyAverage: boolean;
   showBestDay: boolean;
   showAllTime: boolean;
-  showYearlyStats: boolean;
-  showYearSelector: boolean;
   showLanguages: boolean;
   showEditors: boolean;
   showOS: boolean;
   showProjects: boolean;
-  profileUrl: string;
+  // Yearly stats section
+  showYearlyStats: boolean;
+  showYearSelector: boolean;
   selectedYears: number[];
   yearlyStatsType: 'last365' | 'calendar';
+  // Yearly display options
+  showYearlyTotalTime: boolean;
+  showYearlyDailyAverage: boolean;
+  showYearlyBestDay: boolean;
+  showYearlyLanguages: boolean;
+  showYearlyEditors: boolean;
+  showYearlyOS: boolean;
+  showYearlyProjects: boolean;
+  // Other
+  profileUrl: string;
+  cacheYearlyData: boolean;
 }
 
 const DEFAULT_CONFIG: WakaTimeConfig = {
@@ -25,15 +37,23 @@ const DEFAULT_CONFIG: WakaTimeConfig = {
   showDailyAverage: true,
   showBestDay: true,
   showAllTime: true,
-  showYearlyStats: true,
-  showYearSelector: true,
   showLanguages: true,
   showEditors: true,
   showOS: true,
   showProjects: true,
-  profileUrl: 'https://wakatime.com/@josefelipe',
+  showYearlyStats: true,
+  showYearSelector: true,
   selectedYears: [],
   yearlyStatsType: 'last365',
+  showYearlyTotalTime: true,
+  showYearlyDailyAverage: true,
+  showYearlyBestDay: true,
+  showYearlyLanguages: true,
+  showYearlyEditors: true,
+  showYearlyOS: true,
+  showYearlyProjects: true,
+  profileUrl: 'https://wakatime.com/@josefelipedev',
+  cacheYearlyData: true,
 };
 
 async function getWakaTimeConfig(): Promise<WakaTimeConfig> {
