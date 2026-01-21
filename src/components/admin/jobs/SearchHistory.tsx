@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
 
 interface SearchHistoryEntry {
   id: string;
@@ -17,6 +18,7 @@ interface SearchHistoryProps {
 }
 
 export default function SearchHistory({ onSelectSearch }: SearchHistoryProps) {
+  const { confirm } = useConfirm();
   const [history, setHistory] = useState<SearchHistoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAll, setShowAll] = useState(false);
@@ -40,7 +42,13 @@ export default function SearchHistory({ onSelectSearch }: SearchHistoryProps) {
   };
 
   const clearHistory = async () => {
-    if (!confirm('Limpar todo o historico de buscas?')) return;
+    const confirmed = await confirm({
+      title: 'Clear History',
+      message: 'Limpar todo o historico de buscas?',
+      type: 'danger',
+      confirmText: 'Clear All',
+    });
+    if (!confirmed) return;
 
     try {
       await fetch('/api/jobs/history', { method: 'DELETE' });

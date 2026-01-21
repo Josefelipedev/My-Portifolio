@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useToast } from '@/components/ui/Toast';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
 
 interface Skill {
   id: string;
@@ -22,6 +24,8 @@ interface SkillSuggestion {
 const CATEGORIES = ['frontend', 'backend', 'devops', 'tools', 'other'];
 
 export default function SkillsAdminPage() {
+  const { showError } = useToast();
+  const { confirm } = useConfirm();
   const [skills, setSkills] = useState<Skill[]>([]);
   const [suggestions, setSuggestions] = useState<SkillSuggestion[]>([]);
   const [loading, setLoading] = useState(true);
@@ -101,7 +105,7 @@ export default function SkillsAdminPage() {
       setSuggestions((prev) => prev.filter((s) => s.name !== suggestion.name));
       await fetchSkills();
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to add skill');
+      showError(err instanceof Error ? err.message : 'Failed to add skill');
     } finally {
       setSaving(null);
     }
@@ -135,7 +139,7 @@ export default function SkillsAdminPage() {
       setFormData({ name: '', category: 'frontend', level: 3, iconUrl: '' });
       await fetchSkills();
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to save');
+      showError(err instanceof Error ? err.message : 'Failed to save');
     } finally {
       setSaving(null);
     }
@@ -153,7 +157,13 @@ export default function SkillsAdminPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this skill?')) return;
+    const confirmed = await confirm({
+      title: 'Delete Skill',
+      message: 'Are you sure you want to delete this skill?',
+      type: 'danger',
+      confirmText: 'Delete',
+    });
+    if (!confirmed) return;
 
     try {
       setSaving(id);
@@ -165,7 +175,7 @@ export default function SkillsAdminPage() {
 
       await fetchSkills();
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to delete');
+      showError(err instanceof Error ? err.message : 'Failed to delete');
     } finally {
       setSaving(null);
     }

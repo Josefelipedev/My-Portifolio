@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import BulkActionBar from './jobs/BulkActionBar';
 import { exportApplicationsToCSV, exportApplicationsToPDF, ExportableApplication } from '@/lib/export';
+import { useToast } from '@/components/ui/Toast';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
 
 interface JobApplication {
   id: string;
@@ -40,6 +42,8 @@ interface JobApplicationsProps {
 const STATUSES = ['saved', 'applied', 'interview', 'offer', 'rejected'] as const;
 
 export default function JobApplications({ onApplicationDeleted }: JobApplicationsProps) {
+  const { showError, showWarning, showSuccess } = useToast();
+  const { confirm, prompt } = useConfirm();
   const [applications, setApplications] = useState<JobApplication[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -116,14 +120,20 @@ export default function JobApplications({ onApplicationDeleted }: JobApplication
       await fetchApplications();
       setEditingId(null);
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to update');
+      showError(err instanceof Error ? err.message : 'Failed to update');
     } finally {
       setUpdating(null);
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this application?')) return;
+    const confirmed = await confirm({
+      title: 'Delete Application',
+      message: 'Are you sure you want to delete this application?',
+      type: 'danger',
+      confirmText: 'Delete',
+    });
+    if (!confirmed) return;
 
     try {
       setDeleting(id);
@@ -136,7 +146,7 @@ export default function JobApplications({ onApplicationDeleted }: JobApplication
       setApplications((prev) => prev.filter((a) => a.id !== id));
       onApplicationDeleted();
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to delete');
+      showError(err instanceof Error ? err.message : 'Failed to delete');
     } finally {
       setDeleting(null);
     }
@@ -171,7 +181,7 @@ export default function JobApplications({ onApplicationDeleted }: JobApplication
         notes: '',
       });
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to add application');
+      showError(err instanceof Error ? err.message : 'Failed to add application');
     } finally {
       setAdding(false);
     }
@@ -199,7 +209,13 @@ export default function JobApplications({ onApplicationDeleted }: JobApplication
   };
 
   const handleBulkDelete = async () => {
-    if (!confirm(`Are you sure you want to delete ${selectedIds.size} application(s)?`)) return;
+    const confirmed = await confirm({
+      title: 'Delete Applications',
+      message: `Are you sure you want to delete ${selectedIds.size} application(s)?`,
+      type: 'danger',
+      confirmText: 'Delete All',
+    });
+    if (!confirmed) return;
 
     try {
       setBulkDeleting(true);
@@ -217,14 +233,20 @@ export default function JobApplications({ onApplicationDeleted }: JobApplication
       setSelectedIds(new Set());
       onApplicationDeleted();
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to delete applications');
+      showError(err instanceof Error ? err.message : 'Failed to delete applications');
     } finally {
       setBulkDeleting(false);
     }
   };
 
   const handleBulkStatusChange = async (status: string) => {
-    if (!confirm(`Update ${selectedIds.size} application(s) to "${status}"?`)) return;
+    const confirmed = await confirm({
+      title: 'Update Status',
+      message: `Update ${selectedIds.size} application(s) to "${status}"?`,
+      type: 'warning',
+      confirmText: 'Update All',
+    });
+    if (!confirmed) return;
 
     try {
       setBulkUpdating(true);
@@ -241,7 +263,7 @@ export default function JobApplications({ onApplicationDeleted }: JobApplication
       await fetchApplications();
       setSelectedIds(new Set());
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to update applications');
+      showError(err instanceof Error ? err.message : 'Failed to update applications');
     } finally {
       setBulkUpdating(false);
     }
@@ -253,7 +275,7 @@ export default function JobApplications({ onApplicationDeleted }: JobApplication
       : filteredApplications;
 
     if (appsToExport.length === 0) {
-      alert('No applications to export');
+      showWarning('No applications to export');
       return;
     }
 
@@ -272,10 +294,12 @@ export default function JobApplications({ onApplicationDeleted }: JobApplication
     }));
 
     // Show format options
-    const format = window.prompt(
-      `Export ${exportData.length} application(s) as:\n1. CSV\n2. PDF\n\nEnter 1 or 2:`,
-      '1'
-    );
+    const format = await prompt({
+      title: 'Export Format',
+      message: `Export ${exportData.length} application(s) as:\n1. CSV\n2. PDF\n\nEnter 1 or 2:`,
+      defaultValue: '1',
+      placeholder: '1 or 2',
+    });
 
     if (!format) return;
 
@@ -286,8 +310,9 @@ export default function JobApplications({ onApplicationDeleted }: JobApplication
       } else {
         exportApplicationsToCSV(exportData, `applications-${new Date().toISOString().split('T')[0]}`);
       }
+      showSuccess('Export completed!');
     } catch (err) {
-      alert('Failed to export: ' + (err instanceof Error ? err.message : 'Unknown error'));
+      showError('Failed to export: ' + (err instanceof Error ? err.message : 'Unknown error'));
     } finally {
       setExporting(false);
     }

@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import BulkActionBar from './jobs/BulkActionBar';
 import { exportJobsToCSV, exportJobsToPDF, ExportableJob } from '@/lib/export';
+import { useToast } from '@/components/ui/Toast';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
 
 interface SavedJob {
   id: string;
@@ -32,6 +34,8 @@ interface SavedJobsProps {
 }
 
 export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJobsProps) {
+  const { showError, showWarning, showSuccess } = useToast();
+  const { confirm, prompt } = useConfirm();
   const [jobs, setJobs] = useState<SavedJob[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -68,7 +72,13 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to remove this saved job?')) return;
+    const confirmed = await confirm({
+      title: 'Remove Saved Job',
+      message: 'Are you sure you want to remove this saved job?',
+      type: 'danger',
+      confirmText: 'Remove',
+    });
+    if (!confirmed) return;
 
     try {
       setDeleting(id);
@@ -81,7 +91,7 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
       setJobs((prev) => prev.filter((j) => j.id !== id));
       onJobRemoved();
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to delete');
+      showError(err instanceof Error ? err.message : 'Failed to delete');
     } finally {
       setDeleting(null);
     }
@@ -107,7 +117,7 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
       await fetchSavedJobs();
       onApplicationCreated();
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to create application');
+      showError(err instanceof Error ? err.message : 'Failed to create application');
     } finally {
       setApplying(null);
     }
@@ -130,7 +140,7 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
       );
       setEditingNotes(null);
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to save notes');
+      showError(err instanceof Error ? err.message : 'Failed to save notes');
     }
   };
 
@@ -156,7 +166,13 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
   };
 
   const handleBulkDelete = async () => {
-    if (!confirm(`Deletar ${selectedIds.size} vagas salvas?`)) return;
+    const confirmed = await confirm({
+      title: 'Delete Saved Jobs',
+      message: `Deletar ${selectedIds.size} vagas salvas?`,
+      type: 'danger',
+      confirmText: 'Delete All',
+    });
+    if (!confirmed) return;
 
     try {
       setBulkDeleting(true);
@@ -178,7 +194,7 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
       }
       setSelectedIds(new Set());
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to delete jobs');
+      showError(err instanceof Error ? err.message : 'Failed to delete jobs');
     } finally {
       setBulkDeleting(false);
     }
@@ -190,7 +206,7 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
       : jobs;
 
     if (jobsToExport.length === 0) {
-      alert('No jobs to export');
+      showWarning('No jobs to export');
       return;
     }
 
@@ -206,10 +222,12 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
     }));
 
     // Show format options
-    const format = window.prompt(
-      `Export ${exportData.length} job(s) as:\n1. CSV\n2. PDF\n\nEnter 1 or 2:`,
-      '1'
-    );
+    const format = await prompt({
+      title: 'Export Format',
+      message: `Export ${exportData.length} job(s) as:\n1. CSV\n2. PDF\n\nEnter 1 or 2:`,
+      defaultValue: '1',
+      placeholder: '1 or 2',
+    });
 
     if (!format) return;
 
@@ -220,8 +238,9 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
       } else {
         exportJobsToCSV(exportData, `saved-jobs-${new Date().toISOString().split('T')[0]}`);
       }
+      showSuccess('Export completed!');
     } catch (err) {
-      alert('Failed to export: ' + (err instanceof Error ? err.message : 'Unknown error'));
+      showError('Failed to export: ' + (err instanceof Error ? err.message : 'Unknown error'));
     } finally {
       setExporting(false);
     }

@@ -35,8 +35,7 @@ export function exportToCSV<T>(
   columns?: { key: keyof T; label: string }[]
 ): void {
   if (data.length === 0) {
-    alert('No data to export');
-    return;
+    throw new Error('No data to export');
   }
 
   let csvData: string;
