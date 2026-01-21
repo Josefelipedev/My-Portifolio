@@ -566,18 +566,16 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
                       {job.salary}
                     </span>
                   )}
-                  {job.contactEmail && (
-                    <button
-                      onClick={() => openEmailComposer(job)}
-                      className="flex items-center gap-1 text-purple-600 dark:text-purple-400 hover:underline hover:text-purple-700 dark:hover:text-purple-300"
-                      title="Click to send email"
-                    >
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                      </svg>
-                      {job.contactEmail}
-                    </button>
-                  )}
+                  <button
+                    onClick={() => openEmailComposer(job)}
+                    className="flex items-center gap-1 px-2 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 rounded hover:bg-purple-200 dark:hover:bg-purple-800/50 transition-colors"
+                    title="Compor email de candidatura"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                    {job.contactEmail ? job.contactEmail : 'Compor Email'}
+                  </button>
                   {job.contactPhone && (
                     <a
                       href={`tel:${job.contactPhone}`}
