@@ -22,7 +22,8 @@ export type AIFeature =
   | 'skills-suggestion'
   | 'resume-analysis'
   | 'alert-suggestions'
-  | 'wakatime-ranking';
+  | 'wakatime-ranking'
+  | 'generate-email';
 
 interface TrackingParams {
   feature: AIFeature;
