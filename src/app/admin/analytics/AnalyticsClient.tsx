@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useToast } from '@/components/ui/Toast';
 
 interface AnalyticsData {
   overview: {
@@ -31,6 +32,7 @@ interface AnalyticsData {
 
 export default function AnalyticsClient({ data }: { data: AnalyticsData }) {
   const router = useRouter();
+  const { showError } = useToast();
   const [showResetModal, setShowResetModal] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
   const maxVisits = Math.max(...data.visitsByDay.map((d) => d.count), 1);
@@ -43,10 +45,10 @@ export default function AnalyticsClient({ data }: { data: AnalyticsData }) {
         setShowResetModal(false);
         router.refresh();
       } else {
-        alert('Failed to reset analytics');
+        showError('Failed to reset analytics');
       }
     } catch {
-      alert('Error resetting analytics');
+      showError('Error resetting analytics');
     } finally {
       setIsResetting(false);
     }

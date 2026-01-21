@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AISummaryButton } from './admin/AISummaryButton';
+import { useToast } from '@/components/ui/Toast';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
 
 interface Project {
   id: string;
@@ -46,6 +48,8 @@ export default function ProjectAdmin({ projects: initialProjects }: { projects: 
   const [rank, setRank] = useState<number | null>(null);
   const [aiAnalysis, setAiAnalysis] = useState<AIAnalysisResult | null>(null);
   const router = useRouter();
+  const { showError, showWarning } = useToast();
+  const { confirm } = useConfirm();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -93,7 +97,7 @@ export default function ProjectAdmin({ projects: initialProjects }: { projects: 
 
   const handleAnalyzeReadme = async () => {
     if (!readme.trim() || readme.trim().length < 50) {
-      alert('Please enter at least 50 characters of README content');
+      showWarning('Please enter at least 50 characters of README content');
       return;
     }
 
@@ -110,10 +114,10 @@ export default function ProjectAdmin({ projects: initialProjects }: { projects: 
         setAiAnalysis(analysis);
       } else {
         const err = await res.json();
-        alert(err.error || 'Failed to analyze README');
+        showError(err.error || 'Failed to analyze README');
       }
     } catch {
-      alert('Failed to analyze README');
+      showError('Failed to analyze README');
     } finally {
       setIsAnalyzing(false);
     }
@@ -173,7 +177,13 @@ export default function ProjectAdmin({ projects: initialProjects }: { projects: 
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this project?')) return;
+    const confirmed = await confirm({
+      title: 'Delete Project',
+      message: 'Are you sure you want to delete this project?',
+      type: 'danger',
+      confirmText: 'Delete',
+    });
+    if (!confirmed) return;
 
     // Optimistic update
     setProjects(prev => prev.filter(p => p.id !== id));

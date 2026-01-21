@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Experience } from '@prisma/client';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
 
 export default function ExperienceAdmin({ experiences: initialExperiences }: { experiences: Experience[] }) {
   const [experiences] = useState<Experience[]>(initialExperiences);
@@ -16,6 +17,7 @@ export default function ExperienceAdmin({ experiences: initialExperiences }: { e
   const [technologies, setTechnologies] = useState('');
   const [expandedExperience, setExpandedExperience] = useState<string | null>(null);
   const router = useRouter();
+  const { confirm } = useConfirm();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -81,7 +83,13 @@ export default function ExperienceAdmin({ experiences: initialExperiences }: { e
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this experience?')) return;
+    const confirmed = await confirm({
+      title: 'Delete Experience',
+      message: 'Are you sure you want to delete this experience?',
+      type: 'danger',
+      confirmText: 'Delete',
+    });
+    if (!confirmed) return;
     const res = await fetch(`/api/experiences/${id}`, { method: 'DELETE' });
     if (res.ok) {
       router.refresh();

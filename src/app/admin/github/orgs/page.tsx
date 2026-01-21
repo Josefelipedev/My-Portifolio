@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useToast } from '@/components/ui/Toast';
 
 interface GitHubOrg {
   id: number;
@@ -27,6 +28,7 @@ interface GitHubRepo {
 }
 
 export default function GitHubOrgsPage() {
+  const { showSuccess, showError } = useToast();
   const [orgs, setOrgs] = useState<GitHubOrg[]>([]);
   const [selectedOrg, setSelectedOrg] = useState<GitHubOrg | null>(null);
   const [repos, setRepos] = useState<GitHubRepo[]>([]);
@@ -104,9 +106,9 @@ export default function GitHubOrgsPage() {
         prev.map((r) => (r.id === repo.id ? { ...r, isImported: true } : r))
       );
 
-      alert(`Successfully imported "${repo.name}"${generateSummary ? ' with AI summary!' : '!'}`);
+      showSuccess(`Successfully imported "${repo.name}"${generateSummary ? ' with AI summary!' : '!'}`);
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to import');
+      showError(err instanceof Error ? err.message : 'Failed to import');
     } finally {
       setImporting(null);
     }

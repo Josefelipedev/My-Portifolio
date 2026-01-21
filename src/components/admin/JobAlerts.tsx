@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useToast } from '@/components/ui/Toast';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
 
 interface JobAlertMatch {
   id: string;
@@ -47,6 +49,8 @@ const COUNTRIES = [
 ];
 
 export default function JobAlerts() {
+  const { showError, showSuccess, showInfo } = useToast();
+  const { confirm } = useConfirm();
   const [alerts, setAlerts] = useState<JobAlert[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -105,14 +109,20 @@ export default function JobAlerts() {
       setShowCreateForm(false);
       setFormData({ name: '', keyword: '', countries: 'all', sources: 'all' });
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to create alert');
+      showError(err instanceof Error ? err.message : 'Failed to create alert');
     } finally {
       setCreating(false);
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this alert?')) return;
+    const confirmed = await confirm({
+      title: 'Delete Alert',
+      message: 'Are you sure you want to delete this alert?',
+      type: 'danger',
+      confirmText: 'Delete',
+    });
+    if (!confirmed) return;
 
     try {
       const response = await fetch(`/api/jobs/alerts?id=${id}`, { method: 'DELETE' });
@@ -123,7 +133,7 @@ export default function JobAlerts() {
 
       setAlerts((prev) => prev.filter((a) => a.id !== id));
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to delete alert');
+      showError(err instanceof Error ? err.message : 'Failed to delete alert');
     }
   };
 
@@ -143,7 +153,7 @@ export default function JobAlerts() {
         prev.map((a) => (a.id === jobAlert.id ? { ...a, isActive: !a.isActive } : a))
       );
     } catch (err) {
-      window.alert(err instanceof Error ? err.message : 'Failed to update alert');
+      showError(err instanceof Error ? err.message : 'Failed to update alert');
     }
   };
 
@@ -162,10 +172,10 @@ export default function JobAlerts() {
         throw new Error(data.error || 'Failed to run alert');
       }
 
-      alert(data.message);
+      showInfo(data.message);
       await fetchAlerts();
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to run alert');
+      showError(err instanceof Error ? err.message : 'Failed to run alert');
     } finally {
       setRunningAlert(null);
     }
