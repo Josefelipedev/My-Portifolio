@@ -29,6 +29,15 @@ interface JobAlert {
   };
 }
 
+interface AlertSuggestion {
+  name: string;
+  keyword: string;
+  countries: string;
+  sources: string;
+  reason: string;
+  confidence: 'high' | 'medium' | 'low';
+}
+
 const SOURCES = [
   { value: 'all', label: 'All Sources' },
   { value: 'remoteok', label: 'RemoteOK' },
@@ -37,6 +46,9 @@ const SOURCES = [
   { value: 'adzuna', label: 'Adzuna' },
   { value: 'linkedin', label: 'LinkedIn' },
   { value: 'jooble', label: 'Jooble' },
+  { value: 'geekhunter', label: 'GeekHunter' },
+  { value: 'vagascombr', label: 'Vagas.com.br' },
+  { value: 'netempregos', label: 'Net-Empregos' },
 ];
 
 const COUNTRIES = [
@@ -58,6 +70,9 @@ export default function JobAlerts() {
   const [creating, setCreating] = useState(false);
   const [runningAlert, setRunningAlert] = useState<string | null>(null);
   const [expandedAlert, setExpandedAlert] = useState<string | null>(null);
+  const [suggestions, setSuggestions] = useState<AlertSuggestion[]>([]);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -191,6 +206,36 @@ export default function JobAlerts() {
     });
   };
 
+  const fetchSuggestions = async () => {
+    setLoadingSuggestions(true);
+    try {
+      const response = await fetch('/api/jobs/alerts/suggestions');
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to fetch suggestions');
+      }
+
+      setSuggestions(data.suggestions || []);
+      setShowSuggestions(true);
+    } catch (err) {
+      showError(err instanceof Error ? err.message : 'Failed to fetch suggestions');
+    } finally {
+      setLoadingSuggestions(false);
+    }
+  };
+
+  const createFromSuggestion = (suggestion: AlertSuggestion) => {
+    setFormData({
+      name: suggestion.name,
+      keyword: suggestion.keyword,
+      countries: suggestion.countries.split(',')[0] || 'all',
+      sources: suggestion.sources.split(',')[0] || 'all',
+    });
+    setShowCreateForm(true);
+    setShowSuggestions(false);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -221,15 +266,39 @@ export default function JobAlerts() {
           <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Job Alerts</h2>
           <p className="text-sm text-zinc-500">Get notified when new jobs match your criteria</p>
         </div>
-        <button
-          onClick={() => setShowCreateForm(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-red-500 text-white text-sm font-medium rounded-lg hover:bg-red-600 transition-colors"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          Create Alert
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={fetchSuggestions}
+            disabled={loadingSuggestions}
+            className="flex items-center gap-2 px-4 py-2 bg-purple-500 text-white text-sm font-medium rounded-lg hover:bg-purple-600 disabled:opacity-50 transition-colors"
+          >
+            {loadingSuggestions ? (
+              <>
+                <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                Generating...
+              </>
+            ) : (
+              <>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                AI Suggestions
+              </>
+            )}
+          </button>
+          <button
+            onClick={() => setShowCreateForm(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-red-500 text-white text-sm font-medium rounded-lg hover:bg-red-600 transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Create Alert
+          </button>
+        </div>
       </div>
 
       {/* Create Alert Modal */}
@@ -317,6 +386,78 @@ export default function JobAlerts() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* AI Suggestions Panel */}
+      {showSuggestions && suggestions.length > 0 && (
+        <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-xl p-4 mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <svg className="w-5 h-5 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+              <h3 className="font-semibold text-purple-900 dark:text-purple-100">
+                AI Suggestions based on your resume
+              </h3>
+            </div>
+            <button
+              onClick={() => setShowSuggestions(false)}
+              className="text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-200"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          <div className="space-y-3">
+            {suggestions.map((suggestion, index) => (
+              <div
+                key={index}
+                className="bg-white dark:bg-zinc-800 rounded-lg p-4 border border-purple-100 dark:border-purple-900"
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium text-zinc-900 dark:text-zinc-100">
+                        {suggestion.name}
+                      </p>
+                      <span
+                        className={`px-2 py-0.5 rounded text-xs font-medium ${
+                          suggestion.confidence === 'high'
+                            ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
+                            : suggestion.confidence === 'medium'
+                            ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400'
+                            : 'bg-zinc-100 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400'
+                        }`}
+                      >
+                        {suggestion.confidence}
+                      </span>
+                    </div>
+                    <p className="text-sm text-zinc-500 mt-1">{suggestion.reason}</p>
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      <span className="px-2 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 text-xs rounded">
+                        {suggestion.keyword}
+                      </span>
+                      <span className="px-2 py-1 bg-zinc-100 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400 text-xs rounded">
+                        {suggestion.countries}
+                      </span>
+                      <span className="px-2 py-1 bg-zinc-100 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400 text-xs rounded">
+                        {suggestion.sources}
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => createFromSuggestion(suggestion)}
+                    className="px-4 py-2 bg-purple-500 text-white text-sm font-medium rounded-lg hover:bg-purple-600 transition-colors whitespace-nowrap"
+                  >
+                    Create Alert
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}

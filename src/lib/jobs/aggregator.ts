@@ -16,6 +16,7 @@ import { searchJSearch } from './apis/jsearch';
 import { searchNetEmpregos } from './apis/net-empregos';
 import { searchVagasComBr } from './apis/vagas';
 import { searchLinkedIn } from './apis/linkedin';
+import { searchGeekHunter } from './apis/geekhunter';
 import { isAIExtractionAvailable } from './ai-extraction';
 
 /**
@@ -94,6 +95,11 @@ export async function searchJobs(
   // Brazil-specific: Vagas.com.br
   if (sources.includes('vagascombr') || (isAllSources && shouldSearchCountry('br'))) {
     searches.push(searchVagasComBr(params));
+  }
+
+  // Brazil-specific: GeekHunter (Tech Jobs)
+  if (sources.includes('geekhunter') || (isAllSources && shouldSearchCountry('br'))) {
+    searches.push(searchGeekHunter(params));
   }
 
   // LinkedIn Jobs (Brazil and Portugal)
@@ -184,6 +190,7 @@ export function getApiStatus(): ApiStatus[] {
     { name: 'Net-Empregos', configured: true, needsKey: false },
     { name: 'Vagas.com.br', configured: true, needsKey: false },
     { name: 'LinkedIn', configured: true, needsKey: false },
+    { name: 'GeekHunter', configured: true, needsKey: false },
     { name: 'AI Extraction', configured: hasAIExtraction, needsKey: true },
     { name: 'Adzuna', configured: !!(process.env.ADZUNA_APP_ID && process.env.ADZUNA_APP_KEY), needsKey: true },
     { name: 'Jooble', configured: !!process.env.JOOBLE_API_KEY, needsKey: true },

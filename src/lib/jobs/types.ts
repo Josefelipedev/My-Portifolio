@@ -26,7 +26,8 @@ export type JobSourceType =
   | 'jsearch'
   | 'netempregos'
   | 'vagascombr'
-  | 'linkedin';
+  | 'linkedin'
+  | 'geekhunter';
 
 export type JobSource = 'all' | JobSourceType;
 

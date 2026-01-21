@@ -81,6 +81,7 @@ interface WakaTimeConfig {
   showRankingBadge: boolean;
   rankingPercentile: number;
   rankingTotalDevs: string;
+  yearlyRankings: Record<number, { percentile: number; totalDevs: string }>;
   // Other
   profileUrl: string;
   cacheYearlyData: boolean;
@@ -310,6 +311,11 @@ export function WakaTimeStatsClient({ stats, allTimeStats, yearlyStats, yearlySt
     ? config.yearlyReportLinks?.[selectedYear]
     : null;
 
+  // Get ranking for current selected year (or fallback to global)
+  const currentYearRanking = typeof selectedYear === 'number' && config.yearlyRankings?.[selectedYear]
+    ? config.yearlyRankings[selectedYear]
+    : { percentile: config.rankingPercentile, totalDevs: config.rankingTotalDevs };
+
   const texts = {
     title: language === 'pt' ? 'Estatísticas de Código' : 'Coding Stats',
     subtitle: language === 'pt' ? 'Minha atividade de programação via WakaTime' : 'My coding activity tracked by WakaTime',
@@ -340,12 +346,15 @@ export function WakaTimeStatsClient({ stats, allTimeStats, yearlyStats, yearlySt
         {/* Section Header */}
         <div className="text-center mb-8">
           {/* Ranking Badge */}
-          {config.showRankingBadge && config.rankingPercentile > 0 && (
+          {config.showRankingBadge && currentYearRanking.percentile > 0 && (
             <div className="inline-flex items-center gap-2 px-4 py-2 mb-4 rounded-full bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/30">
               <TrophyIconSmall />
               <span className="text-sm font-semibold">
-                <span className="text-amber-400">Top {config.rankingPercentile}%</span>
-                <span className="text-slate-400 ml-1">{texts.ofDevs} {config.rankingTotalDevs} {texts.devs}</span>
+                <span className="text-amber-400">Top {currentYearRanking.percentile}%</span>
+                <span className="text-slate-400 ml-1">{texts.ofDevs} {currentYearRanking.totalDevs} {texts.devs}</span>
+                {typeof selectedYear === 'number' && (
+                  <span className="text-slate-500 ml-1">({selectedYear})</span>
+                )}
               </span>
             </div>
           )}

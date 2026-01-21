@@ -33,6 +33,7 @@ export interface WakaTimeConfig {
   showRankingBadge: boolean;
   rankingPercentile: number;
   rankingTotalDevs: string;
+  yearlyRankings: Record<number, { percentile: number; totalDevs: string }>;
   // Other
   profileUrl: string;
   cacheYearlyData: boolean;
@@ -64,6 +65,11 @@ const DEFAULT_CONFIG: WakaTimeConfig = {
   showRankingBadge: true,
   rankingPercentile: 1,
   rankingTotalDevs: '500k+',
+  yearlyRankings: {
+    2023: { percentile: 1, totalDevs: '500k+' },
+    2024: { percentile: 1, totalDevs: '500k+' },
+    2025: { percentile: 4, totalDevs: '500k+' },
+  },
   profileUrl: 'https://wakatime.com/@josefelipedev',
   cacheYearlyData: true,
 };
