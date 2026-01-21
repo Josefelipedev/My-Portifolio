@@ -57,47 +57,42 @@ export async function POST(request: Request) {
     let errorMessage: string | undefined;
 
     // Portfolio URL
-    const portfolioUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://josefelipe.dev';
+    const portfolioUrl = 'https://portfolio.josefelipedev.com/';
     const linkedinUrl = personalInfo?.linkedin ? `https://linkedin.com/in/${personalInfo.linkedin}` : '';
     const githubUrl = personalInfo?.github ? `https://github.com/${personalInfo.github}` : '';
 
     try {
-      const prompt = `You are a professional career coach helping someone write a job application email.
+      const prompt = `Write a SHORT job application email in PORTUGUESE (Brazilian).
 
-CANDIDATE'S RESUME:
-Name: ${personalInfo?.name || 'Not specified'}
-Email: ${personalInfo?.email || 'Not specified'}
-Phone: ${personalInfo?.phone || 'Not specified'}
+CANDIDATE INFO:
+Name: ${personalInfo?.name || 'Jose Felipe'}
 Portfolio: ${portfolioUrl}
 LinkedIn: ${linkedinUrl}
 GitHub: ${githubUrl}
-Summary: ${summary}
 Skills: ${skills}
-Experience: ${experience}
 
-JOB DETAILS:
+JOB:
 Position: ${jobTitle}
 Company: ${company}
-Description: ${description ? description.slice(0, 2000) : 'Not available'}
-URL: ${jobUrl || 'Not available'}
 
-Write a professional, personalized email for this job application in PORTUGUESE (Brazilian).
+RULES - FOLLOW EXACTLY:
+1. Start with greeting: "Boa tarde," or "Ola,"
+2. MAXIMUM 5 LINES of text (not counting signature)
+3. Be direct and professional
+4. Mention 1-2 relevant skills only
+5. End with "Atenciosamente," and the name
 
-Requirements:
-1. The email should be warm but professional
-2. Highlight relevant skills from the resume that match the job
-3. Show genuine interest in the company and position
-4. Keep it concise (max 250 words)
-5. Include a clear call to action
-6. Do NOT use generic phrases like "[Your name]" - use the actual name from the resume
-7. Make it sound natural, not robotic
-8. ALWAYS include the portfolio URL (${portfolioUrl}) in the signature
-9. Include LinkedIn and GitHub links in the signature
+SIGNATURE FORMAT (always include):
+Atenciosamente,
+${personalInfo?.name || 'Jose Felipe'}
+Portfolio: ${portfolioUrl}
+LinkedIn: ${linkedinUrl}
+GitHub: ${githubUrl}
 
-Return ONLY a JSON object with this format:
+Return ONLY JSON:
 {
-  "subject": "The email subject line in Portuguese",
-  "body": "The complete email body in Portuguese"
+  "subject": "Candidatura: ${jobTitle} - ${personalInfo?.name || 'Jose Felipe'}",
+  "body": "the short email body"
 }`;
 
       const aiResponse = await client.chat.completions.create({
