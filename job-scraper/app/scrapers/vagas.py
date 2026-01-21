@@ -1,12 +1,14 @@
 import hashlib
+import os
 from datetime import datetime
 from typing import List
-from playwright.async_api import async_playwright
+from playwright.async_api import async_playwright, Page
 from bs4 import BeautifulSoup
 import logging
 
 from scrapers.base import BaseScraper
 from models import JobListing, JobSource
+from config import config
 
 logger = logging.getLogger(__name__)
 
@@ -14,6 +16,29 @@ logger = logging.getLogger(__name__)
 class VagasComBrScraper(BaseScraper):
     name = "vagascombr"
     base_url = "https://www.vagas.com.br"
+
+    async def _save_debug(self, page: Page, html: str, keyword: str):
+        """Save screenshot and HTML for debugging"""
+        if not config.DEBUG_MODE:
+            return
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        base_name = f"vagascombr_{keyword}_{timestamp}"
+
+        try:
+            # Save screenshot
+            screenshot_path = os.path.join(config.DEBUG_DIR, f"{base_name}.png")
+            await page.screenshot(path=screenshot_path, full_page=True)
+            logger.info(f"Debug screenshot saved: {screenshot_path}")
+
+            # Save HTML
+            html_path = os.path.join(config.DEBUG_DIR, f"{base_name}.html")
+            with open(html_path, "w", encoding="utf-8") as f:
+                f.write(html)
+            logger.info(f"Debug HTML saved: {html_path}")
+
+        except Exception as e:
+            logger.error(f"Failed to save debug files: {e}")
 
     async def search(self, keyword: str, country: str, limit: int) -> List[JobListing]:
         """Search Vagas.com.br using Playwright"""
@@ -46,9 +71,16 @@ class VagasComBrScraper(BaseScraper):
                     logger.warning("No job elements found")
 
                 html = await page.content()
-                await browser.close()
 
+                # Parse HTML
                 jobs = self._parse_html(html, limit)
+
+                # Save debug if no jobs found
+                if len(jobs) == 0:
+                    logger.warning(f"No jobs found for '{keyword}', saving debug files")
+                    await self._save_debug(page, html, keyword)
+
+                await browser.close()
 
         except Exception as e:
             logger.error(f"Vagas.com.br scraping error: {e}")
