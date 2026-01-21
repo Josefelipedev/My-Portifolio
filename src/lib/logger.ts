@@ -18,6 +18,7 @@ export type LogSource =
   | 'netempregos'
   | 'linkedin'
   | 'ai-extraction'
+  | 'job-enrichment'
   | 'api'
   | 'auth'
   | 'cron'
