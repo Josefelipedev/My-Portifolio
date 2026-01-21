@@ -15,6 +15,8 @@ interface WakaTimeConfig {
   showOS: boolean;
   showProjects: boolean;
   profileUrl: string;
+  selectedYears: number[];
+  yearlyStatsType: 'last365' | 'calendar';
 }
 
 const DEFAULT_CONFIG: WakaTimeConfig = {
@@ -29,6 +31,14 @@ const DEFAULT_CONFIG: WakaTimeConfig = {
   showOS: true,
   showProjects: true,
   profileUrl: 'https://wakatime.com/@josefelipe',
+  selectedYears: [],
+  yearlyStatsType: 'last365',
+};
+
+// Generate available years (current year and last 4 years)
+const getAvailableYears = () => {
+  const currentYear = new Date().getFullYear();
+  return [currentYear, currentYear - 1, currentYear - 2, currentYear - 3, currentYear - 4];
 };
 
 export default function WakaTimeAdminPage() {
@@ -196,6 +206,94 @@ export default function WakaTimeAdminPage() {
                 Link para o seu perfil público do WakaTime
               </p>
             </div>
+
+            {/* Year Selection */}
+            {config.showYearlyStats && (
+              <div className="bg-white dark:bg-zinc-800 rounded-xl border border-zinc-200 dark:border-zinc-700 p-4">
+                <h3 className="text-lg font-medium text-zinc-900 dark:text-zinc-100 mb-4">
+                  Configuração de Anos
+                </h3>
+
+                {/* Stats Type Selection */}
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+                    Tipo de Estatísticas Anuais
+                  </label>
+                  <div className="flex gap-4">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="yearlyStatsType"
+                        value="last365"
+                        checked={config.yearlyStatsType === 'last365'}
+                        onChange={() => setConfig({ ...config, yearlyStatsType: 'last365' })}
+                        className="w-4 h-4 text-red-500"
+                      />
+                      <span className="text-sm text-zinc-700 dark:text-zinc-300">Últimos 365 dias</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="yearlyStatsType"
+                        value="calendar"
+                        checked={config.yearlyStatsType === 'calendar'}
+                        onChange={() => setConfig({ ...config, yearlyStatsType: 'calendar' })}
+                        className="w-4 h-4 text-red-500"
+                      />
+                      <span className="text-sm text-zinc-700 dark:text-zinc-300">Anos específicos</span>
+                    </label>
+                  </div>
+                </div>
+
+                {/* Year Selection (only show when calendar type is selected) */}
+                {config.yearlyStatsType === 'calendar' && (
+                  <div>
+                    <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+                      Selecione os anos para exibir
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {getAvailableYears().map((year) => {
+                        const isSelected = config.selectedYears.includes(year);
+                        return (
+                          <button
+                            key={year}
+                            type="button"
+                            onClick={() => {
+                              if (isSelected) {
+                                setConfig({
+                                  ...config,
+                                  selectedYears: config.selectedYears.filter((y) => y !== year),
+                                });
+                              } else {
+                                setConfig({
+                                  ...config,
+                                  selectedYears: [...config.selectedYears, year].sort((a, b) => b - a),
+                                });
+                              }
+                            }}
+                            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                              isSelected
+                                ? 'bg-red-500 text-white'
+                                : 'bg-zinc-100 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-600'
+                            }`}
+                          >
+                            {year}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-2">
+                      Clique nos anos que deseja mostrar. Os dados serão carregados para cada ano selecionado.
+                    </p>
+                    {config.selectedYears.length === 0 && (
+                      <p className="text-sm text-amber-600 dark:text-amber-400 mt-2">
+                        ⚠️ Selecione pelo menos um ano para exibir estatísticas.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Save Button */}
             <div className="flex justify-end">

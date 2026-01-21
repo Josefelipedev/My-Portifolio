@@ -15,6 +15,8 @@ export interface WakaTimeConfig {
   showOS: boolean;
   showProjects: boolean;
   profileUrl: string;
+  selectedYears: number[]; // Years to display (e.g., [2024, 2023])
+  yearlyStatsType: 'last365' | 'calendar'; // 'last365' = last 365 days, 'calendar' = specific years
 }
 
 const DEFAULT_CONFIG: WakaTimeConfig = {
@@ -29,6 +31,8 @@ const DEFAULT_CONFIG: WakaTimeConfig = {
   showOS: true,
   showProjects: true,
   profileUrl: 'https://wakatime.com/@josefelipe',
+  selectedYears: [],
+  yearlyStatsType: 'last365',
 };
 
 // GET - Fetch WakaTime settings (public for frontend)
@@ -77,6 +81,8 @@ export async function PUT(request: Request) {
       showOS: typeof body.showOS === 'boolean' ? body.showOS : DEFAULT_CONFIG.showOS,
       showProjects: typeof body.showProjects === 'boolean' ? body.showProjects : DEFAULT_CONFIG.showProjects,
       profileUrl: typeof body.profileUrl === 'string' ? body.profileUrl : DEFAULT_CONFIG.profileUrl,
+      selectedYears: Array.isArray(body.selectedYears) ? body.selectedYears.filter((y: unknown) => typeof y === 'number') : DEFAULT_CONFIG.selectedYears,
+      yearlyStatsType: body.yearlyStatsType === 'calendar' ? 'calendar' : 'last365',
     };
 
     const configJson = JSON.stringify(newConfig);

@@ -1,4 +1,4 @@
-import { getWakaTimeStats, getWakaTimeAllTimeStats, getWakaTimeYearlyStats } from '@/lib/wakatime';
+import { getWakaTimeStats, getWakaTimeAllTimeStats, getWakaTimeYearlyStats, getWakaTimeStatsForYear, WakaTimeStats } from '@/lib/wakatime';
 import { WakaTimeStatsClient } from './WakaTimeStatsClient';
 import prisma from '@/lib/prisma';
 
@@ -14,6 +14,8 @@ export interface WakaTimeConfig {
   showOS: boolean;
   showProjects: boolean;
   profileUrl: string;
+  selectedYears: number[];
+  yearlyStatsType: 'last365' | 'calendar';
 }
 
 const DEFAULT_CONFIG: WakaTimeConfig = {
@@ -28,6 +30,8 @@ const DEFAULT_CONFIG: WakaTimeConfig = {
   showOS: true,
   showProjects: true,
   profileUrl: 'https://wakatime.com/@josefelipe',
+  selectedYears: [],
+  yearlyStatsType: 'last365',
 };
 
 async function getWakaTimeConfig(): Promise<WakaTimeConfig> {
@@ -58,15 +62,47 @@ export async function WakaTimeStatsSection() {
     return null;
   }
 
-  const [stats, allTimeStats, yearlyStats] = await Promise.all([
+  // Fetch base stats
+  const [stats, allTimeStats] = await Promise.all([
     getWakaTimeStats(),
     getWakaTimeAllTimeStats(),
-    config.showYearlyStats ? getWakaTimeYearlyStats() : Promise.resolve(null),
   ]);
 
   if (!stats) {
     return null; // Don't render if no WakaTime data
   }
 
-  return <WakaTimeStatsClient stats={stats} allTimeStats={allTimeStats} yearlyStats={yearlyStats} config={config} />;
+  // Fetch yearly stats based on config
+  let yearlyStats: WakaTimeStats | null = null;
+  let yearlyStatsByYear: Record<number, WakaTimeStats> = {};
+
+  if (config.showYearlyStats) {
+    if (config.yearlyStatsType === 'calendar' && config.selectedYears.length > 0) {
+      // Fetch stats for each selected year
+      const yearPromises = config.selectedYears.map(async (year) => {
+        const data = await getWakaTimeStatsForYear(year);
+        return { year, data };
+      });
+
+      const results = await Promise.all(yearPromises);
+      for (const { year, data } of results) {
+        if (data) {
+          yearlyStatsByYear[year] = data;
+        }
+      }
+    } else {
+      // Default to last 365 days
+      yearlyStats = await getWakaTimeYearlyStats();
+    }
+  }
+
+  return (
+    <WakaTimeStatsClient
+      stats={stats}
+      allTimeStats={allTimeStats}
+      yearlyStats={yearlyStats}
+      yearlyStatsByYear={yearlyStatsByYear}
+      config={config}
+    />
+  );
 }
