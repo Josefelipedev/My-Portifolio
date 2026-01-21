@@ -47,6 +47,29 @@ npx prisma db push
 log "Building application..."
 npm run build
 
+# Update and restart Job Scraper Docker service
+if [ -d "$APP_DIR/job-scraper" ]; then
+  log "Updating Job Scraper Docker service..."
+  cd "$APP_DIR/job-scraper"
+
+  # Build and restart container
+  docker-compose build --no-cache
+  docker-compose down 2>/dev/null || true
+  docker-compose up -d
+
+  # Wait for health check
+  log "Waiting for Job Scraper to be healthy..."
+  for i in {1..30}; do
+    if curl -sf http://localhost:8000/health > /dev/null 2>&1; then
+      log "Job Scraper is healthy"
+      break
+    fi
+    sleep 1
+  done
+
+  cd "$APP_DIR"
+fi
+
 # Restart PM2
 log "Restarting PM2..."
 pm2 restart myportfolio

@@ -2,6 +2,23 @@
 
 import Together from 'together-ai';
 import type { AIExtractedJob } from './types';
+import { trackAIUsage, estimateTokens, checkQuotaLimits } from '../ai-tracking';
+
+// Store last extraction details for debugging
+let lastExtractionDebug: {
+  siteName: string;
+  htmlLength: number;
+  cleanedHtmlLength: number;
+  promptLength: number;
+  rawResponse: string;
+  parsedJobs: number;
+  error?: string;
+  timestamp: Date;
+} | null = null;
+
+export function getLastExtractionDebug() {
+  return lastExtractionDebug;
+}
 
 // Get Together AI client for job extraction
 let togetherClientForJobs: Together | null = null;
@@ -31,7 +48,21 @@ export async function extractJobsWithAI(
     return [];
   }
 
+  const startTime = Date.now();
+  const model = process.env.TOGETHER_MODEL || 'meta-llama/Llama-3.3-70B-Instruct-Turbo';
+  let inputTokens = 0;
+  let outputTokens = 0;
+  let success = true;
+  let errorMessage: string | undefined;
+
   try {
+    // Check quota before making the call
+    const quotaCheck = await checkQuotaLimits();
+    if (!quotaCheck.withinLimits) {
+      console.log('AI extraction: Quota exceeded, skipping AI extraction');
+      return [];
+    }
+
     // Clean HTML - remove scripts, styles, and excessive whitespace
     const cleanedHtml = html
       .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
@@ -68,27 +99,63 @@ IMPORTANT:
 Respond with ONLY the JSON array.`;
 
     const response = await client.chat.completions.create({
-      model: process.env.TOGETHER_MODEL || 'meta-llama/Llama-3.3-70B-Instruct-Turbo',
+      model,
       messages: [{ role: 'user', content: prompt }],
       max_tokens: 4000,
       temperature: 0.1, // Low temperature for consistent extraction
     });
 
+    inputTokens = response.usage?.prompt_tokens || estimateTokens(prompt);
+    outputTokens = response.usage?.completion_tokens || 0;
+
     const content = response.choices[0]?.message?.content?.trim() || '[]';
+    outputTokens = outputTokens || estimateTokens(content);
+
+    // Store debug info
+    lastExtractionDebug = {
+      siteName,
+      htmlLength: html.length,
+      cleanedHtmlLength: cleanedHtml.length,
+      promptLength: prompt.length,
+      rawResponse: content.slice(0, 2000), // First 2k chars
+      parsedJobs: 0,
+      timestamp: new Date(),
+    };
 
     // Extract JSON array from response
     const jsonMatch = content.match(/\[[\s\S]*\]/);
     if (!jsonMatch) {
       console.log('AI extraction: No JSON array found in response');
+      console.log('AI extraction: Raw response (first 500 chars):', content.slice(0, 500));
+      lastExtractionDebug.error = 'No JSON array found in response';
       return [];
     }
 
     const jobs = JSON.parse(jsonMatch[0]) as AIExtractedJob[];
+    lastExtractionDebug.parsedJobs = jobs.length;
     console.log(`AI extraction: Found ${jobs.length} jobs from ${siteName}`);
     return jobs;
   } catch (error) {
+    success = false;
+    errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error('AI extraction error:', error);
     return [];
+  } finally {
+    const latencyMs = Date.now() - startTime;
+
+    // Track usage
+    trackAIUsage({
+      feature: 'job-extraction',
+      model,
+      inputTokens,
+      outputTokens,
+      latencyMs,
+      success,
+      error: errorMessage,
+      metadata: { siteName, baseUrl },
+    }).catch(() => {
+      // Silently ignore tracking errors
+    });
   }
 }
 

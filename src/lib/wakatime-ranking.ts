@@ -1,6 +1,7 @@
 // WakaTime Year in Review Ranking Extractor
 
 import Together from 'together-ai';
+import { trackAIUsage, estimateTokens, checkQuotaLimits } from './ai-tracking';
 
 export interface YearlyRanking {
   year: number;
@@ -72,7 +73,21 @@ async function extractWithAI(html: string, year: number): Promise<YearlyRanking 
     return null;
   }
 
+  const startTime = Date.now();
+  const model = process.env.TOGETHER_MODEL || 'meta-llama/Llama-3.3-70B-Instruct-Turbo';
+  let inputTokens = 0;
+  let outputTokens = 0;
+  let success = true;
+  let errorMessage: string | undefined;
+
   try {
+    // Check quota before making the call
+    const quotaCheck = await checkQuotaLimits();
+    if (!quotaCheck.withinLimits) {
+      console.log('WakaTime ranking: Quota exceeded, using regex fallback');
+      return null;
+    }
+
     // Clean HTML - remove scripts, styles, and limit size
     const cleanedHtml = html
       .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
@@ -102,13 +117,17 @@ IMPORTANT:
 - Return ONLY valid JSON, no other text`;
 
     const response = await client.chat.completions.create({
-      model: process.env.TOGETHER_MODEL || 'meta-llama/Llama-3.3-70B-Instruct-Turbo',
+      model,
       messages: [{ role: 'user', content: prompt }],
       max_tokens: 500,
       temperature: 0.1,
     });
 
+    inputTokens = response.usage?.prompt_tokens || estimateTokens(prompt);
+    outputTokens = response.usage?.completion_tokens || 0;
+
     const content = response.choices[0]?.message?.content?.trim() || '';
+    outputTokens = outputTokens || estimateTokens(content);
 
     // Extract JSON from response
     const jsonMatch = content.match(/\{[\s\S]*\}/);
@@ -134,8 +153,26 @@ IMPORTANT:
       } : undefined,
     };
   } catch (error) {
+    success = false;
+    errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error('AI extraction error:', error);
     return null;
+  } finally {
+    const latencyMs = Date.now() - startTime;
+
+    // Track usage
+    trackAIUsage({
+      feature: 'wakatime-ranking',
+      model,
+      inputTokens,
+      outputTokens,
+      latencyMs,
+      success,
+      error: errorMessage,
+      metadata: { year },
+    }).catch(() => {
+      // Silently ignore tracking errors
+    });
   }
 }
 

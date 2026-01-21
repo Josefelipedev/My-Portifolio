@@ -18,6 +18,7 @@ import { searchVagasComBr } from './apis/vagas';
 import { searchLinkedIn } from './apis/linkedin';
 import { searchGeekHunter } from './apis/geekhunter';
 import { isAIExtractionAvailable } from './ai-extraction';
+import { isPythonScraperAvailable } from './apis/python-scraper';
 
 /**
  * Main job search function that aggregates results from multiple sources
@@ -92,12 +93,12 @@ export async function searchJobs(
     searches.push(searchNetEmpregos(params));
   }
 
-  // Brazil-specific: Vagas.com.br
+  // Brazil-specific: Vagas.com.br (JS scraper with Python fallback)
   if (sources.includes('vagascombr') || (isAllSources && shouldSearchCountry('br'))) {
     searches.push(searchVagasComBr(params));
   }
 
-  // Brazil-specific: GeekHunter (Tech Jobs)
+  // Brazil-specific: GeekHunter (JS scraper with Python fallback)
   if (sources.includes('geekhunter') || (isAllSources && shouldSearchCountry('br'))) {
     searches.push(searchGeekHunter(params));
   }
@@ -183,6 +184,7 @@ export async function searchJobsByCountry(
  */
 export function getApiStatus(): ApiStatus[] {
   const hasAIExtraction = isAIExtractionAvailable();
+  const hasPythonScraper = !!process.env.PYTHON_SCRAPER_URL;
   return [
     { name: 'RemoteOK', configured: true, needsKey: false },
     { name: 'Remotive', configured: true, needsKey: false },
@@ -191,6 +193,7 @@ export function getApiStatus(): ApiStatus[] {
     { name: 'Vagas.com.br', configured: true, needsKey: false },
     { name: 'LinkedIn', configured: true, needsKey: false },
     { name: 'GeekHunter', configured: true, needsKey: false },
+    { name: 'Python Scraper', configured: hasPythonScraper, needsKey: false },
     { name: 'AI Extraction', configured: hasAIExtraction, needsKey: true },
     { name: 'Adzuna', configured: !!(process.env.ADZUNA_APP_ID && process.env.ADZUNA_APP_KEY), needsKey: true },
     { name: 'Jooble', configured: !!process.env.JOOBLE_API_KEY, needsKey: true },
