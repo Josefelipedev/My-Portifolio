@@ -7,13 +7,14 @@ import JobApplications from './JobApplications';
 import JobAnalytics from './JobAnalytics';
 import JobAlerts from './JobAlerts';
 import ScraperStatus from './ScraperStatus';
+import AgentCostTracker from './AgentCostTracker';
 
 interface JobsTabsProps {
   initialSavedCount: number;
   initialApplicationsCount: number;
 }
 
-type TabType = 'search' | 'saved' | 'applications' | 'analytics' | 'alerts' | 'scraper';
+type TabType = 'search' | 'saved' | 'applications' | 'analytics' | 'alerts' | 'scraper' | 'agent-costs';
 
 export default function JobsTabs({ initialSavedCount, initialApplicationsCount }: JobsTabsProps) {
   const [activeTab, setActiveTab] = useState<TabType>('search');
@@ -93,6 +94,15 @@ export default function JobsTabs({ initialSavedCount, initialApplicationsCount }
         </svg>
       ),
     },
+    {
+      id: 'agent-costs',
+      label: 'Agent Costs',
+      icon: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      ),
+    },
   ];
 
   return (
@@ -137,6 +147,7 @@ export default function JobsTabs({ initialSavedCount, initialApplicationsCount }
         {activeTab === 'analytics' && <JobAnalytics />}
         {activeTab === 'alerts' && <JobAlerts />}
         {activeTab === 'scraper' && <ScraperStatus defaultExpanded={true} />}
+        {activeTab === 'agent-costs' && <AgentCostTracker />}
       </div>
     </div>
   );

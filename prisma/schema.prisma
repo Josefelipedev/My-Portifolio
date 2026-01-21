@@ -301,19 +301,26 @@ model JobSearchHistory {
 // ==========================================
 
 model JobAlert {
-  id          String   @id @default(cuid())
-  name        String
-  keyword     String
-  countries   String
-  sources     String
-  filters     String?  @db.Text
-  isActive    Boolean  @default(true)
-  lastRun     DateTime?
-  createdAt   DateTime @default(now())
+  id              String   @id @default(cuid())
+  name            String
+  keyword         String
+  countries       String
+  sources         String
+  filters         String?  @db.Text
+  isActive        Boolean  @default(true)
+  lastRun         DateTime?
+  createdAt       DateTime @default(now())
+  // Scheduling fields
+  scheduleEnabled Boolean  @default(false)
+  scheduleHours   String?  // Comma-separated hours (e.g., "9,12,18")
+  scheduleDays    String?  // Comma-separated days (0-6, 0=Sunday, e.g., "1,2,3,4,5" for weekdays)
+  nextRun         DateTime?
+  emailOnMatch    Boolean  @default(true)
 
-  matches     JobAlertMatch[]
+  matches         JobAlertMatch[]
 
   @@index([isActive])
+  @@index([scheduleEnabled, nextRun])
 }
 
 model JobAlertMatch {
@@ -439,5 +446,46 @@ model SystemLog {
 
   @@index([level])
   @@index([source])
+  @@index([createdAt])
+}
+
+// ==========================================
+// Agent Execution Tracking
+// ==========================================
+
+model PipelineExecution {
+  id              String   @id @default(cuid())
+  source          String   // "geekhunter", "vagascombr"
+  keyword         String
+  totalDurationMs Int
+  jobsFound       Int
+  status          String   // "success", "partial", "failed"
+  trigger         String   // "manual", "scheduled", "alert"
+  createdAt       DateTime @default(now())
+
+  agents          AgentExecution[]
+
+  @@index([source])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model AgentExecution {
+  id              String   @id @default(cuid())
+  pipelineId      String
+  agentName       String   // "search", "page", "analyzer", "extractor"
+  status          String   // "success", "failed", "skipped"
+  durationMs      Int      // Time in milliseconds
+  message         String?
+  error           String?  @db.Text
+  inputData       Json?    // Input data (optional)
+  outputData      Json?    // Output data (optional)
+  createdAt       DateTime @default(now())
+
+  pipeline        PipelineExecution @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+
+  @@index([pipelineId])
+  @@index([agentName])
+  @@index([status])
   @@index([createdAt])
 }

@@ -12,6 +12,9 @@ class Config:
     CACHE_TTL: int = int(os.getenv("CACHE_TTL", "300"))
     LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
 
+    # Next.js API URL for tracking
+    NEXTJS_URL: str = os.getenv("NEXTJS_URL", "http://localhost:3000")
+
     # Redis settings
     REDIS_URL: str = os.getenv("REDIS_URL", "redis://localhost:6379/1")
 
