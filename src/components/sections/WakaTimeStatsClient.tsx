@@ -50,9 +50,23 @@ interface WakaTimeStats {
   };
 }
 
+interface WakaTimeConfig {
+  enabled: boolean;
+  showTotalTime: boolean;
+  showDailyAverage: boolean;
+  showBestDay: boolean;
+  showAllTime: boolean;
+  showLanguages: boolean;
+  showEditors: boolean;
+  showOS: boolean;
+  showProjects: boolean;
+  profileUrl: string;
+}
+
 interface Props {
   stats: WakaTimeStats;
   allTimeStats: { totalSeconds: number; text: string } | null;
+  config: WakaTimeConfig;
 }
 
 // Animated counter
@@ -232,8 +246,8 @@ function getOSIcon(name: string) {
   );
 }
 
-export function WakaTimeStatsClient({ stats, allTimeStats }: Props) {
-  const { t, language } = useLanguage();
+export function WakaTimeStatsClient({ stats, allTimeStats, config }: Props) {
+  const { language } = useLanguage();
 
   const texts = {
     title: language === 'pt' ? 'Estatísticas de Código' : 'Coding Stats',
@@ -267,20 +281,24 @@ export function WakaTimeStatsClient({ stats, allTimeStats }: Props) {
 
         {/* Stats Grid */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <StatCard
-            icon={<ClockIcon />}
-            label={texts.totalTime}
-            value={stats.totalHours}
-            subtext={texts.last7Days}
-            color="from-indigo-500 to-purple-500"
-          />
-          <StatCard
-            icon={<ChartIcon />}
-            label={texts.dailyAverage}
-            value={stats.dailyAverage}
-            color="from-cyan-500 to-blue-500"
-          />
-          {stats.bestDay && (
+          {config.showTotalTime && (
+            <StatCard
+              icon={<ClockIcon />}
+              label={texts.totalTime}
+              value={stats.totalHours}
+              subtext={texts.last7Days}
+              color="from-indigo-500 to-purple-500"
+            />
+          )}
+          {config.showDailyAverage && (
+            <StatCard
+              icon={<ChartIcon />}
+              label={texts.dailyAverage}
+              value={stats.dailyAverage}
+              color="from-cyan-500 to-blue-500"
+            />
+          )}
+          {config.showBestDay && stats.bestDay && (
             <StatCard
               icon={<TrophyIcon />}
               label={texts.bestDay}
@@ -289,7 +307,7 @@ export function WakaTimeStatsClient({ stats, allTimeStats }: Props) {
               color="from-amber-500 to-orange-500"
             />
           )}
-          {allTimeStats && (
+          {config.showAllTime && allTimeStats && (
             <StatCard
               icon={<InfinityIcon />}
               label={texts.allTime}
@@ -302,7 +320,7 @@ export function WakaTimeStatsClient({ stats, allTimeStats }: Props) {
         {/* Two Column Layout */}
         <div className="grid md:grid-cols-2 gap-8">
           {/* Languages */}
-          {stats.languages.length > 0 && (
+          {config.showLanguages && stats.languages.length > 0 && (
             <div className="bg-slate-800/30 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-6">
               <h3 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
                 <CodeIcon />
@@ -313,7 +331,7 @@ export function WakaTimeStatsClient({ stats, allTimeStats }: Props) {
           )}
 
           {/* Editors */}
-          {stats.editors.length > 0 && (
+          {config.showEditors && stats.editors.length > 0 && (
             <div className="bg-slate-800/30 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-6">
               <h3 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
                 <EditorIcon />
@@ -338,7 +356,7 @@ export function WakaTimeStatsClient({ stats, allTimeStats }: Props) {
           )}
 
           {/* Operating Systems */}
-          {stats.operatingSystems.length > 0 && (
+          {config.showOS && stats.operatingSystems.length > 0 && (
             <div className="bg-slate-800/30 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-6">
               <h3 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
                 <ComputerIcon />
@@ -363,7 +381,7 @@ export function WakaTimeStatsClient({ stats, allTimeStats }: Props) {
           )}
 
           {/* Projects */}
-          {stats.projects.length > 0 && (
+          {config.showProjects && stats.projects.length > 0 && (
             <div className="bg-slate-800/30 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-6">
               <h3 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
                 <FolderIcon />
@@ -385,18 +403,20 @@ export function WakaTimeStatsClient({ stats, allTimeStats }: Props) {
         </div>
 
         {/* WakaTime Profile Link */}
-        <div className="mt-8 text-center">
-          <a
-            href="https://wakatime.com/@josefelipe"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 px-6 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-full transition-all hover:-translate-y-1"
-          >
-            <WakaTimeIcon />
-            {texts.viewProfile}
-            <ExternalLinkIcon />
-          </a>
-        </div>
+        {config.profileUrl && (
+          <div className="mt-8 text-center">
+            <a
+              href={config.profileUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-full transition-all hover:-translate-y-1"
+            >
+              <WakaTimeIcon />
+              {texts.viewProfile}
+              <ExternalLinkIcon />
+            </a>
+          </div>
+        )}
       </div>
     </section>
   );
