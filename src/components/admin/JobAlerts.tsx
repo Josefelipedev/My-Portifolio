@@ -46,6 +46,7 @@ const SOURCES = [
   { value: 'adzuna', label: 'Adzuna' },
   { value: 'linkedin', label: 'LinkedIn' },
   { value: 'jooble', label: 'Jooble' },
+  { value: 'jsearch', label: 'JSearch' },
   { value: 'geekhunter', label: 'GeekHunter' },
   { value: 'vagascombr', label: 'Vagas.com.br' },
   { value: 'netempregos', label: 'Net-Empregos' },
