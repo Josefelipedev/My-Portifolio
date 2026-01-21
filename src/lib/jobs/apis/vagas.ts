@@ -74,7 +74,8 @@ export async function searchVagasComBr(params: JobSearchParams): Promise<JobList
     // If no results from JS scraping, try Python scraper as fallback
     if (results.length === 0) {
       logger.warn('vagascombr', 'No results from JS scraping, trying Python scraper fallback', {
-        request: { params },
+        keyword: params.keyword,
+        country: params.country,
       });
       return tryPythonScraperFallback(params);
     }
@@ -86,7 +87,8 @@ export async function searchVagasComBr(params: JobSearchParams): Promise<JobList
     logger.error('vagascombr', `Scraping error: ${err.message}`, {
       error: err.message,
       stack: err.stack,
-      request: { params },
+      keyword: params.keyword,
+      country: params.country,
     });
     // Try Python scraper as fallback on error
     return tryPythonScraperFallback(params);
