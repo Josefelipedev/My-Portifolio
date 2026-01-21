@@ -4,6 +4,7 @@ import type { JobListing, JobSearchParams } from '../types';
 import { extractJobsWithAI } from '../ai-extraction';
 import { cleanHtmlText } from '../helpers';
 import { searchGeekHunterPython, isPythonScraperAvailable } from './python-scraper';
+import { logger } from '@/lib/logger';
 
 interface GeekHunterJob {
   title: string;
@@ -34,8 +35,11 @@ export async function searchGeekHunter(params: JobSearchParams): Promise<JobList
     });
 
     if (!response.ok) {
-      console.error('GeekHunter: HTTP error', response.status);
-      return [];
+      logger.error('geekhunter', `HTTP error: ${response.status}`, {
+        response: { status: response.status },
+        request: { url },
+      });
+      return tryPythonScraperFallback(params);
     }
 
     const html = await response.text();
@@ -56,7 +60,7 @@ export async function searchGeekHunter(params: JobSearchParams): Promise<JobList
       }));
     } else {
       // Fallback to regex parsing
-      console.log('GeekHunter: AI extraction failed, using regex fallback');
+      logger.warn('geekhunter', 'AI extraction failed, using regex fallback');
       jobs = parseGeekHunterHTML(html);
     }
 
@@ -77,13 +81,21 @@ export async function searchGeekHunter(params: JobSearchParams): Promise<JobList
 
     // If no results from JS scraping, try Python scraper as fallback
     if (results.length === 0) {
-      console.log('GeekHunter: No results from JS scraping, trying Python scraper fallback');
+      logger.warn('geekhunter', 'No results from JS scraping, trying Python scraper fallback', {
+        request: { params },
+      });
       return tryPythonScraperFallback(params);
     }
 
+    logger.info('geekhunter', `Found ${results.length} jobs`, { count: results.length });
     return results;
   } catch (error) {
-    console.error('GeekHunter scraping error:', error);
+    const err = error instanceof Error ? error : new Error(String(error));
+    logger.error('geekhunter', `Scraping error: ${err.message}`, {
+      error: err.message,
+      stack: err.stack,
+      request: { params },
+    });
     // Try Python scraper as fallback on error
     return tryPythonScraperFallback(params);
   }
@@ -93,11 +105,21 @@ async function tryPythonScraperFallback(params: JobSearchParams): Promise<JobLis
   try {
     const available = await isPythonScraperAvailable();
     if (available) {
-      console.log('GeekHunter: Using Python scraper fallback');
-      return searchGeekHunterPython(params);
+      logger.info('geekhunter', 'Using Python scraper fallback');
+      const results = await searchGeekHunterPython(params);
+      logger.info('python-scraper', `GeekHunter fallback found ${results.length} jobs`, {
+        count: results.length,
+      });
+      return results;
+    } else {
+      logger.warn('geekhunter', 'Python scraper not available for fallback');
     }
   } catch (fallbackError) {
-    console.error('GeekHunter: Python scraper fallback also failed:', fallbackError);
+    const err = fallbackError instanceof Error ? fallbackError : new Error(String(fallbackError));
+    logger.error('python-scraper', `GeekHunter fallback failed: ${err.message}`, {
+      error: err.message,
+      stack: err.stack,
+    });
   }
   return [];
 }
