@@ -1,9 +1,11 @@
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, HTMLResponse
 from datetime import datetime
 from collections import deque
 import logging
 import time
+import os
 
 from models import SearchParams, SearchResponse, JobListing
 from scrapers.geekhunter import GeekHunterScraper
@@ -168,3 +170,79 @@ async def get_stats():
         "uptime_seconds": int(uptime),
         "uptime_human": f"{int(uptime // 3600)}h {int((uptime % 3600) // 60)}m",
     }
+
+
+@app.get("/debug")
+async def list_debug_files():
+    """List available debug files (screenshots and HTML)"""
+    if not config.DEBUG_MODE:
+        return {"enabled": False, "message": "Debug mode is disabled", "files": []}
+
+    if not os.path.exists(config.DEBUG_DIR):
+        return {"enabled": True, "files": [], "message": "No debug files yet"}
+
+    files = []
+    for filename in os.listdir(config.DEBUG_DIR):
+        filepath = os.path.join(config.DEBUG_DIR, filename)
+        if os.path.isfile(filepath):
+            stat = os.stat(filepath)
+            files.append({
+                "name": filename,
+                "size": stat.st_size,
+                "created": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                "type": "screenshot" if filename.endswith(".png") else "html",
+            })
+
+    # Sort by creation time, newest first
+    files.sort(key=lambda x: x["created"], reverse=True)
+
+    return {
+        "enabled": True,
+        "debug_dir": config.DEBUG_DIR,
+        "files": files,
+        "total": len(files),
+    }
+
+
+@app.get("/debug/{filename}")
+async def get_debug_file(filename: str):
+    """Get a specific debug file"""
+    if not config.DEBUG_MODE:
+        raise HTTPException(status_code=400, detail="Debug mode is disabled")
+
+    # Security: only allow alphanumeric, dash, underscore, dot
+    safe_chars = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_.")
+    if not all(c in safe_chars for c in filename):
+        raise HTTPException(status_code=400, detail="Invalid filename")
+
+    filepath = os.path.join(config.DEBUG_DIR, filename)
+
+    if not os.path.exists(filepath):
+        raise HTTPException(status_code=404, detail="File not found")
+
+    if filename.endswith(".png"):
+        return FileResponse(filepath, media_type="image/png")
+    elif filename.endswith(".html"):
+        return FileResponse(filepath, media_type="text/html")
+    else:
+        raise HTTPException(status_code=400, detail="Unknown file type")
+
+
+@app.delete("/debug")
+async def clear_debug_files():
+    """Clear all debug files"""
+    if not config.DEBUG_MODE:
+        raise HTTPException(status_code=400, detail="Debug mode is disabled")
+
+    if not os.path.exists(config.DEBUG_DIR):
+        return {"deleted": 0}
+
+    deleted = 0
+    for filename in os.listdir(config.DEBUG_DIR):
+        filepath = os.path.join(config.DEBUG_DIR, filename)
+        if os.path.isfile(filepath):
+            os.remove(filepath)
+            deleted += 1
+
+    logger.info(f"Cleared {deleted} debug files")
+    return {"deleted": deleted}

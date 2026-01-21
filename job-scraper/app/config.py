@@ -25,5 +25,13 @@ class Config:
     DEFAULT_LIMIT: int = 50
     MAX_LIMIT: int = 100
 
+    # Debug settings
+    DEBUG_MODE: bool = os.getenv("DEBUG_MODE", "true").lower() == "true"
+    DEBUG_DIR: str = os.getenv("DEBUG_DIR", "/app/debug")
+
 
 config = Config()
+
+# Create debug directory if it doesn't exist
+if config.DEBUG_MODE:
+    os.makedirs(config.DEBUG_DIR, exist_ok=True)
