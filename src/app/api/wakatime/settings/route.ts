@@ -27,9 +27,16 @@ export interface WakaTimeConfig {
   showYearlyEditors: boolean;
   showYearlyOS: boolean;
   showYearlyProjects: boolean;
+  // Year in Review links (A Look Back)
+  yearlyReportLinks: Record<number, string>; // { 2024: "url", 2025: "url" }
+  showYearlyReportLink: boolean;
+  // Ranking badge
+  showRankingBadge: boolean;
+  rankingPercentile: number; // e.g., 1 for "Top 1%"
+  rankingTotalDevs: string; // e.g., "500k+"
   // Other
   profileUrl: string;
-  cacheYearlyData: boolean; // Save yearly data in database
+  cacheYearlyData: boolean;
 }
 
 const DEFAULT_CONFIG: WakaTimeConfig = {
@@ -53,6 +60,11 @@ const DEFAULT_CONFIG: WakaTimeConfig = {
   showYearlyEditors: true,
   showYearlyOS: true,
   showYearlyProjects: true,
+  yearlyReportLinks: {},
+  showYearlyReportLink: true,
+  showRankingBadge: true,
+  rankingPercentile: 1,
+  rankingTotalDevs: '500k+',
   profileUrl: 'https://wakatime.com/@josefelipedev',
   cacheYearlyData: true,
 };
@@ -90,6 +102,17 @@ export async function PUT(request: Request) {
 
     const body = await request.json();
 
+    // Validate yearlyReportLinks
+    let yearlyReportLinks: Record<number, string> = {};
+    if (body.yearlyReportLinks && typeof body.yearlyReportLinks === 'object') {
+      for (const [key, value] of Object.entries(body.yearlyReportLinks)) {
+        const year = parseInt(key);
+        if (!isNaN(year) && typeof value === 'string' && value.trim()) {
+          yearlyReportLinks[year] = value.trim();
+        }
+      }
+    }
+
     // Validate and sanitize the config
     const newConfig: WakaTimeConfig = {
       enabled: typeof body.enabled === 'boolean' ? body.enabled : DEFAULT_CONFIG.enabled,
@@ -112,6 +135,11 @@ export async function PUT(request: Request) {
       showYearlyEditors: typeof body.showYearlyEditors === 'boolean' ? body.showYearlyEditors : DEFAULT_CONFIG.showYearlyEditors,
       showYearlyOS: typeof body.showYearlyOS === 'boolean' ? body.showYearlyOS : DEFAULT_CONFIG.showYearlyOS,
       showYearlyProjects: typeof body.showYearlyProjects === 'boolean' ? body.showYearlyProjects : DEFAULT_CONFIG.showYearlyProjects,
+      yearlyReportLinks,
+      showYearlyReportLink: typeof body.showYearlyReportLink === 'boolean' ? body.showYearlyReportLink : DEFAULT_CONFIG.showYearlyReportLink,
+      showRankingBadge: typeof body.showRankingBadge === 'boolean' ? body.showRankingBadge : DEFAULT_CONFIG.showRankingBadge,
+      rankingPercentile: typeof body.rankingPercentile === 'number' ? body.rankingPercentile : DEFAULT_CONFIG.rankingPercentile,
+      rankingTotalDevs: typeof body.rankingTotalDevs === 'string' ? body.rankingTotalDevs : DEFAULT_CONFIG.rankingTotalDevs,
       profileUrl: typeof body.profileUrl === 'string' ? body.profileUrl : DEFAULT_CONFIG.profileUrl,
       cacheYearlyData: typeof body.cacheYearlyData === 'boolean' ? body.cacheYearlyData : DEFAULT_CONFIG.cacheYearlyData,
     };

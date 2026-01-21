@@ -27,6 +27,13 @@ interface WakaTimeConfig {
   showYearlyEditors: boolean;
   showYearlyOS: boolean;
   showYearlyProjects: boolean;
+  // Year in Review links
+  yearlyReportLinks: Record<number, string>;
+  showYearlyReportLink: boolean;
+  // Ranking badge
+  showRankingBadge: boolean;
+  rankingPercentile: number;
+  rankingTotalDevs: string;
   // Other
   profileUrl: string;
   cacheYearlyData: boolean;
@@ -61,6 +68,11 @@ const DEFAULT_CONFIG: WakaTimeConfig = {
   showYearlyEditors: true,
   showYearlyOS: true,
   showYearlyProjects: true,
+  yearlyReportLinks: {},
+  showYearlyReportLink: true,
+  showRankingBadge: true,
+  rankingPercentile: 1,
+  rankingTotalDevs: '500k+',
   profileUrl: 'https://wakatime.com/@josefelipedev',
   cacheYearlyData: true,
 };
@@ -591,6 +603,140 @@ export default function WakaTimeAdminPage() {
                     </p>
                   )}
                 </div>
+              </div>
+            )}
+
+            {/* Year in Review Links */}
+            {config.enabled && config.showYearlyStats && (
+              <div className="bg-white dark:bg-zinc-800 rounded-xl border border-zinc-200 dark:border-zinc-700 p-4">
+                <h3 className="text-lg font-medium text-zinc-900 dark:text-zinc-100 mb-4 flex items-center gap-2">
+                  <svg className="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                  </svg>
+                  Links "Year in Review"
+                </h3>
+                <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-4">
+                  Cole os links públicos do WakaTime "A Look Back" para cada ano
+                </p>
+
+                {/* Toggle show link */}
+                <div className="p-3 flex items-center justify-between bg-zinc-50 dark:bg-zinc-700/50 rounded-lg mb-4">
+                  <div>
+                    <p className="font-medium text-zinc-900 dark:text-zinc-100">Mostrar botão "Ver relatório completo"</p>
+                    <p className="text-sm text-zinc-500 dark:text-zinc-400">Link para o relatório completo no WakaTime</p>
+                  </div>
+                  <button
+                    onClick={() => handleToggle('showYearlyReportLink')}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      config.showYearlyReportLink ? 'bg-red-500' : 'bg-zinc-300 dark:bg-zinc-600'
+                    }`}
+                  >
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      config.showYearlyReportLink ? 'translate-x-6' : 'translate-x-1'
+                    }`} />
+                  </button>
+                </div>
+
+                <div className="space-y-3">
+                  {getAvailableYears().map((year) => (
+                    <div key={year} className="flex items-center gap-3">
+                      <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300 w-12">{year}</span>
+                      <input
+                        type="url"
+                        value={config.yearlyReportLinks?.[year] || ''}
+                        onChange={(e) => setConfig({
+                          ...config,
+                          yearlyReportLinks: {
+                            ...config.yearlyReportLinks,
+                            [year]: e.target.value,
+                          },
+                        })}
+                        className="flex-1 px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 text-sm"
+                        placeholder={`https://wakatime.com/a-look-back-at-${year}/...`}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Ranking Badge */}
+            {config.enabled && (
+              <div className="bg-white dark:bg-zinc-800 rounded-xl border border-zinc-200 dark:border-zinc-700 p-4">
+                <h3 className="text-lg font-medium text-zinc-900 dark:text-zinc-100 mb-4 flex items-center gap-2">
+                  <svg className="w-5 h-5 text-amber-500" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M5 3a2 2 0 00-2 2v2a5 5 0 003.5 4.78V14a1 1 0 001 1h.5v5a1 1 0 001 1h6a1 1 0 001-1v-5h.5a1 1 0 001-1v-2.22A5 5 0 0021 7V5a2 2 0 00-2-2H5z" />
+                  </svg>
+                  Badge de Ranking
+                </h3>
+                <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-4">
+                  Mostra seu ranking entre os desenvolvedores do WakaTime
+                </p>
+
+                {/* Toggle show badge */}
+                <div className="p-3 flex items-center justify-between bg-zinc-50 dark:bg-zinc-700/50 rounded-lg mb-4">
+                  <div>
+                    <p className="font-medium text-zinc-900 dark:text-zinc-100">Mostrar badge de ranking</p>
+                    <p className="text-sm text-zinc-500 dark:text-zinc-400">Ex: "Top 1% de 500k+ devs"</p>
+                  </div>
+                  <button
+                    onClick={() => handleToggle('showRankingBadge')}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      config.showRankingBadge ? 'bg-amber-500' : 'bg-zinc-300 dark:bg-zinc-600'
+                    }`}
+                  >
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      config.showRankingBadge ? 'translate-x-6' : 'translate-x-1'
+                    }`} />
+                  </button>
+                </div>
+
+                {config.showRankingBadge && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+                        Percentil (Top X%)
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="100"
+                        value={config.rankingPercentile}
+                        onChange={(e) => setConfig({ ...config, rankingPercentile: parseInt(e.target.value) || 1 })}
+                        className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100"
+                        placeholder="1"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+                        Total de devs
+                      </label>
+                      <input
+                        type="text"
+                        value={config.rankingTotalDevs}
+                        onChange={(e) => setConfig({ ...config, rankingTotalDevs: e.target.value })}
+                        className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100"
+                        placeholder="500k+"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Preview */}
+                {config.showRankingBadge && (
+                  <div className="mt-4 p-4 bg-slate-900 rounded-lg">
+                    <p className="text-sm text-slate-400 mb-2">Preview:</p>
+                    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/30">
+                      <svg className="w-4 h-4 text-amber-400" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M5 3a2 2 0 00-2 2v2a5 5 0 003.5 4.78V14a1 1 0 001 1h.5v5a1 1 0 001 1h6a1 1 0 001-1v-5h.5a1 1 0 001-1v-2.22A5 5 0 0021 7V5a2 2 0 00-2-2H5z" />
+                      </svg>
+                      <span className="text-sm font-semibold">
+                        <span className="text-amber-400">Top {config.rankingPercentile}%</span>
+                        <span className="text-slate-400 ml-1">de {config.rankingTotalDevs} devs</span>
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
