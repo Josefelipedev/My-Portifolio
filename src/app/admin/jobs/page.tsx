@@ -1,7 +1,6 @@
 import Link from 'next/link';
 import prisma from '@/lib/prisma';
 import JobsTabs from '@/components/admin/JobsTabs';
-import ScraperStatus from '@/components/admin/ScraperStatus';
 
 // Force dynamic to avoid build errors when tables don't exist yet
 export const dynamic = 'force-dynamic';
@@ -72,37 +71,28 @@ export default async function JobsAdminPage() {
           </div>
         )}
 
-        {/* Stats and Scraper Status - Side by Side */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
-          {/* Left: Stats Cards */}
-          <div className="bg-white dark:bg-zinc-800 rounded-xl border border-zinc-200 dark:border-zinc-700 p-4">
-            <h3 className="text-sm font-medium text-zinc-500 dark:text-zinc-400 mb-3">Application Stats</h3>
-            <div className="grid grid-cols-2 sm:grid-cols-5 lg:grid-cols-5 gap-3">
-              <div className="text-center p-2">
-                <p className="text-2xl font-bold text-red-500">{savedJobsCount}</p>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400">Saved</p>
-              </div>
-              <div className="text-center p-2">
-                <p className="text-2xl font-bold text-blue-500">{statsMap.applied || 0}</p>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400">Applied</p>
-              </div>
-              <div className="text-center p-2">
-                <p className="text-2xl font-bold text-yellow-500">{statsMap.interview || 0}</p>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400">Interview</p>
-              </div>
-              <div className="text-center p-2">
-                <p className="text-2xl font-bold text-green-500">{statsMap.offer || 0}</p>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400">Offers</p>
-              </div>
-              <div className="text-center p-2">
-                <p className="text-2xl font-bold text-zinc-400">{statsMap.rejected || 0}</p>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400">Rejected</p>
-              </div>
-            </div>
+        {/* Stats Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
+          <div className="bg-white dark:bg-zinc-800 rounded-lg p-3 border border-zinc-200 dark:border-zinc-700">
+            <p className="text-2xl font-bold text-red-500">{savedJobsCount}</p>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">Saved Jobs</p>
           </div>
-
-          {/* Right: Python Scraper Status */}
-          <ScraperStatus />
+          <div className="bg-white dark:bg-zinc-800 rounded-lg p-3 border border-zinc-200 dark:border-zinc-700">
+            <p className="text-2xl font-bold text-blue-500">{statsMap.applied || 0}</p>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">Applied</p>
+          </div>
+          <div className="bg-white dark:bg-zinc-800 rounded-lg p-3 border border-zinc-200 dark:border-zinc-700">
+            <p className="text-2xl font-bold text-yellow-500">{statsMap.interview || 0}</p>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">Interview</p>
+          </div>
+          <div className="bg-white dark:bg-zinc-800 rounded-lg p-3 border border-zinc-200 dark:border-zinc-700">
+            <p className="text-2xl font-bold text-green-500">{statsMap.offer || 0}</p>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">Offers</p>
+          </div>
+          <div className="bg-white dark:bg-zinc-800 rounded-lg p-3 border border-zinc-200 dark:border-zinc-700">
+            <p className="text-2xl font-bold text-zinc-400">{statsMap.rejected || 0}</p>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">Rejected</p>
+          </div>
         </div>
 
         {/* Tabs Component */}
