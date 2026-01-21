@@ -220,3 +220,86 @@ export async function sendLoginAlert(
 
   return sendEmail({ to: email, subject, html });
 }
+
+export async function sendScraperAlert(
+  scraperName: string,
+  keyword: string,
+  jobsFound: number,
+  errorMessage?: string
+): Promise<boolean> {
+  const alertEmail = process.env.ALERT_EMAIL || process.env.CONTACT_EMAIL;
+
+  if (!alertEmail) {
+    console.warn('ALERT_EMAIL not configured. Skipping scraper alert.');
+    return false;
+  }
+
+  const isError = jobsFound === 0 || !!errorMessage;
+  const subject = isError
+    ? `⚠️ Scraper Alert: ${scraperName} - No jobs found`
+    : `✅ Scraper Success: ${scraperName} - ${jobsFound} jobs`;
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; padding: 20px; }
+        .container { max-width: 500px; margin: 0 auto; background: white; border-radius: 12px; padding: 40px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .header { background: ${isError ? 'linear-gradient(135deg, #ef4444, #f97316)' : 'linear-gradient(135deg, #22c55e, #3b82f6)'}; color: white; margin: -40px -40px 30px; padding: 30px 40px; border-radius: 12px 12px 0 0; }
+        .header h1 { margin: 0; font-size: 20px; }
+        .info { background: #f8fafc; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
+        .info-row { margin: 8px 0; }
+        .info-label { color: #64748b; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .info-value { color: #1e293b; font-weight: 500; margin-top: 4px; }
+        .error-box { background: #fef2f2; border: 1px solid #fecaca; padding: 15px; border-radius: 8px; color: #991b1b; }
+        .action { margin-top: 20px; padding: 15px; background: #fffbeb; border-radius: 8px; border-left: 4px solid #f59e0b; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1>${isError ? '⚠️ Scraper Alert' : '✅ Scraper Success'}</h1>
+        </div>
+
+        <div class="info">
+          <div class="info-row">
+            <div class="info-label">Scraper</div>
+            <div class="info-value">${scraperName}</div>
+          </div>
+          <div class="info-row">
+            <div class="info-label">Keyword</div>
+            <div class="info-value">${keyword}</div>
+          </div>
+          <div class="info-row">
+            <div class="info-label">Jobs Found</div>
+            <div class="info-value">${jobsFound}</div>
+          </div>
+          <div class="info-row">
+            <div class="info-label">Time</div>
+            <div class="info-value">${new Date().toLocaleString('pt-BR')}</div>
+          </div>
+        </div>
+
+        ${errorMessage ? `
+        <div class="error-box">
+          <strong>Error:</strong> ${errorMessage}
+        </div>
+        ` : ''}
+
+        ${isError ? `
+        <div class="action">
+          <strong>Ação recomendada:</strong> Os seletores CSS do scraper podem estar desatualizados.
+          Verifique os arquivos de debug (screenshot e HTML) no painel admin para identificar as mudanças no site.
+        </div>
+        ` : ''}
+      </div>
+    </body>
+    </html>
+  `;
+
+  const text = `Scraper Alert: ${scraperName}\n\nKeyword: ${keyword}\nJobs Found: ${jobsFound}\nTime: ${new Date().toLocaleString('pt-BR')}\n${errorMessage ? `\nError: ${errorMessage}` : ''}`;
+
+  return sendEmail({ to: alertEmail, subject, html, text });
+}
