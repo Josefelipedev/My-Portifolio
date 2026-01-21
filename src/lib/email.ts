@@ -227,7 +227,7 @@ export async function sendScraperAlert(
   jobsFound: number,
   errorMessage?: string
 ): Promise<boolean> {
-  const alertEmail = process.env.ALERT_EMAIL || process.env.CONTACT_EMAIL;
+  const alertEmail = process.env.ALERT_EMAIL || process.env.CONTACT_EMAIL || process.env.SMTP_USER;
 
   if (!alertEmail) {
     console.warn('ALERT_EMAIL not configured. Skipping scraper alert.');

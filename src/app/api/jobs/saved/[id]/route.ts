@@ -31,7 +31,7 @@ export async function GET(
   }
 }
 
-// PUT update a saved job (mainly for notes)
+// PUT update a saved job (notes and contact info)
 export async function PUT(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -44,11 +44,26 @@ export async function PUT(
     const { id } = await params;
     const data = await request.json();
 
+    // Build update object with only provided fields
+    const updateData: {
+      notes?: string;
+      contactEmail?: string | null;
+      contactPhone?: string | null;
+    } = {};
+
+    if (data.notes !== undefined) {
+      updateData.notes = data.notes;
+    }
+    if (data.contactEmail !== undefined) {
+      updateData.contactEmail = data.contactEmail || null;
+    }
+    if (data.contactPhone !== undefined) {
+      updateData.contactPhone = data.contactPhone || null;
+    }
+
     const savedJob = await prisma.savedJob.update({
       where: { id },
-      data: {
-        notes: data.notes,
-      },
+      data: updateData,
     });
 
     return success(savedJob);
