@@ -26,6 +26,13 @@ export interface WakaTimeConfig {
   showYearlyEditors: boolean;
   showYearlyOS: boolean;
   showYearlyProjects: boolean;
+  // Year in Review links
+  yearlyReportLinks: Record<number, string>;
+  showYearlyReportLink: boolean;
+  // Ranking badge
+  showRankingBadge: boolean;
+  rankingPercentile: number;
+  rankingTotalDevs: string;
   // Other
   profileUrl: string;
   cacheYearlyData: boolean;
@@ -52,6 +59,11 @@ const DEFAULT_CONFIG: WakaTimeConfig = {
   showYearlyEditors: true,
   showYearlyOS: true,
   showYearlyProjects: true,
+  yearlyReportLinks: {},
+  showYearlyReportLink: true,
+  showRankingBadge: true,
+  rankingPercentile: 1,
+  rankingTotalDevs: '500k+',
   profileUrl: 'https://wakatime.com/@josefelipedev',
   cacheYearlyData: true,
 };

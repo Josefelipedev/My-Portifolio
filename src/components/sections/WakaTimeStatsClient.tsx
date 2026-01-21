@@ -74,6 +74,13 @@ interface WakaTimeConfig {
   showYearlyEditors: boolean;
   showYearlyOS: boolean;
   showYearlyProjects: boolean;
+  // Year in Review links
+  yearlyReportLinks: Record<number, string>;
+  showYearlyReportLink: boolean;
+  // Ranking badge
+  showRankingBadge: boolean;
+  rankingPercentile: number;
+  rankingTotalDevs: string;
   // Other
   profileUrl: string;
   cacheYearlyData: boolean;
@@ -298,6 +305,11 @@ export function WakaTimeStatsClient({ stats, allTimeStats, yearlyStats, yearlySt
     ? yearlyStats
     : yearlyStatsByYear[selectedYear] || null;
 
+  // Get link for current selected year
+  const currentYearReportLink = typeof selectedYear === 'number'
+    ? config.yearlyReportLinks?.[selectedYear]
+    : null;
+
   const texts = {
     title: language === 'pt' ? 'Estatísticas de Código' : 'Coding Stats',
     subtitle: language === 'pt' ? 'Minha atividade de programação via WakaTime' : 'My coding activity tracked by WakaTime',
@@ -317,6 +329,9 @@ export function WakaTimeStatsClient({ stats, allTimeStats, yearlyStats, yearlySt
     yearlyDailyAvg: language === 'pt' ? 'Média Diária (Ano)' : 'Daily Average (Year)',
     selectYear: language === 'pt' ? 'Selecionar Ano' : 'Select Year',
     last365Days: language === 'pt' ? 'Últimos 365 dias' : 'Last 365 days',
+    viewFullReport: language === 'pt' ? 'Ver relatório completo' : 'View full report',
+    ofDevs: language === 'pt' ? 'de' : 'of',
+    devs: 'devs',
   };
 
   return (
@@ -324,6 +339,17 @@ export function WakaTimeStatsClient({ stats, allTimeStats, yearlyStats, yearlySt
       <div className="max-w-6xl mx-auto">
         {/* Section Header */}
         <div className="text-center mb-8">
+          {/* Ranking Badge */}
+          {config.showRankingBadge && config.rankingPercentile > 0 && (
+            <div className="inline-flex items-center gap-2 px-4 py-2 mb-4 rounded-full bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/30">
+              <TrophyIconSmall />
+              <span className="text-sm font-semibold">
+                <span className="text-amber-400">Top {config.rankingPercentile}%</span>
+                <span className="text-slate-400 ml-1">{texts.ofDevs} {config.rankingTotalDevs} {texts.devs}</span>
+              </span>
+            </div>
+          )}
+
           <h2 className="text-3xl md:text-4xl font-bold mb-4">
             <span className="bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
               {texts.title}
@@ -632,6 +658,22 @@ export function WakaTimeStatsClient({ stats, allTimeStats, yearlyStats, yearlySt
                     </div>
                   )}
                 </div>
+
+                {/* View Full Report Link */}
+                {config.showYearlyReportLink && currentYearReportLink && (
+                  <div className="mt-8 text-center">
+                    <a
+                      href={currentYearReportLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-full font-medium transition-all hover:-translate-y-1 hover:shadow-lg hover:shadow-purple-500/25"
+                    >
+                      <ReportIcon />
+                      {texts.viewFullReport} {selectedYear}
+                      <ExternalLinkIcon />
+                    </a>
+                  </div>
+                )}
               </>
             )}
           </div>
@@ -721,5 +763,17 @@ const WakaTimeIcon = () => (
 const ExternalLinkIcon = () => (
   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+  </svg>
+);
+
+const TrophyIconSmall = () => (
+  <svg className="w-4 h-4 text-amber-400" fill="currentColor" viewBox="0 0 24 24">
+    <path d="M5 3a2 2 0 00-2 2v2a5 5 0 003.5 4.78V14a1 1 0 001 1h.5v5a1 1 0 001 1h6a1 1 0 001-1v-5h.5a1 1 0 001-1v-2.22A5 5 0 0021 7V5a2 2 0 00-2-2H5z" />
+  </svg>
+);
+
+const ReportIcon = () => (
+  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
   </svg>
 );
