@@ -61,6 +61,11 @@ export async function POST(request: Request) {
     const linkedinUrl = personalInfo?.linkedin ? `https://linkedin.com/in/${personalInfo.linkedin}` : '';
     const githubUrl = personalInfo?.github ? `https://github.com/${personalInfo.github}` : '';
 
+    // Extract key requirements from description if available
+    const descriptionContext = description
+      ? `\nJOB DESCRIPTION (use to personalize):\n${description.substring(0, 1500)}`
+      : '';
+
     try {
       const prompt = `Write a SHORT job application email in PORTUGUESE (Brazilian).
 
@@ -70,16 +75,17 @@ Portfolio: ${portfolioUrl}
 LinkedIn: ${linkedinUrl}
 GitHub: ${githubUrl}
 Skills: ${skills}
+Recent Experience: ${experience}
 
 JOB:
 Position: ${jobTitle}
-Company: ${company}
+Company: ${company}${descriptionContext}
 
 RULES - FOLLOW EXACTLY:
 1. Start with greeting: "Boa tarde," or "Ola,"
 2. MAXIMUM 5 LINES of text (not counting signature)
 3. Be direct and professional
-4. Mention 1-2 relevant skills only
+4. If job description mentions specific tech/requirements, highlight 1-2 matching skills
 5. End with "Atenciosamente," and the name
 
 SIGNATURE FORMAT (always include):

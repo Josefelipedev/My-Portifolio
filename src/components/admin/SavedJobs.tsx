@@ -637,6 +637,61 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
             {/* Expanded Content */}
             {expandedId === job.id && (
               <div className="mt-4 pt-4 border-t border-zinc-200 dark:border-zinc-700 space-y-4">
+                {/* Source Info Card */}
+                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                  <h4 className="text-sm font-medium text-blue-700 dark:text-blue-300 mb-3 flex items-center gap-2">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Informacoes da Vaga
+                  </h4>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                    <div className="bg-white dark:bg-zinc-800 rounded-lg p-2">
+                      <span className="block text-xs text-zinc-500 dark:text-zinc-400">Fonte</span>
+                      <span className="font-medium text-zinc-700 dark:text-zinc-300 capitalize">{job.source}</span>
+                    </div>
+                    {job.jobType && (
+                      <div className="bg-white dark:bg-zinc-800 rounded-lg p-2">
+                        <span className="block text-xs text-zinc-500 dark:text-zinc-400">Tipo</span>
+                        <span className="font-medium text-zinc-700 dark:text-zinc-300">{job.jobType}</span>
+                      </div>
+                    )}
+                    {job.location && (
+                      <div className="bg-white dark:bg-zinc-800 rounded-lg p-2">
+                        <span className="block text-xs text-zinc-500 dark:text-zinc-400">Local</span>
+                        <span className="font-medium text-zinc-700 dark:text-zinc-300">{job.location}</span>
+                      </div>
+                    )}
+                    {job.postedAt && (
+                      <div className="bg-white dark:bg-zinc-800 rounded-lg p-2">
+                        <span className="block text-xs text-zinc-500 dark:text-zinc-400">Publicado</span>
+                        <span className="font-medium text-zinc-700 dark:text-zinc-300">{formatDate(job.postedAt)}</span>
+                      </div>
+                    )}
+                    {job.salary && (
+                      <div className="bg-white dark:bg-zinc-800 rounded-lg p-2">
+                        <span className="block text-xs text-zinc-500 dark:text-zinc-400">Salario</span>
+                        <span className="font-medium text-green-600 dark:text-green-400">{job.salary}</span>
+                      </div>
+                    )}
+                    <div className="bg-white dark:bg-zinc-800 rounded-lg p-2">
+                      <span className="block text-xs text-zinc-500 dark:text-zinc-400">ID Externo</span>
+                      <span className="font-medium text-zinc-700 dark:text-zinc-300 text-xs truncate block" title={job.externalId}>{job.externalId.substring(0, 20)}...</span>
+                    </div>
+                  </div>
+                  <a
+                    href={job.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-3 text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+                  >
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                    {job.url.length > 60 ? job.url.substring(0, 60) + '...' : job.url}
+                  </a>
+                </div>
+
                 {/* Description */}
                 <div>
                   <h4 className="text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
