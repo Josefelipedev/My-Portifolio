@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { fetchWithCSRF } from '@/lib/csrf-client';
-import ScraperStatus from '@/components/admin/ScraperStatus';
 
 interface SystemLog {
   id: string;
@@ -234,71 +233,60 @@ export default function LogsPage() {
         </div>
       </div>
 
-      {/* Stats and Scraper Status - Side by Side */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        {/* Left Column: Stats */}
-        <div className="space-y-4">
-          {/* Stats Cards */}
-          {stats && (
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
-                <div className="text-red-400 text-sm font-medium">Errors (24h)</div>
-                <div className="text-2xl font-bold text-red-300">
-                  {stats.byLevel.error}
-                </div>
-              </div>
-              <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
-                <div className="text-yellow-400 text-sm font-medium">
-                  Warnings (24h)
-                </div>
-                <div className="text-2xl font-bold text-yellow-300">
-                  {stats.byLevel.warn}
-                </div>
-              </div>
-              <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
-                <div className="text-blue-400 text-sm font-medium">Info (24h)</div>
-                <div className="text-2xl font-bold text-blue-300">
-                  {stats.byLevel.info}
-                </div>
-              </div>
-              <div className="bg-gray-500/10 border border-gray-500/30 rounded-lg p-4">
-                <div className="text-gray-400 text-sm font-medium">Total Logs</div>
-                <div className="text-2xl font-bold text-gray-300">
-                  {pagination?.total || 0}
-                </div>
-              </div>
+      {/* Stats Cards */}
+      {stats && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
+            <div className="text-red-400 text-sm font-medium">Errors (24h)</div>
+            <div className="text-2xl font-bold text-red-300">
+              {stats.byLevel.error}
             </div>
-          )}
-
-          {/* Errors by Source */}
-          {stats && Object.keys(stats.errorsBySource).length > 0 && (
-            <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-4">
-              <h3 className="text-sm font-medium text-gray-400 mb-3">
-                Errors by Source (24h)
-              </h3>
-              <div className="flex flex-wrap gap-2">
-                {Object.entries(stats.errorsBySource).map(([source, count]) => (
-                  <button
-                    key={source}
-                    onClick={() => {
-                      setSourceFilter(source);
-                      setLevelFilter('error');
-                    }}
-                    className="px-3 py-1 bg-red-500/20 border border-red-500/30 rounded-full text-sm text-red-300 hover:bg-red-500/30 transition-colors"
-                  >
-                    {source}: {count}
-                  </button>
-                ))}
-              </div>
+          </div>
+          <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
+            <div className="text-yellow-400 text-sm font-medium">
+              Warnings (24h)
             </div>
-          )}
+            <div className="text-2xl font-bold text-yellow-300">
+              {stats.byLevel.warn}
+            </div>
+          </div>
+          <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
+            <div className="text-blue-400 text-sm font-medium">Info (24h)</div>
+            <div className="text-2xl font-bold text-blue-300">
+              {stats.byLevel.info}
+            </div>
+          </div>
+          <div className="bg-gray-500/10 border border-gray-500/30 rounded-lg p-4">
+            <div className="text-gray-400 text-sm font-medium">Total Logs</div>
+            <div className="text-2xl font-bold text-gray-300">
+              {pagination?.total || 0}
+            </div>
+          </div>
         </div>
+      )}
 
-        {/* Right Column: Python Scraper Status */}
-        <div>
-          <ScraperStatus defaultExpanded={true} />
+      {/* Errors by Source */}
+      {stats && Object.keys(stats.errorsBySource).length > 0 && (
+        <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-4 mb-6">
+          <h3 className="text-sm font-medium text-gray-400 mb-3">
+            Errors by Source (24h)
+          </h3>
+          <div className="flex flex-wrap gap-2">
+            {Object.entries(stats.errorsBySource).map(([source, count]) => (
+              <button
+                key={source}
+                onClick={() => {
+                  setSourceFilter(source);
+                  setLevelFilter('error');
+                }}
+                className="px-3 py-1 bg-red-500/20 border border-red-500/30 rounded-full text-sm text-red-300 hover:bg-red-500/30 transition-colors"
+              >
+                {source}: {count}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Filters */}
       <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-4 mb-6">
