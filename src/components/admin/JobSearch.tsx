@@ -7,7 +7,7 @@ import SearchHistory, { saveSearchToHistory } from './jobs/SearchHistory';
 
 interface JobListing {
   id: string;
-  source: 'remoteok' | 'remotive' | 'arbeitnow' | 'adzuna' | 'jooble' | 'jsearch' | 'netempregos' | 'vagascombr' | 'linkedin';
+  source: 'remoteok' | 'remotive' | 'arbeitnow' | 'adzuna' | 'jooble' | 'jsearch' | 'netempregos' | 'vagascombr' | 'linkedin' | 'geekhunter';
   title: string;
   company: string;
   companyLogo?: string;
@@ -41,6 +41,7 @@ const SOURCE_LABELS: Record<string, { label: string; color: string }> = {
   netempregos: { label: 'Net-Empregos', color: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400' },
   vagascombr: { label: 'Vagas.com.br', color: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400' },
   linkedin: { label: 'LinkedIn', color: 'bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-400' },
+  geekhunter: { label: 'GeekHunter', color: 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400' },
 };
 
 const COUNTRY_OPTIONS = [
@@ -67,6 +68,7 @@ const SOURCE_OPTIONS = [
   { value: 'adzuna', label: 'Adzuna', region: 'PT/BR' },
   { value: 'jooble', label: 'Jooble', region: 'Global' },
   { value: 'jsearch', label: 'JSearch', region: 'Global' },
+  { value: 'geekhunter', label: 'GeekHunter', region: 'BR' },
 ];
 
 // Popular search terms for developers
