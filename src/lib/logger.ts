@@ -19,6 +19,7 @@ export type LogSource =
   | 'linkedin'
   | 'ai-extraction'
   | 'job-enrichment'
+  | 'job-alerts'
   | 'api'
   | 'auth'
   | 'cron'

@@ -91,4 +91,13 @@ export { searchJooble } from './apis/jooble';
 export { searchJSearch } from './apis/jsearch';
 export { searchNetEmpregos } from './apis/net-empregos';
 export { searchVagasComBr } from './apis/vagas';
+export { searchGeekHunter } from './apis/geekhunter';
 export { searchLinkedIn } from './apis/linkedin';
+
+// Python Scraper exports
+export {
+  searchWithPythonScraper,
+  isPythonScraperAvailable,
+  getPythonScraperHealth,
+  getPythonScraperSources,
+} from './apis/python-scraper';

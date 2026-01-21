@@ -59,7 +59,7 @@ async function main() {
         title: 'Full Stack Developer',
         bio: 'Full-stack developer with a strong emphasis on back-end development and proven experience in designing and implementing modern, scalable solutions.',
         githubUrl: 'https://github.com/Josefelipedev',
-        linkedinUrl: 'https://linkedin.com/in/josefelipealmeida',
+        linkedinUrl: 'https://www.linkedin.com/in/jose-felipe-almeida-da-silva-a29665210/',
         email: 'josefelipedev@gmail.com',
         location: 'Faro, Portugal',
       },

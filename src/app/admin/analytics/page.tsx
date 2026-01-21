@@ -1,7 +1,7 @@
-import Link from 'next/link';
 import prisma from '@/lib/prisma';
 import { isAuthenticated } from '@/lib/auth';
 import { redirect } from 'next/navigation';
+import AnalyticsPageWrapper from '@/components/admin/AnalyticsPageWrapper';
 import AnalyticsClient from './AnalyticsClient';
 
 export default async function AnalyticsPage() {
@@ -149,24 +149,8 @@ export default async function AnalyticsPage() {
   };
 
   return (
-    <main className="min-h-screen bg-zinc-50 dark:bg-zinc-900 p-4 md:p-8">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">Analytics</h1>
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">Site visitor statistics</p>
-          </div>
-          <Link
-            href="/admin"
-            className="px-3 py-1.5 bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-sm font-medium rounded-lg hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-colors"
-          >
-            Back to Admin
-          </Link>
-        </div>
-
-        <AnalyticsClient data={data} />
-      </div>
-    </main>
+    <AnalyticsPageWrapper data={data}>
+      <AnalyticsClient data={data} />
+    </AnalyticsPageWrapper>
   );
 }

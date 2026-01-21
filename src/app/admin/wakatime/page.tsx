@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import Link from 'next/link';
+import AdminLayout from '@/components/admin/AdminLayout';
 
 interface WakaTimeConfig {
   enabled: boolean;
@@ -228,36 +228,26 @@ export default function WakaTimeAdminPage() {
     { key: 'showYearlyProjects', label: 'Projetos (Ano)', description: 'Mostra os projetos do ano' },
   ] as const;
 
+  const headerActions = (
+    <button
+      onClick={fetchPreview}
+      className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors flex items-center gap-2"
+    >
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+      </svg>
+      Preview
+    </button>
+  );
+
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-900 p-8">
+    <AdminLayout
+      title="WakaTime Settings"
+      subtitle="Configure quais estatísticas mostrar na página inicial"
+      actions={headerActions}
+    >
       <div className="max-w-4xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-zinc-900 dark:text-zinc-100">WakaTime Settings</h1>
-            <p className="text-zinc-600 dark:text-zinc-400 mt-1">
-              Configure quais estatísticas mostrar na página inicial
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={fetchPreview}
-              className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors flex items-center gap-2"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-              </svg>
-              Preview
-            </button>
-            <Link
-              href="/admin"
-              className="px-4 py-2 bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-lg hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-colors"
-            >
-              Voltar
-            </Link>
-          </div>
-        </div>
 
         {/* Error */}
         {error && (
@@ -932,6 +922,6 @@ export default function WakaTimeAdminPage() {
           </div>
         )}
       </div>
-    </div>
+    </AdminLayout>
   );
 }
