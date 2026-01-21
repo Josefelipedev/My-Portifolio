@@ -418,3 +418,20 @@ model AuditLog {
   @@index([userId])
   @@index([createdAt])
 }
+
+// ==========================================
+// System Logs (Application Logs)
+// ==========================================
+
+model SystemLog {
+  id        String   @id @default(cuid())
+  level     String   // 'error', 'warn', 'info', 'debug'
+  source    String   // 'geekhunter', 'vagascombr', 'python-scraper', 'api', etc.
+  message   String   @db.Text
+  details   Json?    // Stack trace, request info, etc.
+  createdAt DateTime @default(now())
+
+  @@index([level])
+  @@index([source])
+  @@index([createdAt])
+}
