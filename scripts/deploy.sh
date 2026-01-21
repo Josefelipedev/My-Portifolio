@@ -41,7 +41,7 @@ npx prisma generate
 
 # Push schema to database
 log "Pushing schema to database..."
-npx prisma db push --skip-generate
+npx prisma db push
 
 # Build application
 log "Building application..."
