@@ -10,6 +10,7 @@ import os
 from models import SearchParams, SearchResponse, JobListing
 from scrapers.geekhunter import GeekHunterScraper
 from scrapers.vagas import VagasComBrScraper
+from agents.orchestrator import AgentOrchestrator, report_execution
 from config import config
 
 # Custom log handler to store logs in memory
@@ -60,6 +61,9 @@ scrapers = {
     "geekhunter": GeekHunterScraper(),
     "vagascombr": VagasComBrScraper(),
 }
+
+# Initialize agent orchestrator
+orchestrator = AgentOrchestrator()
 
 
 @app.get("/health")
@@ -255,3 +259,111 @@ async def clear_debug_files():
 
     logger.info(f"Cleared {deleted} debug files")
     return {"deleted": deleted}
+
+
+# ============================================================================
+# Agent-based Scraping Endpoints
+# ============================================================================
+
+
+@app.get("/search/agent", response_model=SearchResponse)
+async def search_with_agents(
+    keyword: str = Query(default="desenvolvedor"),
+    source: str = Query(default="geekhunter"),
+    country: str = Query(default="br"),
+    limit: int = Query(default=50, le=100),
+    trigger: str = Query(default="manual"),
+):
+    """
+    Search for jobs using the agent-based architecture.
+
+    Pipeline:
+    1. SearchAgent - Builds search URL
+    2. PageAgent - Fetches page with Playwright
+    3. AnalyzerAgent - Detects page structure
+    4. ExtractorAgent - Extracts job listings
+    """
+    stats["requests_total"] += 1
+
+    if source not in ("geekhunter", "vagascombr"):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Source '{source}' not supported by agent architecture. Use: geekhunter, vagascombr"
+        )
+
+    try:
+        logger.info(f"Agent search: '{keyword}' on {source}")
+
+        # Use search_with_details to get pipeline info for tracking
+        result = await orchestrator.search_with_details(
+            keyword=keyword,
+            source=source,
+            country=country,
+            limit=limit,
+        )
+
+        jobs = [JobListing(**job) for job in result.get("jobs", [])]
+        errors = result.get("errors", [])
+
+        stats["jobs_found"] += len(jobs)
+
+        if errors and len(jobs) == 0:
+            stats["requests_failed"] += 1
+        else:
+            stats["requests_success"] += 1
+
+        # Report execution to tracking API (fire and forget)
+        await report_execution(result, trigger=trigger)
+
+        return SearchResponse(
+            jobs=jobs,
+            total=len(jobs),
+            source=source,
+            timestamp=datetime.utcnow(),
+            errors=errors,
+        )
+
+    except Exception as e:
+        stats["requests_failed"] += 1
+        logger.error(f"Agent search error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/search/agent/details")
+async def search_with_agents_detailed(
+    keyword: str = Query(default="desenvolvedor"),
+    source: str = Query(default="geekhunter"),
+    country: str = Query(default="br"),
+    limit: int = Query(default=50, le=100),
+    trigger: str = Query(default="manual"),
+):
+    """
+    Search with agents and return detailed pipeline information.
+
+    Returns job listings plus debug information about each pipeline stage.
+    Useful for debugging and understanding how the agents work.
+    """
+    if source not in ("geekhunter", "vagascombr"):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Source '{source}' not supported by agent architecture"
+        )
+
+    try:
+        logger.info(f"Agent detailed search: '{keyword}' on {source}")
+
+        result = await orchestrator.search_with_details(
+            keyword=keyword,
+            source=source,
+            country=country,
+            limit=limit,
+        )
+
+        # Report execution to tracking API (fire and forget)
+        await report_execution(result, trigger=trigger)
+
+        return result
+
+    except Exception as e:
+        logger.error(f"Agent detailed search error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

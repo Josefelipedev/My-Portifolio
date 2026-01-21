@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import Link from 'next/link';
 import { fetchWithCSRF } from '@/lib/csrf-client';
+import AdminLayout from '@/components/admin/AdminLayout';
 
 interface GitHubRepo {
   id: number;
@@ -135,7 +135,10 @@ export default function GitHubAdminPage() {
   const selectedCount = selectedRepos.size;
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-900 p-8">
+    <AdminLayout
+      title="GitHub Import"
+      subtitle="Import repositories from your GitHub account"
+    >
       {/* Toast Notifications */}
       <div className="fixed top-4 right-4 z-50 flex flex-col gap-2">
         {toasts.map(toast => (
@@ -168,25 +171,6 @@ export default function GitHubAdminPage() {
           </div>
         ))}
       </div>
-
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-zinc-900 dark:text-zinc-100">
-              GitHub Import
-            </h1>
-            <p className="text-zinc-600 dark:text-zinc-400 mt-1">
-              Import repositories from your GitHub account
-            </p>
-          </div>
-          <Link
-            href="/admin"
-            className="px-4 py-2 bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-lg hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-colors"
-          >
-            Back to Admin
-          </Link>
-        </div>
 
         {/* Options */}
         <div className="bg-white dark:bg-zinc-800 rounded-xl p-4 mb-6 border border-zinc-200 dark:border-zinc-700">
@@ -402,7 +386,6 @@ export default function GitHubAdminPage() {
             </p>
           </div>
         )}
-      </div>
 
       {/* CSS for toast animation */}
       <style jsx>{`
@@ -420,6 +403,6 @@ export default function GitHubAdminPage() {
           animation: slide-in 0.3s ease-out;
         }
       `}</style>
-    </div>
+    </AdminLayout>
   );
 }

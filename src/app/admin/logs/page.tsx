@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import Link from 'next/link';
 import { fetchWithCSRF } from '@/lib/csrf-client';
+import AdminLayout from '@/components/admin/AdminLayout';
 
 interface SystemLog {
   id: string;
@@ -187,40 +187,49 @@ export default function LogsPage() {
     'system',
   ];
 
-  return (
-    <div className="min-h-screen bg-gray-900 text-white p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <Link
-            href="/admin"
-            className="text-blue-400 hover:text-blue-300 text-sm mb-2 inline-block"
-          >
-            ← Back to Admin
-          </Link>
-          <h1 className="text-3xl font-bold">System Logs</h1>
-          <p className="text-gray-400 mt-1">
-            Monitor application logs and errors
-          </p>
-        </div>
+  const headerActions = (
+    <div className="flex items-center gap-3">
+      <label className="flex items-center gap-2 cursor-pointer bg-gray-800 px-3 py-2 rounded-lg">
+        <input
+          type="checkbox"
+          checked={autoRefresh}
+          onChange={(e) => setAutoRefresh(e.target.checked)}
+          className="w-4 h-4 rounded border-gray-600 text-green-500 focus:ring-green-500"
+        />
+        <span className="text-sm text-gray-300">Auto (5s)</span>
+        {autoRefresh && (
+          <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+        )}
+      </label>
+      <button
+        onClick={fetchLogs}
+        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors flex items-center gap-2"
+      >
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+        </svg>
+        Refresh
+      </button>
+      <button
+        onClick={() => setShowDeleteModal(true)}
+        className="px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
+      >
+        Clear Logs
+      </button>
+    </div>
+  );
 
-        <div className="flex items-center gap-3">
-          {/* Auto-refresh toggle */}
-          <label className="flex items-center gap-2 cursor-pointer bg-gray-800 px-3 py-2 rounded-lg">
-            <input
-              type="checkbox"
-              checked={autoRefresh}
-              onChange={(e) => setAutoRefresh(e.target.checked)}
-              className="w-4 h-4 rounded border-gray-600 text-green-500 focus:ring-green-500"
-            />
-            <span className="text-sm text-gray-300">Auto (5s)</span>
-            {autoRefresh && (
-              <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-            )}
-          </label>
+  return (
+    <AdminLayout
+      title="System Logs"
+      subtitle="Monitor application logs and errors"
+      actions={headerActions}
+    >
+      <div className="text-white">
+        <div className="flex items-center gap-3 mb-6">
           <button
             onClick={fetchLogs}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors flex items-center gap-2"
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors flex items-center gap-2 hidden"
           >
             🔄 Refresh
           </button>
@@ -581,6 +590,6 @@ export default function LogsPage() {
           </div>
         </div>
       )}
-    </div>
+    </AdminLayout>
   );
 }
