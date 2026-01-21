@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
+import { isAuthenticated } from '@/lib/auth';
 
 // Import resume data from JSON (fallback and structured data)
 import resumeData from '@/data/resume.json';
@@ -71,6 +72,44 @@ export async function GET(request: Request) {
     console.error('Error fetching resume data:', error);
     return NextResponse.json(
       { error: 'Failed to fetch resume data' },
+      { status: 500 }
+    );
+  }
+}
+
+// PUT - Update personal info in resume.json
+export async function PUT(request: Request) {
+  try {
+    if (!await isAuthenticated()) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const updates = await request.json();
+    const jsonPath = path.join(process.cwd(), 'src/data/resume.json');
+
+    // Read current resume data
+    const currentData = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
+
+    // Update personal info fields
+    if (updates.personalInfo) {
+      currentData.personalInfo = {
+        ...currentData.personalInfo,
+        ...updates.personalInfo,
+      };
+    }
+
+    // Write back to file
+    fs.writeFileSync(jsonPath, JSON.stringify(currentData, null, 2));
+
+    return NextResponse.json({
+      success: true,
+      message: 'Personal info updated successfully',
+      personalInfo: currentData.personalInfo,
+    });
+  } catch (error) {
+    console.error('Error updating resume data:', error);
+    return NextResponse.json(
+      { error: 'Failed to update resume data' },
       { status: 500 }
     );
   }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import AdminLayout from '@/components/admin/AdminLayout';
 
 interface Experience {
@@ -120,6 +120,69 @@ export default function ResumeAdminPage() {
     syncSkills: true,
     syncJson: true,
   });
+
+  // Contact info editing state
+  const [editingContactInfo, setEditingContactInfo] = useState(false);
+  const [savingContactInfo, setSavingContactInfo] = useState(false);
+  const [contactInfo, setContactInfo] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    address: '',
+    linkedin: '',
+    github: '',
+    portfolio: '',
+  });
+
+  // Load current contact info
+  const loadContactInfo = async () => {
+    try {
+      const response = await fetch('/api/resume?section=personal');
+      const data = await response.json();
+      if (data.personalInfo) {
+        setContactInfo({
+          name: data.personalInfo.name || '',
+          email: data.personalInfo.email || '',
+          phone: data.personalInfo.phone || '',
+          address: data.personalInfo.address || '',
+          linkedin: data.personalInfo.linkedin || '',
+          github: data.personalInfo.github || '',
+          portfolio: data.personalInfo.portfolio || '',
+        });
+      }
+    } catch {
+      console.error('Failed to load contact info');
+    }
+  };
+
+  const handleSaveContactInfo = async () => {
+    try {
+      setSavingContactInfo(true);
+      const response = await fetch('/api/resume', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ personalInfo: contactInfo }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save contact info');
+      }
+
+      setSuccess('Contact info updated successfully!');
+      setEditingContactInfo(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save');
+    } finally {
+      setSavingContactInfo(false);
+    }
+  };
+
+  // Load contact info when editing modal opens
+  useEffect(() => {
+    if (editingContactInfo) {
+      loadContactInfo();
+    }
+  }, [editingContactInfo]);
 
   const handleAnalyze = async (file?: File) => {
     try {
@@ -388,6 +451,32 @@ export default function ResumeAdminPage() {
             <p className="text-green-600 dark:text-green-400">{success}</p>
           </div>
         )}
+
+        {/* Contact Info Edit Card - Always visible */}
+        <div className="bg-white dark:bg-zinc-800 rounded-xl p-4 md:p-6 border border-zinc-200 dark:border-zinc-700 mb-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
+                <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="font-semibold text-zinc-900 dark:text-zinc-100">Informacoes de Contato</h3>
+                <p className="text-sm text-zinc-500">LinkedIn, GitHub, Email, Portfolio</p>
+              </div>
+            </div>
+            <button
+              onClick={() => setEditingContactInfo(true)}
+              className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors flex items-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+              </svg>
+              Editar
+            </button>
+          </div>
+        </div>
 
         {/* Step 1: Upload Section */}
         {viewMode === 'upload' && (
@@ -852,6 +941,166 @@ export default function ResumeAdminPage() {
                 >
                   Save
                 </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Edit Contact Info Modal */}
+        {editingContactInfo && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white dark:bg-zinc-800 rounded-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between p-4 border-b border-zinc-200 dark:border-zinc-700 sticky top-0 bg-white dark:bg-zinc-800">
+                <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                  <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                  Editar Informacoes de Contato
+                </h3>
+                <button
+                  onClick={() => setEditingContactInfo(false)}
+                  className="p-1 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <div className="p-4 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                    Nome Completo
+                  </label>
+                  <input
+                    type="text"
+                    value={contactInfo.name}
+                    onChange={(e) => setContactInfo({ ...contactInfo, name: e.target.value })}
+                    placeholder="Jose Felipe Almeida da Silva"
+                    className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                      Email
+                    </label>
+                    <input
+                      type="email"
+                      value={contactInfo.email}
+                      onChange={(e) => setContactInfo({ ...contactInfo, email: e.target.value })}
+                      placeholder="email@exemplo.com"
+                      className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                      Telefone
+                    </label>
+                    <input
+                      type="tel"
+                      value={contactInfo.phone}
+                      onChange={(e) => setContactInfo({ ...contactInfo, phone: e.target.value })}
+                      placeholder="+351 913 884 527"
+                      className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                    Endereco
+                  </label>
+                  <input
+                    type="text"
+                    value={contactInfo.address}
+                    onChange={(e) => setContactInfo({ ...contactInfo, address: e.target.value })}
+                    placeholder="Cidade, Pais"
+                    className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100"
+                  />
+                </div>
+
+                <div className="pt-4 border-t border-zinc-200 dark:border-zinc-700">
+                  <h4 className="text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-3">Redes Sociais & Portfolio</h4>
+
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-sm text-zinc-500 dark:text-zinc-400 mb-1">
+                        LinkedIn (apenas o username)
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-zinc-400">linkedin.com/in/</span>
+                        <input
+                          type="text"
+                          value={contactInfo.linkedin}
+                          onChange={(e) => setContactInfo({ ...contactInfo, linkedin: e.target.value })}
+                          placeholder="jose-felipe-almeida-da-silva"
+                          className="flex-1 px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm text-zinc-500 dark:text-zinc-400 mb-1">
+                        GitHub (apenas o username)
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-zinc-400">github.com/</span>
+                        <input
+                          type="text"
+                          value={contactInfo.github}
+                          onChange={(e) => setContactInfo({ ...contactInfo, github: e.target.value })}
+                          placeholder="josefelipedev"
+                          className="flex-1 px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm text-zinc-500 dark:text-zinc-400 mb-1">
+                        Portfolio URL
+                      </label>
+                      <input
+                        type="url"
+                        value={contactInfo.portfolio}
+                        onChange={(e) => setContactInfo({ ...contactInfo, portfolio: e.target.value })}
+                        placeholder="https://portfolio.josefelipedev.com"
+                        className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex gap-2 pt-4 border-t border-zinc-200 dark:border-zinc-700">
+                  <button
+                    onClick={handleSaveContactInfo}
+                    disabled={savingContactInfo}
+                    className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {savingContactInfo ? (
+                      <>
+                        <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        </svg>
+                        Salvando...
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        Salvar
+                      </>
+                    )}
+                  </button>
+                  <button
+                    onClick={() => setEditingContactInfo(false)}
+                    className="px-4 py-2 bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300 rounded-lg hover:bg-zinc-300 dark:hover:bg-zinc-600"
+                  >
+                    Cancelar
+                  </button>
+                </div>
               </div>
             </div>
           </div>
