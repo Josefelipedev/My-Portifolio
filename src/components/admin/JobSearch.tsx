@@ -197,37 +197,6 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
       .then(data => setApiStatus(data.apis || []))
       .catch(() => {});
 
-    // Auto-run AI search based on profile on first load
-    const runInitialSearch = async () => {
-      try {
-        setLoading(true);
-        setIsSmartSearch(true);
-
-        const params = new URLSearchParams({
-          country: getCountryParam(),
-          source: getSourceParam(),
-          limit: '50',
-          maxAgeDays,
-        });
-        const response = await fetch(`/api/jobs/smart-search?${params}`);
-        const data = await response.json();
-
-        if (response.ok) {
-          setJobs(data.jobs);
-          setSmartSearchKeywords(data.keywords || []);
-          if (data.apis) {
-            setApiStatus(data.apis);
-          }
-        }
-      } catch {
-        // Silently fail on initial load
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    runInitialSearch();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Close dropdowns when clicking outside
