@@ -210,12 +210,12 @@ export default function ScraperStatus({ defaultExpanded = false }: ScraperStatus
                           <div className="text-xs text-red-600 dark:text-red-400">Failed</div>
                         </div>
                       )}
-                      {info.stats.cache_hits !== undefined && (
+                      {info.stats.jobs_found !== undefined && (
                         <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 text-center">
                           <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                            {info.stats.cache_hits}
+                            {info.stats.jobs_found}
                           </div>
-                          <div className="text-xs text-blue-600 dark:text-blue-400">Cache Hits</div>
+                          <div className="text-xs text-blue-600 dark:text-blue-400">Jobs Found</div>
                         </div>
                       )}
                     </div>
