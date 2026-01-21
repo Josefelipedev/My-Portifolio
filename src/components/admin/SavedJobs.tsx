@@ -79,6 +79,8 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
   // Manual job entry state
   const [addingJob, setAddingJob] = useState(false);
   const [savingJob, setSavingJob] = useState(false);
+  const [extractingJob, setExtractingJob] = useState(false);
+  const [pasteText, setPasteText] = useState('');
   const [manualJob, setManualJob] = useState({
     title: '',
     company: '',
@@ -258,6 +260,47 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
       setTimeout(() => setCopied(false), 3000);
     } catch {
       showError('Failed to copy to clipboard');
+    }
+  };
+
+  const handleExtractJobInfo = async () => {
+    if (!pasteText || pasteText.trim().length < 20) {
+      showError('Cole pelo menos 20 caracteres de informacao da vaga');
+      return;
+    }
+
+    try {
+      setExtractingJob(true);
+      const response = await fetch('/api/jobs/extract', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: pasteText }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to extract job info');
+      }
+
+      // Fill the form with extracted data
+      setManualJob({
+        title: data.title || '',
+        company: data.company || '',
+        description: data.description || pasteText,
+        url: data.url || '',
+        location: data.location || '',
+        salary: data.salary || '',
+        jobType: data.jobType || '',
+        tags: data.tags || '',
+      });
+
+      setPasteText('');
+      showSuccess('Informacoes extraidas! Revise e salve.');
+    } catch (err) {
+      showError(err instanceof Error ? err.message : 'Falha ao extrair informacoes');
+    } finally {
+      setExtractingJob(false);
     }
   };
 
@@ -556,7 +599,11 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
                   Adicionar Vaga Manualmente
                 </h3>
                 <button
-                  onClick={() => setAddingJob(false)}
+                  onClick={() => {
+                    setAddingJob(false);
+                    setPasteText('');
+                    setManualJob({ title: '', company: '', description: '', url: '', location: '', salary: '', jobType: '', tags: '' });
+                  }}
                   className="p-1 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -565,6 +612,57 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
                 </button>
               </div>
               <div className="p-4 space-y-4">
+                {/* AI Extraction Section */}
+                <div className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border border-purple-200 dark:border-purple-800 rounded-xl p-4">
+                  <h4 className="text-sm font-medium text-purple-700 dark:text-purple-300 mb-2 flex items-center gap-2">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                    Extracao Automatica com IA
+                  </h4>
+                  <p className="text-xs text-purple-600 dark:text-purple-400 mb-3">
+                    Cole a informacao da vaga e a IA extrai automaticamente titulo, empresa, descricao, etc.
+                  </p>
+                  <textarea
+                    value={pasteText}
+                    onChange={(e) => setPasteText(e.target.value)}
+                    rows={4}
+                    placeholder="Cole aqui a descricao completa da vaga, email recebido, ou qualquer texto com informacoes da vaga..."
+                    className="w-full px-3 py-2 border border-purple-300 dark:border-purple-600 rounded-lg bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 text-sm"
+                  />
+                  <button
+                    onClick={handleExtractJobInfo}
+                    disabled={extractingJob || pasteText.trim().length < 20}
+                    className="mt-2 w-full px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:from-purple-600 hover:to-pink-600 disabled:opacity-50 flex items-center justify-center gap-2 font-medium"
+                  >
+                    {extractingJob ? (
+                      <>
+                        <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        </svg>
+                        Extraindo informacoes...
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                        Extrair com IA
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-zinc-200 dark:border-zinc-700"></div>
+                  </div>
+                  <div className="relative flex justify-center text-xs">
+                    <span className="px-2 bg-white dark:bg-zinc-800 text-zinc-500">ou preencha manualmente</span>
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
@@ -599,8 +697,8 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
                   <textarea
                     value={manualJob.description}
                     onChange={(e) => setManualJob({ ...manualJob, description: e.target.value })}
-                    rows={6}
-                    placeholder="Cole a descricao da vaga aqui..."
+                    rows={4}
+                    placeholder="Descricao da vaga..."
                     className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100"
                   />
                 </div>
@@ -1333,7 +1431,11 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
                 Adicionar Vaga Manualmente
               </h3>
               <button
-                onClick={() => setAddingJob(false)}
+                onClick={() => {
+                  setAddingJob(false);
+                  setPasteText('');
+                  setManualJob({ title: '', company: '', description: '', url: '', location: '', salary: '', jobType: '', tags: '' });
+                }}
                 className="p-1 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1342,6 +1444,57 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
               </button>
             </div>
             <div className="p-4 space-y-4">
+              {/* AI Extraction Section */}
+              <div className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border border-purple-200 dark:border-purple-800 rounded-xl p-4">
+                <h4 className="text-sm font-medium text-purple-700 dark:text-purple-300 mb-2 flex items-center gap-2">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                  Extracao Automatica com IA
+                </h4>
+                <p className="text-xs text-purple-600 dark:text-purple-400 mb-3">
+                  Cole a informacao da vaga e a IA extrai automaticamente titulo, empresa, descricao, etc.
+                </p>
+                <textarea
+                  value={pasteText}
+                  onChange={(e) => setPasteText(e.target.value)}
+                  rows={4}
+                  placeholder="Cole aqui a descricao completa da vaga, email recebido, ou qualquer texto com informacoes da vaga..."
+                  className="w-full px-3 py-2 border border-purple-300 dark:border-purple-600 rounded-lg bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 text-sm"
+                />
+                <button
+                  onClick={handleExtractJobInfo}
+                  disabled={extractingJob || pasteText.trim().length < 20}
+                  className="mt-2 w-full px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:from-purple-600 hover:to-pink-600 disabled:opacity-50 flex items-center justify-center gap-2 font-medium"
+                >
+                  {extractingJob ? (
+                    <>
+                      <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                      Extraindo informacoes...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                      </svg>
+                      Extrair com IA
+                    </>
+                  )}
+                </button>
+              </div>
+
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-zinc-200 dark:border-zinc-700"></div>
+                </div>
+                <div className="relative flex justify-center text-xs">
+                  <span className="px-2 bg-white dark:bg-zinc-800 text-zinc-500">ou preencha manualmente</span>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
@@ -1376,8 +1529,8 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
                 <textarea
                   value={manualJob.description}
                   onChange={(e) => setManualJob({ ...manualJob, description: e.target.value })}
-                  rows={6}
-                  placeholder="Cole a descricao da vaga aqui..."
+                  rows={4}
+                  placeholder="Descricao da vaga..."
                   className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100"
                 />
               </div>
