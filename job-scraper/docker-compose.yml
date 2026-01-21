@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  job-scraper:
+    build: .
+    container_name: job-scraper
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - SCRAPER_TIMEOUT=30
+      - CACHE_TTL=300
+      - LOG_LEVEL=INFO
+      # Connect to existing Redis server
+      - REDIS_URL=redis://host.docker.internal:6379/1
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./app:/app
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3

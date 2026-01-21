@@ -1,4 +1,6 @@
 import Together from 'together-ai';
+import type { Prisma } from '@prisma/client';
+import { trackAIUsage, estimateTokens, checkQuotaLimits, type AIFeature } from './ai-tracking';
 
 // AI Provider types
 type AIProvider = 'ollama' | 'together' | 'anthropic';
@@ -122,6 +124,86 @@ async function callAI(prompt: string, maxTokens = 500): Promise<string> {
   }
 }
 
+// AI call with usage tracking
+export async function callAIWithTracking(
+  prompt: string,
+  feature: AIFeature,
+  options: {
+    maxTokens?: number;
+    temperature?: number;
+    metadata?: Prisma.InputJsonValue;
+    checkQuota?: boolean;
+  } = {}
+): Promise<{ content: string; inputTokens: number; outputTokens: number }> {
+  const config = getAIConfig();
+
+  // Check quota limits before calling (only for Together AI)
+  if (options.checkQuota !== false && config.provider === 'together') {
+    const quotaCheck = await checkQuotaLimits();
+    if (!quotaCheck.withinLimits) {
+      throw new Error(
+        `AI quota exceeded. Daily: $${quotaCheck.dailyUsed.toFixed(2)}/$${quotaCheck.dailyLimit}, Monthly: $${quotaCheck.monthlyUsed.toFixed(2)}/$${quotaCheck.monthlyLimit}`
+      );
+    }
+  }
+
+  const startTime = Date.now();
+  let success = true;
+  let error: string | undefined;
+  let inputTokens = 0;
+  let outputTokens = 0;
+  let content = '';
+
+  try {
+    // Only track Together AI calls (Ollama is free, Anthropic has its own billing)
+    if (config.provider === 'together') {
+      const client = getTogetherClient();
+
+      const response = await client.chat.completions.create({
+        model: config.model,
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: options.maxTokens || 500,
+        temperature: options.temperature || 0.7,
+      });
+
+      inputTokens = response.usage?.prompt_tokens || estimateTokens(prompt);
+      outputTokens =
+        response.usage?.completion_tokens ||
+        estimateTokens(response.choices[0]?.message?.content || '');
+      content = response.choices[0]?.message?.content?.trim() || '';
+    } else {
+      // For other providers, just call the standard function
+      content = await callAI(prompt, options.maxTokens);
+      inputTokens = estimateTokens(prompt);
+      outputTokens = estimateTokens(content);
+    }
+
+    return { content, inputTokens, outputTokens };
+  } catch (err) {
+    success = false;
+    error = err instanceof Error ? err.message : 'Unknown error';
+    throw err;
+  } finally {
+    const latencyMs = Date.now() - startTime;
+
+    // Track usage (fire and forget)
+    if (config.provider === 'together') {
+      trackAIUsage({
+        feature,
+        model: config.model,
+        inputTokens,
+        outputTokens,
+        latencyMs,
+        success,
+        error,
+        metadata: options.metadata,
+      }).catch(() => {
+        // Silently ignore tracking errors
+      });
+    }
+  }
+}
+
 interface SummarizeInput {
   repoName: string;
   description: string | null;
@@ -146,7 +228,12 @@ ${input.readme ? `README (first 3000 chars):\n${input.readme.slice(0, 3000)}` : 
 
 Write only the summary, no introduction or extra text.`;
 
-  return callAI(prompt);
+  const { content } = await callAIWithTracking(prompt, 'project-summary', {
+    maxTokens: 500,
+    temperature: 0.7,
+    metadata: { repoName: input.repoName },
+  });
+  return content;
 }
 
 export async function generateBioSuggestion(
@@ -165,7 +252,12 @@ ${repoList}
 
 Write only the bio, no introduction or extra text.`;
 
-  return callAI(prompt);
+  const { content } = await callAIWithTracking(prompt, 'bio-generation', {
+    maxTokens: 500,
+    temperature: 0.7,
+    metadata: { repoCount: repos.length },
+  });
+  return content;
 }
 
 // Export current provider info for UI
@@ -209,7 +301,11 @@ IMPORTANT:
 
 Respond ONLY with the JSON object. No other text.`;
 
-  const response = await callAI(prompt, 1000);
+  const { content: response } = await callAIWithTracking(prompt, 'readme-analysis', {
+    maxTokens: 1000,
+    temperature: 0.3,
+    metadata: { title },
+  });
 
   try {
     const jsonMatch = response.match(/\{[\s\S]*\}/);
@@ -283,7 +379,11 @@ For each skill, provide:
 Respond ONLY with a valid JSON array. No other text. Example:
 [{"name":"React","category":"frontend","level":4,"reason":"Used in 5 projects including complex dashboards"},{"name":"Node.js","category":"backend","level":3,"reason":"Backend of 3 projects"}]`;
 
-  const response = await callAI(prompt);
+  const { content: response } = await callAIWithTracking(prompt, 'skills-suggestion', {
+    maxTokens: 2000,
+    temperature: 0.5,
+    metadata: { projectCount: input.projects.length, experienceCount: input.experiences.length },
+  });
 
   try {
     // Try to extract JSON from the response
@@ -429,7 +529,10 @@ IMPORTANT:
 
 Respond ONLY with the JSON object. No other text.`;
 
-  const response = await callAI(prompt, 4000);
+  const { content: response } = await callAIWithTracking(prompt, 'resume-analysis', {
+    maxTokens: 4000,
+    temperature: 0.3,
+  });
 
   try {
     // Extract JSON from response

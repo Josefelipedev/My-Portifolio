@@ -4,14 +4,31 @@ import { jwtVerify } from 'jose';
 
 // Routes that require authentication
 const protectedRoutes = ['/admin', '/admin/github', '/admin/projects', '/admin/experiences'];
-const protectedApiRoutes = ['/api/projects', '/api/experiences', '/api/github/import', '/api/summarize', '/api/logout'];
+const protectedApiRoutes = ['/api/projects', '/api/experiences', '/api/github/import', '/api/summarize', '/api/logout', '/api/admin'];
 
 // Routes that don't need auth
 const publicRoutes = ['/admin/login', '/api/auth/login', '/api/auth/verify', '/api/login'];
 
+// Routes that require CSRF validation for state-changing methods
+const csrfProtectedRoutes = [
+  '/api/projects',
+  '/api/experiences',
+  '/api/github/import',
+  '/api/summarize',
+  '/api/skills',
+  '/api/contact',
+  '/api/config',
+  '/api/admin',
+];
+
+// CSRF cookie and header names
+const CSRF_COOKIE = 'csrf_token';
+const CSRF_HEADER = 'x-csrf-token';
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const token = request.cookies.get('auth_token')?.value;
+  const method = request.method.toUpperCase();
 
   // Skip public routes
   if (publicRoutes.some(route => pathname === route || pathname.startsWith(route))) {
@@ -21,6 +38,25 @@ export async function middleware(request: NextRequest) {
   // Check if route needs protection
   const isProtectedPage = protectedRoutes.some(route => pathname === route || pathname.startsWith(route + '/'));
   const isProtectedApi = protectedApiRoutes.some(route => pathname.startsWith(route));
+
+  // CSRF validation for state-changing requests
+  const isStateChangingMethod = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method);
+  const needsCSRF = csrfProtectedRoutes.some(route => pathname.startsWith(route)) && isStateChangingMethod;
+
+  if (needsCSRF) {
+    const csrfCookie = request.cookies.get(CSRF_COOKIE)?.value;
+    const csrfHeader = request.headers.get(CSRF_HEADER);
+
+    // Validate CSRF token
+    if (!csrfCookie || !csrfHeader || csrfCookie !== csrfHeader || csrfCookie.length !== 64) {
+      // Log the CSRF failure (will be picked up by audit system if needed)
+      console.warn(`CSRF validation failed for ${method} ${pathname}`);
+      return NextResponse.json(
+        { error: 'Invalid CSRF token' },
+        { status: 403 }
+      );
+    }
+  }
 
   if (!isProtectedPage && !isProtectedApi) {
     return NextResponse.next();

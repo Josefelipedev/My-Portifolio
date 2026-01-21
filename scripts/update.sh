@@ -44,4 +44,26 @@ if [ $? -ne 0 ]; then
 fi
 echo -e "${GREEN}✅ Build completed${NC}"
 
+# Update Job Scraper Docker service
+if [ -d "job-scraper" ]; then
+    echo -e "${YELLOW}🐳 Updating Job Scraper Docker service...${NC}"
+    cd job-scraper
+
+    # Build and restart container
+    docker-compose build
+    if [ $? -ne 0 ]; then
+        echo -e "${RED}❌ Failed to build Job Scraper${NC}"
+        cd ..
+    else
+        docker-compose down 2>/dev/null || true
+        docker-compose up -d
+        if [ $? -ne 0 ]; then
+            echo -e "${RED}❌ Failed to start Job Scraper${NC}"
+        else
+            echo -e "${GREEN}✅ Job Scraper updated${NC}"
+        fi
+        cd ..
+    fi
+fi
+
 echo -e "${GREEN}🎉 Update completed successfully!${NC}"

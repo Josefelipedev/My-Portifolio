@@ -3,6 +3,7 @@
 import type { JobListing, JobSearchParams } from '../types';
 import { extractJobsWithAI } from '../ai-extraction';
 import { cleanHtmlText } from '../helpers';
+import { searchGeekHunterPython, isPythonScraperAvailable } from './python-scraper';
 
 interface GeekHunterJob {
   title: string;
@@ -59,7 +60,7 @@ export async function searchGeekHunter(params: JobSearchParams): Promise<JobList
       jobs = parseGeekHunterHTML(html);
     }
 
-    return jobs.slice(0, params.limit || 50).map((job, index) => ({
+    const results = jobs.slice(0, params.limit || 50).map((job, index) => ({
       id: `geekhunter-${Date.now()}-${index}`,
       source: 'geekhunter' as const,
       title: job.title,
@@ -73,10 +74,32 @@ export async function searchGeekHunter(params: JobSearchParams): Promise<JobList
       postedAt: undefined,
       country: 'br',
     }));
+
+    // If no results from JS scraping, try Python scraper as fallback
+    if (results.length === 0) {
+      console.log('GeekHunter: No results from JS scraping, trying Python scraper fallback');
+      return tryPythonScraperFallback(params);
+    }
+
+    return results;
   } catch (error) {
     console.error('GeekHunter scraping error:', error);
-    return [];
+    // Try Python scraper as fallback on error
+    return tryPythonScraperFallback(params);
   }
+}
+
+async function tryPythonScraperFallback(params: JobSearchParams): Promise<JobListing[]> {
+  try {
+    const available = await isPythonScraperAvailable();
+    if (available) {
+      console.log('GeekHunter: Using Python scraper fallback');
+      return searchGeekHunterPython(params);
+    }
+  } catch (fallbackError) {
+    console.error('GeekHunter: Python scraper fallback also failed:', fallbackError);
+  }
+  return [];
 }
 
 function parseGeekHunterHTML(html: string): GeekHunterJob[] {

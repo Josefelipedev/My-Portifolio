@@ -2,6 +2,7 @@
 
 import Together from 'together-ai';
 import resumeData from '@/data/resume.json';
+import { trackAIUsage, estimateTokens, checkQuotaLimits } from '../ai-tracking';
 
 export interface AlertSuggestion {
   name: string;
@@ -44,6 +45,13 @@ export async function generateAlertSuggestions(): Promise<AlertSuggestion[]> {
     return generateRuleBasedSuggestions(resume);
   }
 
+  const startTime = Date.now();
+  const model = process.env.TOGETHER_MODEL || 'meta-llama/Llama-3.3-70B-Instruct-Turbo';
+  let inputTokens = 0;
+  let outputTokens = 0;
+  let success = true;
+  let errorMessage: string | undefined;
+
   const prompt = `You are a tech recruitment expert. Analyze the resume below and suggest personalized job alerts.
 
 ## Resume:
@@ -77,14 +85,25 @@ Consider:
 Respond with ONLY the JSON array.`;
 
   try {
+    // Check quota before making the call
+    const quotaCheck = await checkQuotaLimits();
+    if (!quotaCheck.withinLimits) {
+      console.log('Alert suggestions: Quota exceeded, using rule-based fallback');
+      return generateRuleBasedSuggestions(resume);
+    }
+
     const response = await client.chat.completions.create({
-      model: process.env.TOGETHER_MODEL || 'meta-llama/Llama-3.3-70B-Instruct-Turbo',
+      model,
       messages: [{ role: 'user', content: prompt }],
       max_tokens: 1500,
       temperature: 0.7,
     });
 
+    inputTokens = response.usage?.prompt_tokens || estimateTokens(prompt);
+    outputTokens = response.usage?.completion_tokens || 0;
+
     const content = response.choices[0]?.message?.content || '';
+    outputTokens = outputTokens || estimateTokens(content);
 
     // Extract JSON array from response
     const jsonMatch = content.match(/\[[\s\S]*\]/);
@@ -104,8 +123,26 @@ Respond with ONLY the JSON array.`;
       }))
       .slice(0, 5);
   } catch (error) {
+    success = false;
+    errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error('AI suggestion error:', error);
     return generateRuleBasedSuggestions(resume);
+  } finally {
+    const latencyMs = Date.now() - startTime;
+
+    // Track usage
+    trackAIUsage({
+      feature: 'alert-suggestions',
+      model,
+      inputTokens,
+      outputTokens,
+      latencyMs,
+      success,
+      error: errorMessage,
+      metadata: { skillCount: resume.skills.length },
+    }).catch(() => {
+      // Silently ignore tracking errors
+    });
   }
 }
 

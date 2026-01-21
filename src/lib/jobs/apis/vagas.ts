@@ -3,6 +3,7 @@
 import type { JobListing, JobSearchParams } from '../types';
 import { extractJobsWithAI } from '../ai-extraction';
 import { cleanHtmlText } from '../helpers';
+import { searchVagasComBrPython, isPythonScraperAvailable } from './python-scraper';
 
 interface VagasComBrJob {
   title: string;
@@ -51,7 +52,7 @@ export async function searchVagasComBr(params: JobSearchParams): Promise<JobList
       jobs = parseVagasComBrHTML(html);
     }
 
-    return jobs.slice(0, params.limit || 50).map((job, index) => ({
+    const results = jobs.slice(0, params.limit || 50).map((job, index) => ({
       id: `vagascombr-${Date.now()}-${index}`,
       source: 'vagascombr' as const,
       title: job.title,
@@ -64,10 +65,32 @@ export async function searchVagasComBr(params: JobSearchParams): Promise<JobList
       postedAt: undefined,
       country: 'br',
     }));
+
+    // If no results from JS scraping, try Python scraper as fallback
+    if (results.length === 0) {
+      console.log('Vagas.com.br: No results from JS scraping, trying Python scraper fallback');
+      return tryPythonScraperFallback(params);
+    }
+
+    return results;
   } catch (error) {
     console.error('Vagas.com.br scraping error:', error);
-    return [];
+    // Try Python scraper as fallback on error
+    return tryPythonScraperFallback(params);
   }
+}
+
+async function tryPythonScraperFallback(params: JobSearchParams): Promise<JobListing[]> {
+  try {
+    const available = await isPythonScraperAvailable();
+    if (available) {
+      console.log('Vagas.com.br: Using Python scraper fallback');
+      return searchVagasComBrPython(params);
+    }
+  } catch (fallbackError) {
+    console.error('Vagas.com.br: Python scraper fallback also failed:', fallbackError);
+  }
+  return [];
 }
 
 function parseVagasComBrHTML(html: string): VagasComBrJob[] {

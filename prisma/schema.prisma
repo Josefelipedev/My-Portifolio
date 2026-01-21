@@ -350,3 +350,71 @@ model WakaTimeYearCache {
 
   @@index([year])
 }
+
+// ==========================================
+// AI Usage Tracking
+// ==========================================
+
+model AIUsageLog {
+  id            String   @id @default(cuid())
+  feature       String   // 'job-extraction', 'project-summary', etc.
+  model         String   // 'meta-llama/Llama-3.3-70B-Instruct-Turbo'
+  inputTokens   Int
+  outputTokens  Int
+  totalTokens   Int
+  cost          Float    // Cost in USD
+  latencyMs     Int      // Response time
+  success       Boolean  @default(true)
+  error         String?  @db.Text // Error message if failed
+  metadata      Json?    // Extra data (ex: jobCount, projectId)
+  createdAt     DateTime @default(now())
+
+  @@index([feature])
+  @@index([createdAt])
+  @@index([success])
+}
+
+model AIUsageQuota {
+  id            String   @id @default("main")
+  dailyLimit    Float    @default(5.0)   // Daily limit in USD
+  monthlyLimit  Float    @default(50.0)  // Monthly limit in USD
+  alertAt       Float    @default(0.8)   // Alert at 80% of limit
+  updatedAt     DateTime @updatedAt
+}
+
+// ==========================================
+// Rate Limiting (Persistent)
+// ==========================================
+
+model RateLimitEntry {
+  id           String    @id @default(cuid())
+  key          String    @unique // IP + action identifier
+  count        Int       @default(1)
+  windowStart  DateTime
+  blockedUntil DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([windowStart])
+  @@index([blockedUntil])
+}
+
+// ==========================================
+// Security Audit Logging
+// ==========================================
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  action    String   // 'login', 'project.create', 'settings.update', etc.
+  userId    String?  // null for anonymous actions
+  ip        String
+  userAgent String?  @db.Text
+  resource  String?  // Resource affected (e.g., 'project:abc123')
+  details   Json?    // Additional context
+  success   Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@index([action])
+  @@index([userId])
+  @@index([createdAt])
+}
