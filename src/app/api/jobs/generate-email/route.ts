@@ -56,6 +56,11 @@ export async function POST(request: Request) {
     let success = true;
     let errorMessage: string | undefined;
 
+    // Portfolio URL
+    const portfolioUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://josefelipe.dev';
+    const linkedinUrl = personalInfo?.linkedin ? `https://linkedin.com/in/${personalInfo.linkedin}` : '';
+    const githubUrl = personalInfo?.github ? `https://github.com/${personalInfo.github}` : '';
+
     try {
       const prompt = `You are a professional career coach helping someone write a job application email.
 
@@ -63,6 +68,9 @@ CANDIDATE'S RESUME:
 Name: ${personalInfo?.name || 'Not specified'}
 Email: ${personalInfo?.email || 'Not specified'}
 Phone: ${personalInfo?.phone || 'Not specified'}
+Portfolio: ${portfolioUrl}
+LinkedIn: ${linkedinUrl}
+GitHub: ${githubUrl}
 Summary: ${summary}
 Skills: ${skills}
 Experience: ${experience}
@@ -79,10 +87,12 @@ Requirements:
 1. The email should be warm but professional
 2. Highlight relevant skills from the resume that match the job
 3. Show genuine interest in the company and position
-4. Keep it concise (max 200 words)
+4. Keep it concise (max 250 words)
 5. Include a clear call to action
 6. Do NOT use generic phrases like "[Your name]" - use the actual name from the resume
 7. Make it sound natural, not robotic
+8. ALWAYS include the portfolio URL (${portfolioUrl}) in the signature
+9. Include LinkedIn and GitHub links in the signature
 
 Return ONLY a JSON object with this format:
 {
