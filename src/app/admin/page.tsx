@@ -66,6 +66,15 @@ export default async function AdminPage() {
               GitHub
             </Link>
             <Link
+              href="/admin/wakatime"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-500 text-white text-sm font-medium rounded-lg hover:bg-indigo-600 transition-colors"
+            >
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm0 2.824a9.176 9.176 0 110 18.352 9.176 9.176 0 010-18.352zm-.002 2.39a6.787 6.787 0 100 13.573 6.787 6.787 0 000-13.574zm0 2.822a3.965 3.965 0 110 7.93 3.965 3.965 0 010-7.93z"/>
+              </svg>
+              WakaTime
+            </Link>
+            <Link
               href="/"
               className="px-3 py-1.5 bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-sm font-medium rounded-lg hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-colors"
             >

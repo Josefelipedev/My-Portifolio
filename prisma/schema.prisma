@@ -115,6 +115,9 @@ model SiteConfig {
   twitterUrl  String?
   email       String?
   location    String?
+
+  // WakaTime Configuration (JSON)
+  wakatimeConfig String? @db.Text
 }
 
 // ==========================================
