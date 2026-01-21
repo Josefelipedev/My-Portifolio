@@ -10,6 +10,7 @@ interface WakaTimeConfig {
   showBestDay: boolean;
   showAllTime: boolean;
   showYearlyStats: boolean;
+  showYearSelector: boolean;
   showLanguages: boolean;
   showEditors: boolean;
   showOS: boolean;
@@ -26,6 +27,7 @@ const DEFAULT_CONFIG: WakaTimeConfig = {
   showBestDay: true,
   showAllTime: true,
   showYearlyStats: true,
+  showYearSelector: true,
   showLanguages: true,
   showEditors: true,
   showOS: true,
@@ -103,7 +105,8 @@ export default function WakaTimeAdminPage() {
     { key: 'showDailyAverage', label: 'Média Diária', description: 'Mostra a média de horas por dia' },
     { key: 'showBestDay', label: 'Melhor Dia', description: 'Mostra o dia com mais horas de código' },
     { key: 'showAllTime', label: 'Tempo Total Geral', description: 'Mostra o total de horas desde o início do uso do WakaTime' },
-    { key: 'showYearlyStats', label: 'Estatísticas Anuais', description: 'Mostra uma seção com estatísticas dos últimos 365 dias (linguagens, projetos, etc.)' },
+    { key: 'showYearlyStats', label: 'Estatísticas Anuais', description: 'Mostra uma seção com estatísticas anuais (linguagens, projetos, etc.)' },
+    { key: 'showYearSelector', label: 'Botões de Seleção de Ano', description: 'Mostra os botões para o visitante escolher qual ano visualizar' },
     { key: 'showLanguages', label: 'Linguagens', description: 'Mostra as linguagens de programação mais usadas' },
     { key: 'showEditors', label: 'Editores', description: 'Mostra os editores de código mais usados' },
     { key: 'showOS', label: 'Sistemas Operacionais', description: 'Mostra os sistemas operacionais utilizados' },

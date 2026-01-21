@@ -9,6 +9,7 @@ export interface WakaTimeConfig {
   showBestDay: boolean;
   showAllTime: boolean;
   showYearlyStats: boolean;
+  showYearSelector: boolean;
   showLanguages: boolean;
   showEditors: boolean;
   showOS: boolean;
@@ -25,6 +26,7 @@ const DEFAULT_CONFIG: WakaTimeConfig = {
   showBestDay: true,
   showAllTime: true,
   showYearlyStats: true,
+  showYearSelector: true,
   showLanguages: true,
   showEditors: true,
   showOS: true,

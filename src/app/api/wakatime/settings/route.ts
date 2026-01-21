@@ -10,6 +10,7 @@ export interface WakaTimeConfig {
   showBestDay: boolean;
   showAllTime: boolean;
   showYearlyStats: boolean;
+  showYearSelector: boolean; // Show year selection buttons at top
   showLanguages: boolean;
   showEditors: boolean;
   showOS: boolean;
@@ -26,6 +27,7 @@ const DEFAULT_CONFIG: WakaTimeConfig = {
   showBestDay: true,
   showAllTime: true,
   showYearlyStats: true,
+  showYearSelector: true,
   showLanguages: true,
   showEditors: true,
   showOS: true,
@@ -76,6 +78,7 @@ export async function PUT(request: Request) {
       showBestDay: typeof body.showBestDay === 'boolean' ? body.showBestDay : DEFAULT_CONFIG.showBestDay,
       showAllTime: typeof body.showAllTime === 'boolean' ? body.showAllTime : DEFAULT_CONFIG.showAllTime,
       showYearlyStats: typeof body.showYearlyStats === 'boolean' ? body.showYearlyStats : DEFAULT_CONFIG.showYearlyStats,
+      showYearSelector: typeof body.showYearSelector === 'boolean' ? body.showYearSelector : DEFAULT_CONFIG.showYearSelector,
       showLanguages: typeof body.showLanguages === 'boolean' ? body.showLanguages : DEFAULT_CONFIG.showLanguages,
       showEditors: typeof body.showEditors === 'boolean' ? body.showEditors : DEFAULT_CONFIG.showEditors,
       showOS: typeof body.showOS === 'boolean' ? body.showOS : DEFAULT_CONFIG.showOS,

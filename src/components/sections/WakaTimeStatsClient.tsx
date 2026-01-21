@@ -57,6 +57,7 @@ interface WakaTimeConfig {
   showBestDay: boolean;
   showAllTime: boolean;
   showYearlyStats: boolean;
+  showYearSelector: boolean;
   showLanguages: boolean;
   showEditors: boolean;
   showOS: boolean;
@@ -321,7 +322,7 @@ export function WakaTimeStatsClient({ stats, allTimeStats, yearlyStats, yearlySt
           </p>
 
           {/* Year Selection Buttons */}
-          {config.showYearlyStats && (availableYears.length > 0 || yearlyStats) && (
+          {config.showYearSelector && config.showYearlyStats && (availableYears.length > 0 || yearlyStats) && (
             <div className="flex flex-wrap justify-center gap-2 mt-6">
               {yearlyStats && (
                 <button
