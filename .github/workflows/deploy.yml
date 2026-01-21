@@ -22,7 +22,7 @@ jobs:
             git pull origin main
             npm install --production=false
             npx prisma generate
-            npx prisma db push --skip-generate
+            npx prisma db push
             npm run build
             pm2 restart myportfolio
             echo "Deploy complete!"
