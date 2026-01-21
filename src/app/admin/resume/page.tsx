@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import Link from 'next/link';
+import AdminLayout from '@/components/admin/AdminLayout';
 
 interface Experience {
   title: string;
@@ -347,23 +347,11 @@ export default function ResumeAdminPage() {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-900 p-4 md:p-8">
+    <AdminLayout
+      title="Resume Analyzer"
+      subtitle="Upload your resume PDF and let AI extract structured data"
+    >
       <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-zinc-900 dark:text-zinc-100">Resume Analyzer</h1>
-            <p className="text-zinc-600 dark:text-zinc-400 mt-1 text-sm md:text-base">
-              Upload your resume PDF and let AI extract structured data
-            </p>
-          </div>
-          <Link
-            href="/admin"
-            className="px-4 py-2 bg-zinc-200 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-lg hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-colors text-center"
-          >
-            Back
-          </Link>
-        </div>
 
         {/* Step Indicator */}
         <div className="flex items-center justify-center mb-8">
@@ -869,6 +857,6 @@ export default function ResumeAdminPage() {
           </div>
         )}
       </div>
-    </div>
+    </AdminLayout>
   );
 }
