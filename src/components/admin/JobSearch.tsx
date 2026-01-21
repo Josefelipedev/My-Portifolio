@@ -123,74 +123,6 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
     sortBy: 'date',
   });
 
-  // Email composer state
-  const [emailJob, setEmailJob] = useState<JobListing | null>(null);
-  const [emailTo, setEmailTo] = useState('');
-  const [emailSubject, setEmailSubject] = useState('');
-  const [emailBody, setEmailBody] = useState('');
-  const [sendingEmail, setSendingEmail] = useState(false);
-
-  // Open email composer for a job
-  const openEmailComposer = (job: JobListing) => {
-    setEmailJob(job);
-    setEmailTo('');
-    setEmailSubject(`Candidatura: ${job.title} - ${job.company}`);
-    setEmailBody(`Olá,
-
-Gostaria de me candidatar à vaga de ${job.title} na ${job.company}.
-
-Link da vaga: ${job.url}
-
-Atenciosamente,
-[Seu nome]`);
-  };
-
-  // Send email
-  const handleSendEmail = async () => {
-    if (!emailTo || !emailSubject || !emailBody || !emailJob) {
-      toast.showError('Preencha todos os campos');
-      return;
-    }
-
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(emailTo)) {
-      toast.showError('Email inválido');
-      return;
-    }
-
-    try {
-      setSendingEmail(true);
-      const response = await fetch('/api/jobs/saved/send-email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          to: emailTo,
-          subject: emailSubject,
-          body: emailBody,
-          jobTitle: emailJob.title,
-          jobCompany: emailJob.company,
-          jobUrl: emailJob.url,
-        }),
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Erro ao enviar email');
-      }
-
-      toast.showSuccess('Email enviado com sucesso!');
-      setEmailJob(null);
-      setEmailTo('');
-      setEmailSubject('');
-      setEmailBody('');
-    } catch (err) {
-      toast.showError(err instanceof Error ? err.message : 'Erro ao enviar email');
-    } finally {
-      setSendingEmail(false);
-    }
-  };
-
   // Apply filters to jobs
   const filteredJobs = useMemo(() => {
     return applyJobFilters(jobs, filters);
@@ -964,16 +896,6 @@ Atenciosamente,
                       View Job
                     </a>
                     <button
-                      onClick={() => openEmailComposer(job)}
-                      className="px-3 py-1.5 text-sm bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-800/50 transition-colors flex items-center gap-1"
-                      title="Enviar email para esta vaga"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                      </svg>
-                      Email
-                    </button>
-                    <button
                       onClick={() => handleSaveJob(job)}
                       disabled={saving === job.id || savedIds.has(job.id)}
                       className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors flex items-center gap-1 ${
@@ -1067,104 +989,6 @@ Atenciosamente,
         </div>
       )}
 
-      {/* Email Composer Modal */}
-      {emailJob && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-zinc-800 rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-                  Enviar Email
-                </h3>
-                <button
-                  onClick={() => setEmailJob(null)}
-                  className="p-1 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-
-              {/* Job Info */}
-              <div className="mb-4 p-3 bg-zinc-50 dark:bg-zinc-700/50 rounded-lg">
-                <p className="font-medium text-zinc-900 dark:text-zinc-100">{emailJob.title}</p>
-                <p className="text-sm text-zinc-500 dark:text-zinc-400">{emailJob.company}</p>
-              </div>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
-                    Para (email do recrutador/empresa)
-                  </label>
-                  <input
-                    type="email"
-                    value={emailTo}
-                    onChange={(e) => setEmailTo(e.target.value)}
-                    placeholder="recrutador@empresa.com"
-                    className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
-                    Assunto
-                  </label>
-                  <input
-                    type="text"
-                    value={emailSubject}
-                    onChange={(e) => setEmailSubject(e.target.value)}
-                    className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
-                    Mensagem
-                  </label>
-                  <textarea
-                    value={emailBody}
-                    onChange={(e) => setEmailBody(e.target.value)}
-                    rows={10}
-                    className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 resize-none"
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-3 mt-6">
-                <button
-                  onClick={() => setEmailJob(null)}
-                  className="px-4 py-2 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={handleSendEmail}
-                  disabled={sendingEmail || !emailTo || !emailSubject || !emailBody}
-                  className="px-4 py-2 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 flex items-center gap-2"
-                >
-                  {sendingEmail ? (
-                    <>
-                      <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                      </svg>
-                      Enviando...
-                    </>
-                  ) : (
-                    <>
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                      </svg>
-                      Enviar Email
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
