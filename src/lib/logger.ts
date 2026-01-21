@@ -1,6 +1,7 @@
 // System Logger - Centralized logging with database persistence
 
 import prisma from './prisma';
+import type { Prisma } from '@prisma/client';
 
 export type LogLevel = 'error' | 'warn' | 'info' | 'debug';
 
@@ -71,7 +72,9 @@ class Logger {
           level: entry.level,
           source: entry.source,
           message: entry.message,
-          details: entry.details as Record<string, unknown> | undefined,
+          details: entry.details
+            ? (JSON.parse(JSON.stringify(entry.details)) as Prisma.InputJsonValue)
+            : undefined,
         })),
       });
     } catch (err) {
