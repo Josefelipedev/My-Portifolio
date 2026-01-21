@@ -96,8 +96,10 @@ export { searchLinkedIn } from './apis/linkedin';
 
 // Python Scraper exports
 export {
-  searchWithPythonScraper,
+  searchPythonScraper,
   isPythonScraperAvailable,
   getPythonScraperHealth,
   getPythonScraperSources,
+  searchGeekHunterPython,
+  searchVagasComBrPython,
 } from './apis/python-scraper';
