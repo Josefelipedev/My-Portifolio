@@ -1,7 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useToast } from '@/components/ui/Toast';
+import FilterPanel, { JobFilters, applyJobFilters } from './jobs/FilterPanel';
+import SearchHistory, { saveSearchToHistory } from './jobs/SearchHistory';
 
 interface JobListing {
   id: string;
@@ -94,6 +96,7 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
   const [maxAgeDays, setMaxAgeDays] = useState('0');
   const [jobs, setJobs] = useState<JobListing[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState<string | null>(null);
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
@@ -104,6 +107,24 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
   const [isSmartSearch, setIsSmartSearch] = useState(false);
   const [showSourceDropdown, setShowSourceDropdown] = useState(false);
   const [showCountryDropdown, setShowCountryDropdown] = useState(false);
+  // Pagination state
+  const [page, setPage] = useState(1);
+  const [totalJobs, setTotalJobs] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const PAGE_SIZE = 25;
+  // Advanced filters state
+  const [filters, setFilters] = useState<JobFilters>({
+    salaryMin: 0,
+    salaryMax: 500000,
+    jobType: 'all',
+    experienceLevel: 'all',
+    sortBy: 'date',
+  });
+
+  // Apply filters to jobs
+  const filteredJobs = useMemo(() => {
+    return applyJobFilters(jobs, filters);
+  }, [jobs, filters]);
 
   // Country multi-select functions
   const toggleCountry = (country: string) => {
@@ -216,21 +237,31 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
     return () => document.removeEventListener('click', handleClickOutside);
   }, [showSourceDropdown, showCountryDropdown]);
 
-  const handleSearch = async (e: React.FormEvent) => {
+  const handleSearch = async (e: React.FormEvent, loadMore = false) => {
     e.preventDefault();
     if (!keyword.trim()) return;
 
+    const currentPage = loadMore ? page + 1 : 1;
+
     try {
-      setLoading(true);
+      if (loadMore) {
+        setLoadingMore(true);
+      } else {
+        setLoading(true);
+        setPage(1);
+      }
       setError(null);
       setIsSmartSearch(false);
-      setSmartSearchKeywords([]);
+      if (!loadMore) {
+        setSmartSearchKeywords([]);
+      }
 
       const params = new URLSearchParams({
         keyword,
         country: getCountryParam(),
         source: getSourceParam(),
-        limit: '50',
+        page: String(currentPage),
+        pageSize: String(PAGE_SIZE),
         maxAgeDays,
       });
       const response = await fetch(`/api/jobs/search?${params}`);
@@ -240,7 +271,16 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
         throw new Error(data.error || 'Failed to search jobs');
       }
 
-      setJobs(data.jobs);
+      if (loadMore) {
+        setJobs(prev => [...prev, ...data.jobs]);
+      } else {
+        setJobs(data.jobs);
+        // Save to history (only for new searches, not load more)
+        saveSearchToHistory(keyword, getCountryParam(), getSourceParam(), data.total);
+      }
+      setPage(currentPage);
+      setTotalJobs(data.total);
+      setHasMore(data.hasMore);
       if (data.apis) {
         setApiStatus(data.apis);
       }
@@ -248,19 +288,32 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
       setError(err instanceof Error ? err.message : 'Search failed');
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   };
 
-  const handleSmartSearch = async () => {
+  const handleLoadMore = () => {
+    const fakeEvent = { preventDefault: () => {} } as React.FormEvent;
+    handleSearch(fakeEvent, true);
+  };
+
+  const handleSmartSearch = async (loadMore = false) => {
+    const currentPage = loadMore ? page + 1 : 1;
+
     try {
-      setLoading(true);
+      if (loadMore) {
+        setLoadingMore(true);
+      } else {
+        setLoading(true);
+        setPage(1);
+      }
       setError(null);
       setIsSmartSearch(true);
 
       const params = new URLSearchParams({
         country: getCountryParam(),
         source: getSourceParam(),
-        limit: '50',
+        limit: String(PAGE_SIZE * currentPage), // For smart search, fetch cumulative
         maxAgeDays,
       });
       const response = await fetch(`/api/jobs/smart-search?${params}`);
@@ -270,7 +323,18 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
         throw new Error(data.error || 'Failed to perform smart search');
       }
 
-      setJobs(data.jobs);
+      // Smart search returns all results at once, so we paginate client-side
+      const startIndex = loadMore ? jobs.length : 0;
+      const newJobs = data.jobs.slice(startIndex, startIndex + PAGE_SIZE);
+
+      if (loadMore) {
+        setJobs(prev => [...prev, ...newJobs]);
+      } else {
+        setJobs(newJobs);
+      }
+      setPage(currentPage);
+      setTotalJobs(data.total || data.jobs.length);
+      setHasMore(startIndex + PAGE_SIZE < data.jobs.length);
       setSmartSearchKeywords(data.keywords || []);
       if (data.apis) {
         setApiStatus(data.apis);
@@ -279,6 +343,28 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
       setError(err instanceof Error ? err.message : 'Smart search failed');
     } finally {
       setLoading(false);
+      setLoadingMore(false);
+    }
+  };
+
+  const handleSmartSearchLoadMore = () => {
+    handleSmartSearch(true);
+  };
+
+  // Handler for selecting a search from history
+  const handleSelectHistorySearch = (kw: string, countries: string, sources: string) => {
+    setKeyword(kw);
+    // Parse countries
+    if (countries === 'all') {
+      setSelectedCountries(new Set(['all']));
+    } else {
+      setSelectedCountries(new Set(countries.split(',')));
+    }
+    // Parse sources
+    if (sources === 'all') {
+      setSelectedSources(new Set(['all']));
+    } else {
+      setSelectedSources(new Set(sources.split(',')));
     }
   };
 
@@ -526,7 +612,7 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
           </button>
           <button
             type="button"
-            onClick={handleSmartSearch}
+            onClick={() => handleSmartSearch()}
             disabled={loading}
             className="px-6 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-medium rounded-lg hover:from-purple-600 hover:to-pink-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2"
             title="Busca inteligente baseada no seu curriculo"
@@ -550,6 +636,16 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
           </button>
         </div>
       </form>
+
+      {/* Search History */}
+      <SearchHistory onSelectSearch={handleSelectHistorySearch} />
+
+      {/* Advanced Filters */}
+      <FilterPanel
+        filters={filters}
+        onChange={setFilters}
+        isSmartSearch={isSmartSearch}
+      />
 
       {/* Search Suggestions */}
       <div className="mb-6 p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-xl border border-zinc-200 dark:border-zinc-700">
@@ -637,10 +733,22 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
       {/* Results */}
       {jobs.length > 0 && (
         <div className="space-y-4">
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">
-            Found {jobs.length} jobs
-          </p>
-          {jobs.map((job) => (
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">
+              Mostrando {filteredJobs.length} de {totalJobs} vagas
+              {filteredJobs.length !== jobs.length && (
+                <span className="text-zinc-400 dark:text-zinc-500">
+                  {' '}({jobs.length - filteredJobs.length} filtradas)
+                </span>
+              )}
+            </p>
+            {hasMore && (
+              <span className="text-xs text-zinc-400 dark:text-zinc-500">
+                Pagina {page}
+              </span>
+            )}
+          </div>
+          {filteredJobs.map((job) => (
             <div
               key={job.id}
               className="bg-white dark:bg-zinc-800 rounded-xl border border-zinc-200 dark:border-zinc-700 overflow-hidden"
@@ -817,6 +925,34 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
               </div>
             </div>
           ))}
+
+          {/* Load More Button */}
+          {hasMore && (
+            <div className="flex justify-center pt-6">
+              <button
+                onClick={isSmartSearch ? handleSmartSearchLoadMore : handleLoadMore}
+                disabled={loadingMore}
+                className="px-6 py-3 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-medium rounded-lg hover:bg-zinc-200 dark:hover:bg-zinc-700 disabled:opacity-50 transition-colors flex items-center gap-2"
+              >
+                {loadingMore ? (
+                  <>
+                    <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    Carregando...
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                    Carregar Mais ({totalJobs - jobs.length} restantes)
+                  </>
+                )}
+              </button>
+            </div>
+          )}
         </div>
       )}
 

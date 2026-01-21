@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { readFile } from 'fs/promises';
 import path from 'path';
-import { smartJobSearch, type ResumeData, type JobSource, getApiStatus } from '@/lib/job-search';
+import { smartJobSearch, type ResumeData, type JobSource, getApiStatus } from '@/lib/jobs';
 import { isAuthenticated } from '@/lib/auth';
 import { error, withCacheHeaders } from '@/lib/api-utils';
 

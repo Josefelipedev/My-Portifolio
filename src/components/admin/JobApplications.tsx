@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import BulkActionBar from './jobs/BulkActionBar';
+import { exportApplicationsToCSV, exportApplicationsToPDF, ExportableApplication } from '@/lib/export';
 
 interface JobApplication {
   id: string;
@@ -64,6 +66,10 @@ export default function JobApplications({ onApplicationDeleted }: JobApplication
     notes: '',
   });
   const [adding, setAdding] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [bulkUpdating, setBulkUpdating] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     fetchApplications();
@@ -168,6 +174,122 @@ export default function JobApplications({ onApplicationDeleted }: JobApplication
       alert(err instanceof Error ? err.message : 'Failed to add application');
     } finally {
       setAdding(false);
+    }
+  };
+
+  // Bulk selection handlers
+  const toggleSelection = (id: string) => {
+    setSelectedIds((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) {
+        newSet.delete(id);
+      } else {
+        newSet.add(id);
+      }
+      return newSet;
+    });
+  };
+
+  const selectAll = () => {
+    setSelectedIds(new Set(filteredApplications.map((app) => app.id)));
+  };
+
+  const deselectAll = () => {
+    setSelectedIds(new Set());
+  };
+
+  const handleBulkDelete = async () => {
+    if (!confirm(`Are you sure you want to delete ${selectedIds.size} application(s)?`)) return;
+
+    try {
+      setBulkDeleting(true);
+      const response = await fetch('/api/jobs/applications/bulk', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: Array.from(selectedIds) }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete applications');
+      }
+
+      await fetchApplications();
+      setSelectedIds(new Set());
+      onApplicationDeleted();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to delete applications');
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
+
+  const handleBulkStatusChange = async (status: string) => {
+    if (!confirm(`Update ${selectedIds.size} application(s) to "${status}"?`)) return;
+
+    try {
+      setBulkUpdating(true);
+      const response = await fetch('/api/jobs/applications/bulk', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: Array.from(selectedIds), status }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update applications');
+      }
+
+      await fetchApplications();
+      setSelectedIds(new Set());
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to update applications');
+    } finally {
+      setBulkUpdating(false);
+    }
+  };
+
+  const handleExport = async () => {
+    const appsToExport = selectedIds.size > 0
+      ? filteredApplications.filter((app) => selectedIds.has(app.id))
+      : filteredApplications;
+
+    if (appsToExport.length === 0) {
+      alert('No applications to export');
+      return;
+    }
+
+    const exportData: ExportableApplication[] = appsToExport.map((app) => ({
+      title: app.title,
+      company: app.company,
+      location: app.location,
+      salary: app.salary,
+      url: app.url,
+      status: app.status,
+      appliedAt: app.appliedAt,
+      notes: app.notes,
+      nextStep: app.nextStep,
+      nextStepDate: app.nextStepDate,
+      createdAt: app.createdAt,
+    }));
+
+    // Show format options
+    const format = window.prompt(
+      `Export ${exportData.length} application(s) as:\n1. CSV\n2. PDF\n\nEnter 1 or 2:`,
+      '1'
+    );
+
+    if (!format) return;
+
+    setExporting(true);
+    try {
+      if (format === '2') {
+        await exportApplicationsToPDF(exportData, `applications-${new Date().toISOString().split('T')[0]}`);
+      } else {
+        exportApplicationsToCSV(exportData, `applications-${new Date().toISOString().split('T')[0]}`);
+      }
+    } catch (err) {
+      alert('Failed to export: ' + (err instanceof Error ? err.message : 'Unknown error'));
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -373,6 +495,19 @@ export default function JobApplications({ onApplicationDeleted }: JobApplication
         </div>
       )}
 
+      {/* Bulk Action Bar */}
+      <BulkActionBar
+        selectedCount={selectedIds.size}
+        totalCount={filteredApplications.length}
+        onSelectAll={selectAll}
+        onDeselectAll={deselectAll}
+        onDelete={handleBulkDelete}
+        onExport={handleExport}
+        onStatusChange={handleBulkStatusChange}
+        showStatusChange={true}
+        isDeleting={bulkDeleting || bulkUpdating || exporting}
+      />
+
       {/* Applications List */}
       {filteredApplications.length === 0 ? (
         <div className="text-center py-12">
@@ -393,10 +528,19 @@ export default function JobApplications({ onApplicationDeleted }: JobApplication
           {filteredApplications.map((app) => (
             <div
               key={app.id}
-              className={`bg-white dark:bg-zinc-800 rounded-xl border overflow-hidden ${getStatusColor(app.status)}`}
+              className={`bg-white dark:bg-zinc-800 rounded-xl border overflow-hidden ${getStatusColor(app.status)} ${
+                selectedIds.has(app.id) ? 'ring-2 ring-red-500' : ''
+              }`}
             >
               <div className="p-4">
                 <div className="flex items-start gap-4">
+                  {/* Checkbox */}
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.has(app.id)}
+                    onChange={() => toggleSelection(app.id)}
+                    className="w-4 h-4 mt-1 rounded border-zinc-300 text-red-500 focus:ring-red-500 cursor-pointer"
+                  />
                   {/* Company Logo */}
                   {app.savedJob?.companyLogo ? (
                     <img
