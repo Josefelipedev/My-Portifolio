@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import BulkActionBar from './jobs/BulkActionBar';
+import { exportJobsToCSV, exportJobsToPDF, ExportableJob } from '@/lib/export';
 
 interface SavedJob {
   id: string;
@@ -38,6 +40,10 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [editingNotes, setEditingNotes] = useState<string | null>(null);
   const [notesValue, setNotesValue] = useState('');
+  // Bulk selection state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     fetchSavedJobs();
@@ -128,6 +134,99 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
     }
   };
 
+  // Bulk selection handlers
+  const toggleSelection = (id: string) => {
+    setSelectedIds((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) {
+        newSet.delete(id);
+      } else {
+        newSet.add(id);
+      }
+      return newSet;
+    });
+  };
+
+  const selectAll = () => {
+    setSelectedIds(new Set(jobs.map((j) => j.id)));
+  };
+
+  const deselectAll = () => {
+    setSelectedIds(new Set());
+  };
+
+  const handleBulkDelete = async () => {
+    if (!confirm(`Deletar ${selectedIds.size} vagas salvas?`)) return;
+
+    try {
+      setBulkDeleting(true);
+      const response = await fetch('/api/jobs/saved/bulk', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: Array.from(selectedIds) }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete jobs');
+      }
+
+      const data = await response.json();
+      setJobs((prev) => prev.filter((j) => !selectedIds.has(j.id)));
+      // Call onJobRemoved for each deleted job
+      for (let i = 0; i < data.count; i++) {
+        onJobRemoved();
+      }
+      setSelectedIds(new Set());
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to delete jobs');
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
+
+  const handleExport = async () => {
+    const jobsToExport = selectedIds.size > 0
+      ? jobs.filter((j) => selectedIds.has(j.id))
+      : jobs;
+
+    if (jobsToExport.length === 0) {
+      alert('No jobs to export');
+      return;
+    }
+
+    const exportData: ExportableJob[] = jobsToExport.map((job) => ({
+      title: job.title,
+      company: job.company,
+      location: job.location,
+      salary: job.salary,
+      url: job.url,
+      source: job.source,
+      tags: job.tags,
+      savedAt: job.savedAt,
+    }));
+
+    // Show format options
+    const format = window.prompt(
+      `Export ${exportData.length} job(s) as:\n1. CSV\n2. PDF\n\nEnter 1 or 2:`,
+      '1'
+    );
+
+    if (!format) return;
+
+    setExporting(true);
+    try {
+      if (format === '2') {
+        await exportJobsToPDF(exportData, `saved-jobs-${new Date().toISOString().split('T')[0]}`);
+      } else {
+        exportJobsToCSV(exportData, `saved-jobs-${new Date().toISOString().split('T')[0]}`);
+      }
+    } catch (err) {
+      alert('Failed to export: ' + (err instanceof Error ? err.message : 'Unknown error'));
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString('en-US', {
       month: 'short',
@@ -199,13 +298,38 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
 
   return (
     <div className="space-y-4">
+      {/* Bulk Action Bar */}
+      <BulkActionBar
+        selectedCount={selectedIds.size}
+        totalCount={jobs.length}
+        onSelectAll={selectAll}
+        onDeselectAll={deselectAll}
+        onDelete={handleBulkDelete}
+        onExport={handleExport}
+        isDeleting={bulkDeleting || exporting}
+      />
+
       {jobs.map((job) => (
         <div
           key={job.id}
-          className="bg-white dark:bg-zinc-800 rounded-xl border border-zinc-200 dark:border-zinc-700 overflow-hidden"
+          className={`bg-white dark:bg-zinc-800 rounded-xl border overflow-hidden transition-colors ${
+            selectedIds.has(job.id)
+              ? 'border-red-300 dark:border-red-700 ring-1 ring-red-200 dark:ring-red-800'
+              : 'border-zinc-200 dark:border-zinc-700'
+          }`}
         >
           <div className="p-4">
             <div className="flex items-start gap-4">
+              {/* Checkbox */}
+              <div className="pt-1">
+                <input
+                  type="checkbox"
+                  checked={selectedIds.has(job.id)}
+                  onChange={() => toggleSelection(job.id)}
+                  className="w-4 h-4 rounded border-zinc-300 text-red-500 focus:ring-red-500"
+                />
+              </div>
+
               {/* Company Logo */}
               {job.companyLogo ? (
                 <img

@@ -270,3 +270,54 @@ model JobApplication {
   @@index([createdAt])
   @@index([appliedAt])
 }
+
+// ==========================================
+// Job Search History
+// ==========================================
+
+model JobSearchHistory {
+  id          String   @id @default(cuid())
+  keyword     String
+  countries   String   // comma-separated
+  sources     String   // comma-separated
+  filters     String?  @db.Text // JSON
+  resultCount Int
+  searchedAt  DateTime @default(now())
+
+  @@index([searchedAt])
+}
+
+// ==========================================
+// Job Alerts
+// ==========================================
+
+model JobAlert {
+  id          String   @id @default(cuid())
+  name        String
+  keyword     String
+  countries   String
+  sources     String
+  filters     String?  @db.Text
+  isActive    Boolean  @default(true)
+  lastRun     DateTime?
+  createdAt   DateTime @default(now())
+
+  matches     JobAlertMatch[]
+
+  @@index([isActive])
+}
+
+model JobAlertMatch {
+  id         String   @id @default(cuid())
+  alertId    String
+  alert      JobAlert @relation(fields: [alertId], references: [id], onDelete: Cascade)
+  jobId      String   // externalId da vaga
+  jobTitle   String
+  company    String
+  matchedAt  DateTime @default(now())
+  notified   Boolean  @default(false)
+
+  @@unique([alertId, jobId])
+  @@index([alertId])
+  @@index([matchedAt])
+}
