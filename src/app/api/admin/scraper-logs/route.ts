@@ -14,8 +14,16 @@ interface ScraperStats {
   requests_total?: number;
   requests_success?: number;
   requests_failed?: number;
-  cache_hits?: number;
-  last_scrape?: string;
+  jobs_found?: number;
+  uptime_seconds?: number;
+  uptime_human?: string;
+}
+
+interface ScraperLog {
+  timestamp: string;
+  level: string;
+  message: string;
+  source: string;
 }
 
 export async function GET(request: NextRequest) {
@@ -75,6 +83,36 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // If action is 'logs', fetch logs from Python scraper
+    if (action === 'logs' && isAvailable) {
+      try {
+        const limit = searchParams.get('limit') || '50';
+        const level = searchParams.get('level');
+
+        let logsUrl = `${PYTHON_SCRAPER_URL}/logs?limit=${limit}`;
+        if (level) logsUrl += `&level=${level}`;
+
+        const logsResponse = await fetch(logsUrl, {
+          signal: AbortSignal.timeout(5000),
+        });
+
+        if (logsResponse.ok) {
+          const logsData = await logsResponse.json();
+          return NextResponse.json({
+            available: true,
+            logs: logsData.logs as ScraperLog[],
+            total: logsData.total,
+          });
+        }
+      } catch (error) {
+        return NextResponse.json({
+          available: true,
+          logs: [],
+          error: error instanceof Error ? error.message : 'Failed to fetch logs',
+        });
+      }
+    }
+
     // If action is 'test', try a test scrape
     if (action === 'test' && isAvailable) {
       const source = searchParams.get('source') || 'geekhunter';
@@ -118,12 +156,29 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Fetch recent logs if available
+    let logs: ScraperLog[] = [];
+    if (isAvailable) {
+      try {
+        const logsResponse = await fetch(`${PYTHON_SCRAPER_URL}/logs?limit=20`, {
+          signal: AbortSignal.timeout(5000),
+        });
+        if (logsResponse.ok) {
+          const logsData = await logsResponse.json();
+          logs = logsData.logs || [];
+        }
+      } catch {
+        // Ignore logs fetch error
+      }
+    }
+
     return NextResponse.json({
       available: isAvailable,
       url: PYTHON_SCRAPER_URL,
       health,
       sources,
       stats,
+      logs,
       message: isAvailable
         ? 'Python scraper is running'
         : 'Python scraper is not available. Start it with: cd job-scraper && docker compose up -d',

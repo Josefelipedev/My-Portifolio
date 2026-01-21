@@ -16,8 +16,16 @@ interface ScraperStats {
   requests_total?: number;
   requests_success?: number;
   requests_failed?: number;
-  cache_hits?: number;
-  last_scrape?: string;
+  jobs_found?: number;
+  uptime_seconds?: number;
+  uptime_human?: string;
+}
+
+interface ScraperLog {
+  timestamp: string;
+  level: string;
+  message: string;
+  source: string;
 }
 
 interface ScraperInfo {
@@ -26,6 +34,7 @@ interface ScraperInfo {
   health: ScraperHealth | null;
   sources: string[];
   stats: ScraperStats | null;
+  logs: ScraperLog[];
   message: string;
   test?: {
     source: string;
@@ -44,6 +53,7 @@ export default function ScraperStatus({ defaultExpanded = false }: ScraperStatus
   const [testSource, setTestSource] = useState('geekhunter');
   const [testKeyword, setTestKeyword] = useState('desenvolvedor');
   const [expanded, setExpanded] = useState(defaultExpanded);
+  const [showLogs, setShowLogs] = useState(false);
 
   useEffect(() => {
     if (expanded && !info) {
@@ -281,6 +291,68 @@ export default function ScraperStatus({ defaultExpanded = false }: ScraperStatus
                           </div>
                         )}
                       </div>
+                    )}
+                  </div>
+
+                  {/* Logs Section */}
+                  <div className="border-t border-zinc-200 dark:border-zinc-700 pt-4 mt-4">
+                    <button
+                      onClick={() => setShowLogs(!showLogs)}
+                      className="flex items-center justify-between w-full text-left"
+                    >
+                      <h4 className="text-sm font-medium text-zinc-700 dark:text-zinc-300 flex items-center gap-2">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        Recent Logs ({info.logs?.length || 0})
+                      </h4>
+                      <svg
+                        className={`w-4 h-4 text-zinc-400 transition-transform ${showLogs ? 'rotate-180' : ''}`}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+
+                    {showLogs && info.logs && info.logs.length > 0 && (
+                      <div className="mt-3 max-h-64 overflow-y-auto bg-zinc-900 rounded-lg p-3 font-mono text-xs">
+                        {info.logs.map((log, index) => (
+                          <div
+                            key={index}
+                            className={`py-1 border-b border-zinc-800 last:border-0 ${
+                              log.level === 'ERROR'
+                                ? 'text-red-400'
+                                : log.level === 'WARNING'
+                                ? 'text-yellow-400'
+                                : 'text-zinc-400'
+                            }`}
+                          >
+                            <span className="text-zinc-600">{log.timestamp.split('T')[1]?.split('.')[0] || log.timestamp}</span>
+                            {' '}
+                            <span className={`font-bold ${
+                              log.level === 'ERROR'
+                                ? 'text-red-500'
+                                : log.level === 'WARNING'
+                                ? 'text-yellow-500'
+                                : log.level === 'INFO'
+                                ? 'text-blue-500'
+                                : 'text-zinc-500'
+                            }`}>
+                              [{log.level}]
+                            </span>
+                            {' '}
+                            <span className="text-purple-400">[{log.source}]</span>
+                            {' '}
+                            {log.message}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {showLogs && (!info.logs || info.logs.length === 0) && (
+                      <p className="mt-3 text-sm text-zinc-500">No logs available</p>
                     )}
                   </div>
                 </>
