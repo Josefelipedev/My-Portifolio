@@ -48,7 +48,7 @@ export default function ProjectAdmin({ projects: initialProjects }: { projects: 
   const [rank, setRank] = useState<number | null>(null);
   const [aiAnalysis, setAiAnalysis] = useState<AIAnalysisResult | null>(null);
   const router = useRouter();
-  const { showError, showWarning } = useToast();
+  const { showError, showWarning, showSuccess } = useToast();
   const { confirm } = useConfirm();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -76,8 +76,12 @@ export default function ProjectAdmin({ projects: initialProjects }: { projects: 
           body: JSON.stringify(payload),
         });
         if (res.ok) {
+          showSuccess('Project updated successfully');
           router.refresh();
           closeModal();
+        } else {
+          const data = await res.json();
+          showError(data.error || 'Failed to update project');
         }
       } else {
         const res = await fetch('/api/projects', {
@@ -86,10 +90,16 @@ export default function ProjectAdmin({ projects: initialProjects }: { projects: 
           body: JSON.stringify(payload),
         });
         if (res.ok) {
+          showSuccess('Project created successfully');
           router.refresh();
           closeModal();
+        } else {
+          const data = await res.json();
+          showError(data.error || 'Failed to create project');
         }
       }
+    } catch (err) {
+      showError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
       setIsLoading(false);
     }
