@@ -4,6 +4,7 @@ import { useState, FormEvent, useRef } from 'react';
 import { Turnstile, type TurnstileInstance } from '@marsidev/react-turnstile';
 import { GradientText } from '../ui/GradientText';
 import { useLanguage } from '@/lib/i18n';
+import { fetchWithCSRF } from '@/lib/csrf-client';
 
 const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
 
@@ -33,7 +34,7 @@ export function ContactSection() {
     }
 
     try {
-      const response = await fetch('/api/contact', {
+      const response = await fetchWithCSRF('/api/contact', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

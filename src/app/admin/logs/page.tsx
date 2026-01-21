@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
+import { fetchWithCSRF } from '@/lib/csrf-client';
 
 interface SystemLog {
   id: string;
@@ -112,7 +113,7 @@ export default function LogsPage() {
       }
       // 'all' - no params = delete all
 
-      const response = await fetch(`/api/admin/logs?${params}`, {
+      const response = await fetchWithCSRF(`/api/admin/logs?${params}`, {
         method: 'DELETE',
       });
 

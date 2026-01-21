@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useToast } from '@/components/ui/Toast';
+import { fetchWithCSRF } from '@/lib/csrf-client';
 
 interface GitHubOrg {
   id: number;
@@ -86,7 +87,7 @@ export default function GitHubOrgsPage() {
   const handleImport = async (repo: GitHubRepo) => {
     try {
       setImporting(repo.id);
-      const response = await fetch('/api/github/import', {
+      const response = await fetchWithCSRF('/api/github/import', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

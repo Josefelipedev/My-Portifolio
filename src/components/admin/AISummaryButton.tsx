@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { fetchWithCSRF } from '@/lib/csrf-client';
 
 interface AISummaryButtonProps {
   projectId: string;
@@ -23,7 +24,7 @@ export function AISummaryButton({
       setLoading(true);
       setError(null);
 
-      const response = await fetch('/api/summarize', {
+      const response = await fetchWithCSRF('/api/summarize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ projectId }),
