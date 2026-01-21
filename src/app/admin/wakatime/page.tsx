@@ -163,7 +163,7 @@ export default function WakaTimeAdminPage() {
                   key={option.key}
                   className={`p-4 flex items-center justify-between ${
                     index !== toggleOptions.length - 1 ? 'border-b border-zinc-200 dark:border-zinc-700' : ''
-                  } ${option.key === 'enabled' ? 'bg-zinc-50 dark:bg-zinc-750' : ''}`}
+                  } ${option.key === 'enabled' ? 'bg-zinc-100 dark:bg-zinc-700' : ''}`}
                 >
                   <div className="flex-1">
                     <h3 className={`font-medium ${option.key === 'enabled' ? 'text-lg' : ''} text-zinc-900 dark:text-zinc-100`}>
