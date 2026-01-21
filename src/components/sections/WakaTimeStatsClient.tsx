@@ -62,12 +62,15 @@ interface WakaTimeConfig {
   showOS: boolean;
   showProjects: boolean;
   profileUrl: string;
+  selectedYears: number[];
+  yearlyStatsType: 'last365' | 'calendar';
 }
 
 interface Props {
   stats: WakaTimeStats;
   allTimeStats: { totalSeconds: number; text: string } | null;
   yearlyStats: WakaTimeStats | null;
+  yearlyStatsByYear: Record<number, WakaTimeStats>;
   config: WakaTimeConfig;
 }
 
@@ -101,26 +104,46 @@ function AnimatedValue({ value }: { value: string }) {
   return <span>{displayed}</span>;
 }
 
+// Gradient color mapping
+const GRADIENT_COLORS: Record<string, { from: string; to: string }> = {
+  'indigo-purple': { from: '#6366f1', to: '#a855f7' },
+  'cyan-blue': { from: '#06b6d4', to: '#3b82f6' },
+  'amber-orange': { from: '#f59e0b', to: '#f97316' },
+  'emerald-teal': { from: '#10b981', to: '#14b8a6' },
+  'violet-purple': { from: '#8b5cf6', to: '#a855f7' },
+  'fuchsia-pink': { from: '#d946ef', to: '#ec4899' },
+  'rose-red': { from: '#f43f5e', to: '#ef4444' },
+  'sky-cyan': { from: '#0ea5e9', to: '#06b6d4' },
+};
+
 // Stat Card
 function StatCard({
   icon,
   label,
   value,
   subtext,
-  color,
+  colorKey,
 }: {
   icon: React.ReactNode;
   label: string;
   value: string;
   subtext?: string;
-  color: string;
+  colorKey: string;
 }) {
+  const colors = GRADIENT_COLORS[colorKey] || GRADIENT_COLORS['indigo-purple'];
+  const gradientStyle = {
+    background: `linear-gradient(to right, ${colors.from}, ${colors.to})`,
+  };
+
   return (
     <div className="relative group">
-      <div className={`absolute inset-0 bg-gradient-to-r ${color} opacity-0 group-hover:opacity-10 rounded-xl transition-opacity`} />
+      <div
+        className="absolute inset-0 opacity-0 group-hover:opacity-10 rounded-xl transition-opacity"
+        style={gradientStyle}
+      />
       <div className="relative bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-xl p-4 hover:border-slate-600 transition-all">
         <div className="flex items-center gap-3">
-          <div className={`p-2 rounded-lg bg-gradient-to-r ${color}`}>
+          <div className="p-2 rounded-lg" style={gradientStyle}>
             {icon}
           </div>
           <div>
@@ -248,8 +271,19 @@ function getOSIcon(name: string) {
   );
 }
 
-export function WakaTimeStatsClient({ stats, allTimeStats, yearlyStats, config }: Props) {
+export function WakaTimeStatsClient({ stats, allTimeStats, yearlyStats, yearlyStatsByYear, config }: Props) {
   const { language } = useLanguage();
+
+  // Get available years from yearlyStatsByYear
+  const availableYears = Object.keys(yearlyStatsByYear).map(Number).sort((a, b) => b - a);
+  const [selectedYear, setSelectedYear] = useState<number | 'last365'>(
+    config.yearlyStatsType === 'calendar' && availableYears.length > 0 ? availableYears[0] : 'last365'
+  );
+
+  // Get the stats for the selected year/period
+  const currentYearlyStats = selectedYear === 'last365'
+    ? yearlyStats
+    : yearlyStatsByYear[selectedYear] || null;
 
   const texts = {
     title: language === 'pt' ? 'Estatísticas de Código' : 'Coding Stats',
@@ -268,6 +302,8 @@ export function WakaTimeStatsClient({ stats, allTimeStats, yearlyStats, config }
     yearlySubtitle: language === 'pt' ? 'Últimos 365 dias' : 'Last 365 days',
     yearlyTotal: language === 'pt' ? 'Total Anual' : 'Yearly Total',
     yearlyDailyAvg: language === 'pt' ? 'Média Diária (Ano)' : 'Daily Average (Year)',
+    selectYear: language === 'pt' ? 'Selecionar Ano' : 'Select Year',
+    last365Days: language === 'pt' ? 'Últimos 365 dias' : 'Last 365 days',
   };
 
   return (
@@ -293,7 +329,7 @@ export function WakaTimeStatsClient({ stats, allTimeStats, yearlyStats, config }
               label={texts.totalTime}
               value={stats.totalHours}
               subtext={texts.last7Days}
-              color="from-indigo-500 to-purple-500"
+              colorKey="indigo-purple"
             />
           )}
           {config.showDailyAverage && (
@@ -301,7 +337,7 @@ export function WakaTimeStatsClient({ stats, allTimeStats, yearlyStats, config }
               icon={<ChartIcon />}
               label={texts.dailyAverage}
               value={stats.dailyAverage}
-              color="from-cyan-500 to-blue-500"
+              colorKey="cyan-blue"
             />
           )}
           {config.showBestDay && stats.bestDay && (
@@ -310,7 +346,7 @@ export function WakaTimeStatsClient({ stats, allTimeStats, yearlyStats, config }
               label={texts.bestDay}
               value={stats.bestDay.text}
               subtext={new Date(stats.bestDay.date).toLocaleDateString(language === 'pt' ? 'pt-BR' : 'en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
-              color="from-amber-500 to-orange-500"
+              colorKey="amber-orange"
             />
           )}
           {config.showAllTime && allTimeStats && (
@@ -318,7 +354,7 @@ export function WakaTimeStatsClient({ stats, allTimeStats, yearlyStats, config }
               icon={<InfinityIcon />}
               label={texts.allTime}
               value={allTimeStats.text}
-              color="from-emerald-500 to-teal-500"
+              colorKey="emerald-teal"
             />
           )}
         </div>
@@ -409,84 +445,121 @@ export function WakaTimeStatsClient({ stats, allTimeStats, yearlyStats, config }
         </div>
 
         {/* Yearly Stats Section */}
-        {config.showYearlyStats && yearlyStats && (
+        {config.showYearlyStats && (yearlyStats || availableYears.length > 0) && (
           <div className="mt-12">
             <div className="text-center mb-8">
               <h3 className="text-2xl font-bold text-white mb-2 flex items-center justify-center gap-2">
                 <CalendarIcon />
                 {texts.yearlyStats}
               </h3>
-              <p className="text-slate-400 text-sm">{texts.yearlySubtitle}</p>
+
+              {/* Year Tabs */}
+              {(availableYears.length > 0 || yearlyStats) && (
+                <div className="flex justify-center gap-2 mt-4">
+                  {yearlyStats && (
+                    <button
+                      onClick={() => setSelectedYear('last365')}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                        selectedYear === 'last365'
+                          ? 'bg-purple-500 text-white'
+                          : 'bg-slate-800/50 text-slate-400 hover:bg-slate-700/50'
+                      }`}
+                    >
+                      {texts.last365Days}
+                    </button>
+                  )}
+                  {availableYears.map((year) => (
+                    <button
+                      key={year}
+                      onClick={() => setSelectedYear(year)}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                        selectedYear === year
+                          ? 'bg-purple-500 text-white'
+                          : 'bg-slate-800/50 text-slate-400 hover:bg-slate-700/50'
+                      }`}
+                    >
+                      {year}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
-            {/* Yearly Stats Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-              <StatCard
-                icon={<ClockIcon />}
-                label={texts.yearlyTotal}
-                value={yearlyStats.totalHours}
-                color="from-violet-500 to-purple-500"
-              />
-              <StatCard
-                icon={<ChartIcon />}
-                label={texts.yearlyDailyAvg}
-                value={yearlyStats.dailyAverage}
-                color="from-fuchsia-500 to-pink-500"
-              />
-              {yearlyStats.bestDay && (
-                <StatCard
-                  icon={<TrophyIcon />}
-                  label={texts.bestDay}
-                  value={yearlyStats.bestDay.text}
-                  subtext={new Date(yearlyStats.bestDay.date).toLocaleDateString(language === 'pt' ? 'pt-BR' : 'en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                  color="from-rose-500 to-red-500"
-                />
-              )}
-              <div className="relative group">
-                <div className="absolute inset-0 bg-gradient-to-r from-sky-500 to-cyan-500 opacity-0 group-hover:opacity-10 rounded-xl transition-opacity" />
-                <div className="relative bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-xl p-4 hover:border-slate-600 transition-all h-full flex items-center justify-center">
-                  <div className="text-center">
-                    <p className="text-3xl font-bold text-white">{yearlyStats.languages.length}+</p>
-                    <p className="text-sm text-slate-400">{texts.languages}</p>
+            {currentYearlyStats && (
+              <>
+                {/* Yearly Stats Cards */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                  <StatCard
+                    icon={<ClockIcon />}
+                    label={texts.yearlyTotal}
+                    value={currentYearlyStats.totalHours}
+                    colorKey="violet-purple"
+                  />
+                  <StatCard
+                    icon={<ChartIcon />}
+                    label={texts.yearlyDailyAvg}
+                    value={currentYearlyStats.dailyAverage}
+                    colorKey="fuchsia-pink"
+                  />
+                  {currentYearlyStats.bestDay && (
+                    <StatCard
+                      icon={<TrophyIcon />}
+                      label={texts.bestDay}
+                      value={currentYearlyStats.bestDay.text}
+                      subtext={new Date(currentYearlyStats.bestDay.date).toLocaleDateString(language === 'pt' ? 'pt-BR' : 'en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                      colorKey="rose-red"
+                    />
+                  )}
+                  <div className="relative group">
+                    <div
+                      className="absolute inset-0 opacity-0 group-hover:opacity-10 rounded-xl transition-opacity"
+                      style={{ background: 'linear-gradient(to right, #0ea5e9, #06b6d4)' }}
+                    />
+                    <div className="relative bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-xl p-4 hover:border-slate-600 transition-all h-full flex items-center justify-center">
+                      <div className="text-center">
+                        <p className="text-3xl font-bold text-white">{currentYearlyStats.languages.length}+</p>
+                        <p className="text-sm text-slate-400">{texts.languages}</p>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </div>
 
-            {/* Yearly Languages & Projects */}
-            <div className="grid md:grid-cols-2 gap-8">
-              {/* Yearly Languages */}
-              {yearlyStats.languages.length > 0 && (
-                <div className="bg-slate-800/30 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-6">
-                  <h4 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                    <CodeIcon />
-                    {texts.languages} ({texts.yearlySubtitle})
-                  </h4>
-                  <LanguageChart languages={yearlyStats.languages} />
-                </div>
-              )}
+                {/* Yearly Languages & Projects */}
+                <div className="grid md:grid-cols-2 gap-8">
+                  {/* Yearly Languages */}
+                  {currentYearlyStats.languages.length > 0 && (
+                    <div className="bg-slate-800/30 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-6">
+                      <h4 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                        <CodeIcon />
+                        {texts.languages} ({selectedYear === 'last365' ? texts.last365Days : selectedYear})
+                      </h4>
+                      <LanguageChart languages={currentYearlyStats.languages} />
+                    </div>
+                  )}
 
-              {/* Yearly Projects */}
-              {yearlyStats.projects.length > 0 && (
-                <div className="bg-slate-800/30 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-6">
-                  <h4 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                    <FolderIcon />
-                    {texts.projects} ({texts.yearlySubtitle})
-                  </h4>
-                  <div className="space-y-4">
-                    {yearlyStats.projects.slice(0, 5).map((project, index) => (
-                      <ProgressItem
-                        key={project.name}
-                        name={project.name}
-                        percent={project.percent}
-                        text={project.text}
-                        color={['#a855f7', '#ec4899', '#06b6d4', '#22c55e', '#eab308'][index % 5]}
-                      />
-                    ))}
-                  </div>
+                  {/* Yearly Projects */}
+                  {currentYearlyStats.projects.length > 0 && (
+                    <div className="bg-slate-800/30 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-6">
+                      <h4 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                        <FolderIcon />
+                        {texts.projects} ({selectedYear === 'last365' ? texts.last365Days : selectedYear})
+                      </h4>
+                      <div className="space-y-4">
+                        {currentYearlyStats.projects.slice(0, 5).map((project, index) => (
+                          <ProgressItem
+                            key={project.name}
+                            name={project.name}
+                            percent={project.percent}
+                            text={project.text}
+                            color={['#a855f7', '#ec4899', '#06b6d4', '#22c55e', '#eab308'][index % 5]}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
+              </>
+            )}
           </div>
         )}
 

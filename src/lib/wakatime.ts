@@ -259,6 +259,168 @@ export async function getWakaTimeYearlyStats(): Promise<WakaTimeStats | null> {
   }
 }
 
+// Get stats for a specific calendar year
+export async function getWakaTimeStatsForYear(year: number): Promise<WakaTimeStats | null> {
+  if (!WAKATIME_API_KEY) {
+    console.error('WAKATIME_API_KEY not configured');
+    return null;
+  }
+
+  const startDate = `${year}-01-01`;
+  const endDate = `${year}-12-31`;
+
+  try {
+    const response = await fetch(
+      `${WAKATIME_API_URL}/users/current/summaries?start=${startDate}&end=${endDate}`,
+      {
+        headers: {
+          Authorization: `Basic ${Buffer.from(WAKATIME_API_KEY).toString('base64')}`,
+        },
+        next: { revalidate: 86400 }, // Cache for 24 hours
+      }
+    );
+
+    if (!response.ok) {
+      console.error('WakaTime API error:', response.status, response.statusText);
+      return null;
+    }
+
+    const data = await response.json();
+
+    if (!data.data || data.data.length === 0) {
+      return null;
+    }
+
+    // Aggregate all summaries for the year
+    let totalSeconds = 0;
+    const languagesMap = new Map<string, number>();
+    const editorsMap = new Map<string, number>();
+    const osMap = new Map<string, number>();
+    const projectsMap = new Map<string, number>();
+    const categoriesMap = new Map<string, number>();
+    let bestDay: { date: string; totalSeconds: number } | null = null;
+
+    for (const day of data.data) {
+      const daySeconds = day.grand_total?.total_seconds || 0;
+      totalSeconds += daySeconds;
+
+      // Track best day
+      if (!bestDay || daySeconds > bestDay.totalSeconds) {
+        bestDay = { date: day.range.date, totalSeconds: daySeconds };
+      }
+
+      // Aggregate languages
+      for (const lang of day.languages || []) {
+        const current = languagesMap.get(lang.name) || 0;
+        languagesMap.set(lang.name, current + (lang.total_seconds || 0));
+      }
+
+      // Aggregate editors
+      for (const editor of day.editors || []) {
+        const current = editorsMap.get(editor.name) || 0;
+        editorsMap.set(editor.name, current + (editor.total_seconds || 0));
+      }
+
+      // Aggregate OS
+      for (const os of day.operating_systems || []) {
+        const current = osMap.get(os.name) || 0;
+        osMap.set(os.name, current + (os.total_seconds || 0));
+      }
+
+      // Aggregate projects
+      for (const project of day.projects || []) {
+        const current = projectsMap.get(project.name) || 0;
+        projectsMap.set(project.name, current + (project.total_seconds || 0));
+      }
+
+      // Aggregate categories
+      for (const cat of day.categories || []) {
+        const current = categoriesMap.get(cat.name) || 0;
+        categoriesMap.set(cat.name, current + (cat.total_seconds || 0));
+      }
+    }
+
+    // Convert maps to sorted arrays
+    const toSortedArray = (map: Map<string, number>) => {
+      return Array.from(map.entries())
+        .sort((a, b) => b[1] - a[1])
+        .map(([name, seconds]) => ({
+          name,
+          totalSeconds: seconds,
+          percent: totalSeconds > 0 ? Math.round((seconds / totalSeconds) * 1000) / 10 : 0,
+          text: formatSeconds(seconds),
+        }));
+    };
+
+    const daysInYear = data.data.length;
+    const dailyAverage = daysInYear > 0 ? totalSeconds / daysInYear : 0;
+
+    return {
+      totalSeconds,
+      totalHours: formatSeconds(totalSeconds),
+      dailyAverage: formatSeconds(dailyAverage),
+      bestDay: bestDay ? {
+        date: bestDay.date,
+        totalSeconds: bestDay.totalSeconds,
+        text: formatSeconds(bestDay.totalSeconds),
+      } : null,
+      languages: toSortedArray(languagesMap).slice(0, 10).map(lang => ({
+        ...lang,
+        color: getLanguageColor(lang.name),
+      })),
+      editors: toSortedArray(editorsMap).slice(0, 5),
+      operatingSystems: toSortedArray(osMap).slice(0, 5),
+      projects: toSortedArray(projectsMap).slice(0, 10),
+      categories: toSortedArray(categoriesMap).slice(0, 5),
+      range: {
+        start: startDate,
+        end: endDate,
+        text: `${year}`,
+      },
+    };
+  } catch (error) {
+    console.error(`Error fetching WakaTime stats for ${year}:`, error);
+    return null;
+  }
+}
+
+// Get available years (based on when user started using WakaTime)
+export async function getWakaTimeAvailableYears(): Promise<number[]> {
+  if (!WAKATIME_API_KEY) {
+    return [];
+  }
+
+  const currentYear = new Date().getFullYear();
+  const years: number[] = [];
+
+  // Check up to 5 years back
+  for (let year = currentYear; year >= currentYear - 4; year--) {
+    try {
+      const response = await fetch(
+        `${WAKATIME_API_URL}/users/current/summaries?start=${year}-01-01&end=${year}-01-07`,
+        {
+          headers: {
+            Authorization: `Basic ${Buffer.from(WAKATIME_API_KEY).toString('base64')}`,
+          },
+          next: { revalidate: 86400 },
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        // Check if there's any data for this year
+        if (data.data && data.data.some((d: { grand_total?: { total_seconds?: number } }) => (d.grand_total?.total_seconds ?? 0) > 0)) {
+          years.push(year);
+        }
+      }
+    } catch {
+      // Skip this year if there's an error
+    }
+  }
+
+  return years;
+}
+
 // Get all-time stats
 export async function getWakaTimeAllTimeStats(): Promise<{ totalSeconds: number; text: string } | null> {
   if (!WAKATIME_API_KEY) {
