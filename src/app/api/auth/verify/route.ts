@@ -47,13 +47,13 @@ export async function POST(request: Request) {
       );
     }
 
-    // Set auth cookie
+    // Set auth cookie (14 days)
     const cookieStore = await cookies();
     cookieStore.set('auth_token', result.token!, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
-      maxAge: 24 * 60 * 60, // 24 hours
+      maxAge: 14 * 24 * 60 * 60, // 14 days
       path: '/',
     });
 
