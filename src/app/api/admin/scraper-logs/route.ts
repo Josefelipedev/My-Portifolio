@@ -122,6 +122,29 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // If action is 'clear-logs', clear Python scraper logs
+    if (action === 'clear-logs' && isAvailable) {
+      try {
+        const clearResponse = await fetch(`${PYTHON_SCRAPER_URL}/logs`, {
+          method: 'DELETE',
+          signal: AbortSignal.timeout(5000),
+        });
+
+        if (clearResponse.ok) {
+          const data = await clearResponse.json();
+          return NextResponse.json({
+            success: true,
+            cleared: data.cleared,
+          });
+        }
+      } catch (error) {
+        return NextResponse.json(
+          { error: error instanceof Error ? error.message : 'Failed to clear logs' },
+          { status: 500 }
+        );
+      }
+    }
+
     // If action is 'debug', fetch debug files
     if (action === 'debug' && isAvailable) {
       try {
