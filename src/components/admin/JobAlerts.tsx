@@ -23,6 +23,12 @@ interface JobAlert {
   isActive: boolean;
   lastRun?: string;
   createdAt: string;
+  // Scheduling fields
+  scheduleEnabled: boolean;
+  scheduleHours?: string;
+  scheduleDays?: string;
+  nextRun?: string;
+  emailOnMatch: boolean;
   matches: JobAlertMatch[];
   _count: {
     matches: number;
@@ -80,7 +86,12 @@ export default function JobAlerts() {
     keyword: '',
     countries: 'all',
     sources: 'all',
+    scheduleEnabled: false,
+    scheduleHours: '',
+    scheduleDays: '1,2,3,4,5', // Weekdays by default
+    emailOnMatch: true,
   });
+  const [editingAlert, setEditingAlert] = useState<JobAlert | null>(null);
 
   useEffect(() => {
     fetchAlerts();
@@ -110,25 +121,72 @@ export default function JobAlerts() {
 
     try {
       setCreating(true);
+
+      const method = editingAlert ? 'PUT' : 'POST';
+      const body = editingAlert
+        ? { id: editingAlert.id, ...formData }
+        : formData;
+
       const response = await fetch('/api/jobs/alerts', {
-        method: 'POST',
+        method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(body),
       });
 
       if (!response.ok) {
         const data = await response.json();
-        throw new Error(data.error || 'Failed to create alert');
+        throw new Error(data.error || `Failed to ${editingAlert ? 'update' : 'create'} alert`);
       }
 
       await fetchAlerts();
       setShowCreateForm(false);
-      setFormData({ name: '', keyword: '', countries: 'all', sources: 'all' });
+      setEditingAlert(null);
+      setFormData({
+        name: '',
+        keyword: '',
+        countries: 'all',
+        sources: 'all',
+        scheduleEnabled: false,
+        scheduleHours: '',
+        scheduleDays: '1,2,3,4,5',
+        emailOnMatch: true,
+      });
+      showSuccess(editingAlert ? 'Alert updated!' : 'Alert created!');
     } catch (err) {
-      showError(err instanceof Error ? err.message : 'Failed to create alert');
+      showError(err instanceof Error ? err.message : `Failed to ${editingAlert ? 'update' : 'create'} alert`);
     } finally {
       setCreating(false);
     }
+  };
+
+  const handleEdit = (jobAlert: JobAlert) => {
+    setEditingAlert(jobAlert);
+    setFormData({
+      name: jobAlert.name,
+      keyword: jobAlert.keyword,
+      countries: jobAlert.countries,
+      sources: jobAlert.sources,
+      scheduleEnabled: jobAlert.scheduleEnabled,
+      scheduleHours: jobAlert.scheduleHours || '',
+      scheduleDays: jobAlert.scheduleDays || '1,2,3,4,5',
+      emailOnMatch: jobAlert.emailOnMatch,
+    });
+    setShowCreateForm(true);
+  };
+
+  const closeForm = () => {
+    setShowCreateForm(false);
+    setEditingAlert(null);
+    setFormData({
+      name: '',
+      keyword: '',
+      countries: 'all',
+      sources: 'all',
+      scheduleEnabled: false,
+      scheduleHours: '',
+      scheduleDays: '1,2,3,4,5',
+      emailOnMatch: true,
+    });
   };
 
   const handleDelete = async (id: string) => {
@@ -232,9 +290,26 @@ export default function JobAlerts() {
       keyword: suggestion.keyword,
       countries: suggestion.countries.split(',')[0] || 'all',
       sources: suggestion.sources.split(',')[0] || 'all',
+      scheduleEnabled: false,
+      scheduleHours: '',
+      scheduleDays: '1,2,3,4,5',
+      emailOnMatch: true,
     });
+    setEditingAlert(null);
     setShowCreateForm(true);
     setShowSuggestions(false);
+  };
+
+  const formatSchedule = (alert: JobAlert) => {
+    if (!alert.scheduleEnabled || !alert.scheduleHours) return null;
+
+    const hours = alert.scheduleHours.split(',').map(h => `${h}:00`).join(', ');
+    const dayNames = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'];
+    const days = alert.scheduleDays
+      ? alert.scheduleDays.split(',').map(d => dayNames[parseInt(d)]).join(', ')
+      : 'Todos os dias';
+
+    return `${hours} - ${days}`;
   };
 
   if (loading) {
@@ -302,12 +377,12 @@ export default function JobAlerts() {
         </div>
       </div>
 
-      {/* Create Alert Modal */}
+      {/* Create/Edit Alert Modal */}
       {showCreateForm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-zinc-800 rounded-xl p-6 w-full max-w-md mx-4">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-zinc-800 rounded-xl p-6 w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
             <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
-              Create New Alert
+              {editingAlert ? 'Edit Alert' : 'Create New Alert'}
             </h2>
             <form onSubmit={handleCreate} className="space-y-4">
               <div>
@@ -370,10 +445,109 @@ export default function JobAlerts() {
                   </select>
                 </div>
               </div>
+
+              {/* Scheduling Section */}
+              <div className="border-t border-zinc-200 dark:border-zinc-700 pt-4">
+                <div className="flex items-center justify-between mb-3">
+                  <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                    Agendamento Automatico
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, scheduleEnabled: !formData.scheduleEnabled })}
+                    className={`relative w-12 h-6 rounded-full transition-colors ${
+                      formData.scheduleEnabled ? 'bg-green-500' : 'bg-zinc-300 dark:bg-zinc-600'
+                    }`}
+                  >
+                    <span
+                      className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${
+                        formData.scheduleEnabled ? 'left-7' : 'left-1'
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {formData.scheduleEnabled && (
+                  <div className="space-y-3 bg-zinc-50 dark:bg-zinc-700/50 rounded-lg p-3">
+                    <div>
+                      <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                        Horarios (separados por virgula)
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.scheduleHours}
+                        onChange={(e) => setFormData({ ...formData, scheduleHours: e.target.value })}
+                        placeholder="9,12,18 (9h, 12h, 18h)"
+                        className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm"
+                      />
+                      <p className="text-xs text-zinc-500 mt-1">Ex: 9,18 para executar as 9h e 18h</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+                        Dias da Semana
+                      </label>
+                      <div className="flex flex-wrap gap-2">
+                        {[
+                          { value: '0', label: 'Dom' },
+                          { value: '1', label: 'Seg' },
+                          { value: '2', label: 'Ter' },
+                          { value: '3', label: 'Qua' },
+                          { value: '4', label: 'Qui' },
+                          { value: '5', label: 'Sex' },
+                          { value: '6', label: 'Sab' },
+                        ].map((day) => {
+                          const isSelected = formData.scheduleDays.split(',').includes(day.value);
+                          return (
+                            <button
+                              key={day.value}
+                              type="button"
+                              onClick={() => {
+                                const days = new Set(formData.scheduleDays.split(',').filter(d => d));
+                                if (isSelected) {
+                                  days.delete(day.value);
+                                } else {
+                                  days.add(day.value);
+                                }
+                                setFormData({ ...formData, scheduleDays: Array.from(days).sort().join(',') });
+                              }}
+                              className={`px-3 py-1 text-sm rounded-lg transition-colors ${
+                                isSelected
+                                  ? 'bg-red-500 text-white'
+                                  : 'bg-zinc-200 dark:bg-zinc-600 text-zinc-700 dark:text-zinc-300'
+                              }`}
+                            >
+                              {day.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm text-zinc-700 dark:text-zinc-300">
+                        Enviar email quando encontrar vagas
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, emailOnMatch: !formData.emailOnMatch })}
+                        className={`relative w-10 h-5 rounded-full transition-colors ${
+                          formData.emailOnMatch ? 'bg-green-500' : 'bg-zinc-300 dark:bg-zinc-600'
+                        }`}
+                      >
+                        <span
+                          className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-transform ${
+                            formData.emailOnMatch ? 'left-5' : 'left-0.5'
+                          }`}
+                        />
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <div className="flex gap-3 pt-2">
                 <button
                   type="button"
-                  onClick={() => setShowCreateForm(false)}
+                  onClick={closeForm}
                   className="flex-1 px-4 py-2 bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300 rounded-lg hover:bg-zinc-300 dark:hover:bg-zinc-600 transition-colors"
                 >
                   Cancel
@@ -383,7 +557,7 @@ export default function JobAlerts() {
                   disabled={creating}
                   className="flex-1 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50 transition-colors"
                 >
-                  {creating ? 'Creating...' : 'Create Alert'}
+                  {creating ? (editingAlert ? 'Updating...' : 'Creating...') : (editingAlert ? 'Update Alert' : 'Create Alert')}
                 </button>
               </div>
             </form>
@@ -515,6 +689,29 @@ export default function JobAlerts() {
                         <span>Last run: {formatDate(alert.lastRun)}</span>
                       )}
                     </div>
+                    {/* Schedule Info */}
+                    {alert.scheduleEnabled && (
+                      <div className="mt-2 flex items-center gap-2">
+                        <span className="px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs rounded-full flex items-center gap-1">
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          Agendado: {formatSchedule(alert)}
+                        </span>
+                        {alert.nextRun && (
+                          <span className="text-xs text-zinc-400">
+                            Proxima: {formatDate(alert.nextRun)}
+                          </span>
+                        )}
+                        {alert.emailOnMatch && (
+                          <span className="text-xs text-blue-500" title="Email habilitado">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                            </svg>
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex items-center gap-2">
@@ -539,6 +736,15 @@ export default function JobAlerts() {
                           Run Now
                         </>
                       )}
+                    </button>
+                    <button
+                      onClick={() => handleEdit(alert)}
+                      className="px-3 py-1.5 text-sm bg-zinc-100 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300 rounded-lg hover:bg-zinc-200 dark:hover:bg-zinc-600 transition-colors"
+                      title="Edit alert"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
                     </button>
                     <button
                       onClick={() => handleToggleActive(alert)}
