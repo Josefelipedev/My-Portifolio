@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { fetchWithCSRF } from '@/lib/csrf-client';
 
 interface UsageStats {
   total: {
@@ -121,7 +122,7 @@ export default function AIUsageStats() {
   async function saveQuota() {
     setSaving(true);
     try {
-      const res = await fetch('/api/admin/ai-usage', {
+      const res = await fetchWithCSRF('/api/admin/ai-usage', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

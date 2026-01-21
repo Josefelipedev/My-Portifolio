@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { AISummaryButton } from './admin/AISummaryButton';
 import { useToast } from '@/components/ui/Toast';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
+import { fetchWithCSRF } from '@/lib/csrf-client';
 
 interface Project {
   id: string;
@@ -70,7 +71,7 @@ export default function ProjectAdmin({ projects: initialProjects }: { projects: 
       };
 
       if (editingProject) {
-        const res = await fetch(`/api/projects/${editingProject.id}`, {
+        const res = await fetchWithCSRF(`/api/projects/${editingProject.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
@@ -84,7 +85,7 @@ export default function ProjectAdmin({ projects: initialProjects }: { projects: 
           showError(data.error || 'Failed to update project');
         }
       } else {
-        const res = await fetch('/api/projects', {
+        const res = await fetchWithCSRF('/api/projects', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
@@ -113,7 +114,7 @@ export default function ProjectAdmin({ projects: initialProjects }: { projects: 
 
     setIsAnalyzing(true);
     try {
-      const res = await fetch('/api/projects/analyze', {
+      const res = await fetchWithCSRF('/api/projects/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ readme, title, repoUrl }),
@@ -198,7 +199,7 @@ export default function ProjectAdmin({ projects: initialProjects }: { projects: 
     // Optimistic update
     setProjects(prev => prev.filter(p => p.id !== id));
 
-    const res = await fetch(`/api/projects/${id}`, { method: 'DELETE' });
+    const res = await fetchWithCSRF(`/api/projects/${id}`, { method: 'DELETE' });
     if (!res.ok) {
       // Revert on error
       setProjects(initialProjects);
@@ -214,7 +215,7 @@ export default function ProjectAdmin({ projects: initialProjects }: { projects: 
       p.id === project.id ? { ...p, featured: newFeatured } : p
     ));
 
-    const res = await fetch(`/api/projects/${project.id}`, {
+    const res = await fetchWithCSRF(`/api/projects/${project.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ featured: newFeatured }),
@@ -240,7 +241,7 @@ export default function ProjectAdmin({ projects: initialProjects }: { projects: 
       return p;
     }));
 
-    const res = await fetch(`/api/projects/${project.id}`, {
+    const res = await fetchWithCSRF(`/api/projects/${project.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ rank: newRank }),

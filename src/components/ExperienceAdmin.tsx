@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Experience } from '@prisma/client';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
+import { fetchWithCSRF } from '@/lib/csrf-client';
 
 export default function ExperienceAdmin({ experiences: initialExperiences }: { experiences: Experience[] }) {
   const [experiences] = useState<Experience[]>(initialExperiences);
@@ -27,7 +28,7 @@ export default function ExperienceAdmin({ experiences: initialExperiences }: { e
       const payload = { title, description, responsibilities, challenges, technologies };
 
       if (editingExperience) {
-        const res = await fetch(`/api/experiences/${editingExperience.id}`, {
+        const res = await fetchWithCSRF(`/api/experiences/${editingExperience.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
@@ -37,7 +38,7 @@ export default function ExperienceAdmin({ experiences: initialExperiences }: { e
           closeModal();
         }
       } else {
-        const res = await fetch('/api/experiences', {
+        const res = await fetchWithCSRF('/api/experiences', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
@@ -90,7 +91,7 @@ export default function ExperienceAdmin({ experiences: initialExperiences }: { e
       confirmText: 'Delete',
     });
     if (!confirmed) return;
-    const res = await fetch(`/api/experiences/${id}`, { method: 'DELETE' });
+    const res = await fetchWithCSRF(`/api/experiences/${id}`, { method: 'DELETE' });
     if (res.ok) {
       router.refresh();
     }

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
+import { fetchWithCSRF } from '@/lib/csrf-client';
 
 interface GitHubRepo {
   id: number;
@@ -67,7 +68,7 @@ export default function GitHubAdminPage() {
   const handleImport = async (repo: GitHubRepo) => {
     try {
       setImporting(prev => new Set(prev).add(repo.id));
-      const response = await fetch('/api/github/import', {
+      const response = await fetchWithCSRF('/api/github/import', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

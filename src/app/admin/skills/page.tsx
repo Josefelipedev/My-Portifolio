@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useToast } from '@/components/ui/Toast';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
+import { fetchWithCSRF } from '@/lib/csrf-client';
 
 interface Skill {
   id: string;
@@ -64,7 +65,7 @@ export default function SkillsAdminPage() {
     try {
       setSuggesting(true);
       setError(null);
-      const response = await fetch('/api/skills/suggest', {
+      const response = await fetchWithCSRF('/api/skills/suggest', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ includeExisting: false }),
@@ -86,7 +87,7 @@ export default function SkillsAdminPage() {
   const handleAddSuggestion = async (suggestion: SkillSuggestion) => {
     try {
       setSaving(suggestion.name);
-      const response = await fetch('/api/skills', {
+      const response = await fetchWithCSRF('/api/skills', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -118,7 +119,7 @@ export default function SkillsAdminPage() {
       const url = editingId ? `/api/skills/${editingId}` : '/api/skills';
       const method = editingId ? 'PUT' : 'POST';
 
-      const response = await fetch(url, {
+      const response = await fetchWithCSRF(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -167,7 +168,7 @@ export default function SkillsAdminPage() {
 
     try {
       setSaving(id);
-      const response = await fetch(`/api/skills/${id}`, { method: 'DELETE' });
+      const response = await fetchWithCSRF(`/api/skills/${id}`, { method: 'DELETE' });
 
       if (!response.ok) {
         throw new Error('Failed to delete skill');
