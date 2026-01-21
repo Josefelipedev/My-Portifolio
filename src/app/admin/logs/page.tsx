@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { fetchWithCSRF } from '@/lib/csrf-client';
+import ScraperStatus from '@/components/admin/ScraperStatus';
 
 interface SystemLog {
   id: string;
@@ -265,28 +266,36 @@ export default function LogsPage() {
         </div>
       )}
 
-      {/* Errors by Source */}
-      {stats && Object.keys(stats.errorsBySource).length > 0 && (
-        <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-4 mb-6">
+      {/* Alerts and Python Scraper - Side by Side */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+        {/* Left: Errors by Source (Alerts) */}
+        <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-4 h-fit">
           <h3 className="text-sm font-medium text-gray-400 mb-3">
             Errors by Source (24h)
           </h3>
-          <div className="flex flex-wrap gap-2">
-            {Object.entries(stats.errorsBySource).map(([source, count]) => (
-              <button
-                key={source}
-                onClick={() => {
-                  setSourceFilter(source);
-                  setLevelFilter('error');
-                }}
-                className="px-3 py-1 bg-red-500/20 border border-red-500/30 rounded-full text-sm text-red-300 hover:bg-red-500/30 transition-colors"
-              >
-                {source}: {count}
-              </button>
-            ))}
-          </div>
+          {stats && Object.keys(stats.errorsBySource).length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {Object.entries(stats.errorsBySource).map(([source, count]) => (
+                <button
+                  key={source}
+                  onClick={() => {
+                    setSourceFilter(source);
+                    setLevelFilter('error');
+                  }}
+                  className="px-3 py-1 bg-red-500/20 border border-red-500/30 rounded-full text-sm text-red-300 hover:bg-red-500/30 transition-colors"
+                >
+                  {source}: {count}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-gray-500">No errors in the last 24 hours</p>
+          )}
         </div>
-      )}
+
+        {/* Right: Python Scraper */}
+        <ScraperStatus />
+      </div>
 
       {/* Filters */}
       <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-4 mb-6">
