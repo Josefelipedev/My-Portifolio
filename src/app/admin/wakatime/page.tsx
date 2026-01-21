@@ -34,6 +34,7 @@ interface WakaTimeConfig {
   showRankingBadge: boolean;
   rankingPercentile: number;
   rankingTotalDevs: string;
+  yearlyRankings: Record<number, { percentile: number; totalDevs: string }>;
   // Other
   profileUrl: string;
   cacheYearlyData: boolean;
@@ -73,6 +74,11 @@ const DEFAULT_CONFIG: WakaTimeConfig = {
   showRankingBadge: true,
   rankingPercentile: 1,
   rankingTotalDevs: '500k+',
+  yearlyRankings: {
+    2023: { percentile: 1, totalDevs: '500k+' },
+    2024: { percentile: 1, totalDevs: '500k+' },
+    2025: { percentile: 4, totalDevs: '500k+' },
+  },
   profileUrl: 'https://wakatime.com/@josefelipedev',
   cacheYearlyData: true,
 };
@@ -92,6 +98,8 @@ export default function WakaTimeAdminPage() {
   const [preview, setPreview] = useState<WakaTimePreview | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [fetchingRankings, setFetchingRankings] = useState(false);
+  const [rankingsFetched, setRankingsFetched] = useState<string | null>(null);
 
   useEffect(() => {
     fetchConfig();
@@ -158,6 +166,42 @@ export default function WakaTimeAdminPage() {
   const handleToggle = (key: keyof WakaTimeConfig) => {
     if (typeof config[key] === 'boolean') {
       setConfig({ ...config, [key]: !config[key] });
+    }
+  };
+
+  const fetchRankingsFromUrls = async () => {
+    try {
+      setFetchingRankings(true);
+      setRankingsFetched(null);
+      setError(null);
+
+      const response = await fetch('/api/wakatime/fetch-rankings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to fetch rankings');
+      }
+
+      // Update local config with fetched rankings
+      if (data.rankings) {
+        setConfig(prev => ({
+          ...prev,
+          yearlyRankings: {
+            ...prev.yearlyRankings,
+            ...data.rankings,
+          },
+        }));
+        setRankingsFetched(`Rankings extracted for: ${Object.keys(data.rankings).join(', ')}`);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch rankings');
+    } finally {
+      setFetchingRankings(false);
     }
   };
 
@@ -735,6 +779,93 @@ export default function WakaTimeAdminPage() {
                         <span className="text-slate-400 ml-1">de {config.rankingTotalDevs} devs</span>
                       </span>
                     </div>
+                  </div>
+                )}
+
+                {/* Yearly Rankings */}
+                {config.showRankingBadge && (
+                  <div className="mt-6 pt-6 border-t border-zinc-200 dark:border-zinc-700">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="font-medium text-zinc-900 dark:text-zinc-100">Ranking por Ano</h4>
+                      <button
+                        onClick={fetchRankingsFromUrls}
+                        disabled={fetchingRankings || Object.keys(config.yearlyReportLinks || {}).length === 0}
+                        className="flex items-center gap-2 px-3 py-1.5 text-sm bg-purple-500 text-white rounded-lg hover:bg-purple-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        {fetchingRankings ? (
+                          <>
+                            <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                            </svg>
+                            Buscando...
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                            </svg>
+                            Buscar das URLs
+                          </>
+                        )}
+                      </button>
+                    </div>
+                    <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-4">
+                      Configure o ranking para cada ano. Clique em &quot;Buscar das URLs&quot; para extrair automaticamente das páginas Year in Review.
+                    </p>
+
+                    {rankingsFetched && (
+                      <div className="mb-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                        <p className="text-sm text-green-700 dark:text-green-400">{rankingsFetched}</p>
+                      </div>
+                    )}
+
+                    <div className="space-y-3">
+                      {getAvailableYears().map((year) => (
+                        <div key={year} className="flex items-center gap-3 p-3 bg-zinc-50 dark:bg-zinc-700/50 rounded-lg">
+                          <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300 w-12">{year}</span>
+                          <div className="flex-1 grid grid-cols-2 gap-3">
+                            <input
+                              type="number"
+                              min="1"
+                              max="100"
+                              value={config.yearlyRankings?.[year]?.percentile || ''}
+                              onChange={(e) => setConfig({
+                                ...config,
+                                yearlyRankings: {
+                                  ...config.yearlyRankings,
+                                  [year]: {
+                                    percentile: parseInt(e.target.value) || 1,
+                                    totalDevs: config.yearlyRankings?.[year]?.totalDevs || '500k+',
+                                  },
+                                },
+                              })}
+                              className="px-3 py-1.5 text-sm border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100"
+                              placeholder="Top X%"
+                            />
+                            <input
+                              type="text"
+                              value={config.yearlyRankings?.[year]?.totalDevs || ''}
+                              onChange={(e) => setConfig({
+                                ...config,
+                                yearlyRankings: {
+                                  ...config.yearlyRankings,
+                                  [year]: {
+                                    percentile: config.yearlyRankings?.[year]?.percentile || 1,
+                                    totalDevs: e.target.value,
+                                  },
+                                },
+                              })}
+                              className="px-3 py-1.5 text-sm border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100"
+                              placeholder="500k+"
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-xs text-zinc-400 mt-2">
+                      Dica: Acesse wakatime.com/a-look-back-at-YEAR para ver seu ranking de cada ano
+                    </p>
                   </div>
                 )}
               </div>

@@ -32,8 +32,9 @@ export interface WakaTimeConfig {
   showYearlyReportLink: boolean;
   // Ranking badge
   showRankingBadge: boolean;
-  rankingPercentile: number; // e.g., 1 for "Top 1%"
-  rankingTotalDevs: string; // e.g., "500k+"
+  rankingPercentile: number; // e.g., 1 for "Top 1%" (fallback/global)
+  rankingTotalDevs: string; // e.g., "500k+" (fallback/global)
+  yearlyRankings: Record<number, { percentile: number; totalDevs: string }>; // Per-year rankings
   // Other
   profileUrl: string;
   cacheYearlyData: boolean;
@@ -65,6 +66,11 @@ const DEFAULT_CONFIG: WakaTimeConfig = {
   showRankingBadge: true,
   rankingPercentile: 1,
   rankingTotalDevs: '500k+',
+  yearlyRankings: {
+    2023: { percentile: 1, totalDevs: '500k+' },
+    2024: { percentile: 1, totalDevs: '500k+' },
+    2025: { percentile: 4, totalDevs: '500k+' },
+  },
   profileUrl: 'https://wakatime.com/@josefelipedev',
   cacheYearlyData: true,
 };
@@ -113,6 +119,23 @@ export async function PUT(request: Request) {
       }
     }
 
+    // Validate yearlyRankings
+    let yearlyRankings: Record<number, { percentile: number; totalDevs: string }> = {};
+    if (body.yearlyRankings && typeof body.yearlyRankings === 'object') {
+      for (const [key, value] of Object.entries(body.yearlyRankings)) {
+        const year = parseInt(key);
+        if (!isNaN(year) && typeof value === 'object' && value !== null) {
+          const ranking = value as { percentile?: number; totalDevs?: string };
+          if (typeof ranking.percentile === 'number' && typeof ranking.totalDevs === 'string') {
+            yearlyRankings[year] = {
+              percentile: ranking.percentile,
+              totalDevs: ranking.totalDevs,
+            };
+          }
+        }
+      }
+    }
+
     // Validate and sanitize the config
     const newConfig: WakaTimeConfig = {
       enabled: typeof body.enabled === 'boolean' ? body.enabled : DEFAULT_CONFIG.enabled,
@@ -140,6 +163,7 @@ export async function PUT(request: Request) {
       showRankingBadge: typeof body.showRankingBadge === 'boolean' ? body.showRankingBadge : DEFAULT_CONFIG.showRankingBadge,
       rankingPercentile: typeof body.rankingPercentile === 'number' ? body.rankingPercentile : DEFAULT_CONFIG.rankingPercentile,
       rankingTotalDevs: typeof body.rankingTotalDevs === 'string' ? body.rankingTotalDevs : DEFAULT_CONFIG.rankingTotalDevs,
+      yearlyRankings: Object.keys(yearlyRankings).length > 0 ? yearlyRankings : DEFAULT_CONFIG.yearlyRankings,
       profileUrl: typeof body.profileUrl === 'string' ? body.profileUrl : DEFAULT_CONFIG.profileUrl,
       cacheYearlyData: typeof body.cacheYearlyData === 'boolean' ? body.cacheYearlyData : DEFAULT_CONFIG.cacheYearlyData,
     };
