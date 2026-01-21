@@ -243,6 +243,12 @@ model SavedJob {
   notes         String?   @db.Text
   savedAt       DateTime  @default(now())
 
+  // AI Enrichment fields
+  contactEmail  String?   // Extracted contact email
+  contactPhone  String?   // Extracted phone number
+  enrichedData  String?   @db.Text // JSON with additional extracted data
+  enrichedAt    DateTime? // When enrichment was performed
+
   application   JobApplication?
 
   @@index([source])

@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import prisma from '@/lib/prisma';
 import JobsTabs from '@/components/admin/JobsTabs';
+import ScraperStatus from '@/components/admin/ScraperStatus';
 
 // Force dynamic to avoid build errors when tables don't exist yet
 export const dynamic = 'force-dynamic';
@@ -93,6 +94,11 @@ export default async function JobsAdminPage() {
             <p className="text-2xl font-bold text-zinc-400">{statsMap.rejected || 0}</p>
             <p className="text-xs text-zinc-500 dark:text-zinc-400">Rejected</p>
           </div>
+        </div>
+
+        {/* Python Scraper Status */}
+        <div className="mb-6">
+          <ScraperStatus />
         </div>
 
         {/* Tabs Component */}
