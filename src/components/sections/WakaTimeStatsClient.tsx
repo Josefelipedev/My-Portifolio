@@ -341,7 +341,7 @@ export function WakaTimeStatsClient({ stats, allTimeStats, yearlyStats, yearlySt
   };
 
   return (
-    <section id="wakatime" className="py-20 px-4 overflow-hidden bg-gradient-to-b from-slate-900 via-slate-900 to-slate-800">
+    <section id="wakatime" className="py-20 px-4 overflow-hidden">
       <div className="max-w-6xl mx-auto">
         {/* Section Header */}
         <div className="text-center mb-8">
