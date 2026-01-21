@@ -158,6 +158,15 @@ async def get_logs(
     }
 
 
+@app.delete("/logs")
+async def clear_logs():
+    """Clear all in-memory logs"""
+    count = len(memory_handler.logs)
+    memory_handler.logs.clear()
+    logger.info(f"Cleared {count} logs")
+    return {"cleared": count}
+
+
 @app.get("/stats")
 async def get_stats():
     """Get scraper statistics"""
