@@ -98,7 +98,6 @@ export { searchLinkedIn } from './apis/linkedin';
 export {
   searchPythonScraper,
   isPythonScraperAvailable,
-  getPythonScraperHealth,
   getPythonScraperSources,
   searchGeekHunterPython,
   searchVagasComBrPython,
