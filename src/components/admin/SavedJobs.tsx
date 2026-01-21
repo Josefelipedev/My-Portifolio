@@ -66,6 +66,15 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
   const [exporting, setExporting] = useState(false);
   // AI Enrichment state
   const [enriching, setEnriching] = useState<string | null>(null);
+  // Contact editing state
+  const [editingContact, setEditingContact] = useState<string | null>(null);
+  const [contactEmail, setContactEmail] = useState('');
+  const [contactPhone, setContactPhone] = useState('');
+  // Email composer state
+  const [composingEmail, setComposingEmail] = useState<SavedJob | null>(null);
+  const [emailSubject, setEmailSubject] = useState('');
+  const [emailBody, setEmailBody] = useState('');
+  const [sendingEmail, setSendingEmail] = useState(false);
 
   useEffect(() => {
     fetchSavedJobs();
@@ -159,6 +168,80 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
       setEditingNotes(null);
     } catch (err) {
       showError(err instanceof Error ? err.message : 'Failed to save notes');
+    }
+  };
+
+  const handleSaveContact = async (id: string) => {
+    try {
+      const response = await fetch(`/api/jobs/saved/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contactEmail: contactEmail || null,
+          contactPhone: contactPhone || null,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save contact');
+      }
+
+      setJobs((prev) =>
+        prev.map((j) => (j.id === id ? { ...j, contactEmail, contactPhone } : j))
+      );
+      setEditingContact(null);
+      showSuccess('Contact info saved');
+    } catch (err) {
+      showError(err instanceof Error ? err.message : 'Failed to save contact');
+    }
+  };
+
+  const openEmailComposer = (job: SavedJob) => {
+    setComposingEmail(job);
+    setEmailSubject(`Application for ${job.title} position`);
+    setEmailBody(`Hello,
+
+I am writing to express my interest in the ${job.title} position at ${job.company}.
+
+[Your message here]
+
+Best regards,
+[Your name]`);
+  };
+
+  const handleSendEmail = async () => {
+    if (!composingEmail || !composingEmail.contactEmail) {
+      showError('No email address available');
+      return;
+    }
+
+    try {
+      setSendingEmail(true);
+      const response = await fetch('/api/jobs/saved/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: composingEmail.contactEmail,
+          subject: emailSubject,
+          body: emailBody,
+          jobId: composingEmail.id,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to send email');
+      }
+
+      showSuccess('Email sent successfully!');
+      setComposingEmail(null);
+      setEmailSubject('');
+      setEmailBody('');
+    } catch (err) {
+      showError(err instanceof Error ? err.message : 'Failed to send email');
+    } finally {
+      setSendingEmail(false);
     }
   };
 
@@ -481,15 +564,16 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
                     </span>
                   )}
                   {job.contactEmail && (
-                    <a
-                      href={`mailto:${job.contactEmail}`}
-                      className="flex items-center gap-1 text-purple-600 dark:text-purple-400 hover:underline"
+                    <button
+                      onClick={() => openEmailComposer(job)}
+                      className="flex items-center gap-1 text-purple-600 dark:text-purple-400 hover:underline hover:text-purple-700 dark:hover:text-purple-300"
+                      title="Click to send email"
                     >
                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                       </svg>
                       {job.contactEmail}
-                    </a>
+                    </button>
                   )}
                   {job.contactPhone && (
                     <a
@@ -502,6 +586,21 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
                       {job.contactPhone}
                     </a>
                   )}
+                  {/* Edit contact button */}
+                  <button
+                    onClick={() => {
+                      setEditingContact(job.id);
+                      setContactEmail(job.contactEmail || '');
+                      setContactPhone(job.contactPhone || '');
+                    }}
+                    className="flex items-center gap-1 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
+                    title="Edit contact info"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                    </svg>
+                    {!job.contactEmail && !job.contactPhone && 'Add Contact'}
+                  </button>
                   <span className="flex items-center gap-1">
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
@@ -744,6 +843,147 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
           </div>
         </div>
       ))}
+
+      {/* Contact Editing Modal */}
+      {editingContact && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-zinc-800 rounded-xl max-w-md w-full overflow-hidden">
+            <div className="flex items-center justify-between p-4 border-b border-zinc-200 dark:border-zinc-700">
+              <h3 className="font-semibold text-zinc-900 dark:text-zinc-100">Edit Contact Info</h3>
+              <button
+                onClick={() => setEditingContact(null)}
+                className="p-1 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="p-4 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  value={contactEmail}
+                  onChange={(e) => setContactEmail(e.target.value)}
+                  placeholder="contact@company.com"
+                  className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                  Phone
+                </label>
+                <input
+                  type="tel"
+                  value={contactPhone}
+                  onChange={(e) => setContactPhone(e.target.value)}
+                  placeholder="+55 11 99999-9999"
+                  className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100"
+                />
+              </div>
+              <div className="flex gap-2 pt-2">
+                <button
+                  onClick={() => handleSaveContact(editingContact)}
+                  className="flex-1 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
+                >
+                  Save
+                </button>
+                <button
+                  onClick={() => setEditingContact(null)}
+                  className="px-4 py-2 bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300 rounded-lg hover:bg-zinc-300 dark:hover:bg-zinc-600"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Email Composer Modal */}
+      {composingEmail && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-zinc-800 rounded-xl max-w-2xl w-full overflow-hidden">
+            <div className="flex items-center justify-between p-4 border-b border-zinc-200 dark:border-zinc-700">
+              <div>
+                <h3 className="font-semibold text-zinc-900 dark:text-zinc-100">Send Email</h3>
+                <p className="text-sm text-zinc-500">To: {composingEmail.contactEmail}</p>
+              </div>
+              <button
+                onClick={() => setComposingEmail(null)}
+                className="p-1 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="p-4 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                  Subject
+                </label>
+                <input
+                  type="text"
+                  value={emailSubject}
+                  onChange={(e) => setEmailSubject(e.target.value)}
+                  className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                  Message
+                </label>
+                <textarea
+                  value={emailBody}
+                  onChange={(e) => setEmailBody(e.target.value)}
+                  rows={10}
+                  className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 font-mono text-sm"
+                />
+              </div>
+              <div className="flex gap-2 pt-2">
+                <button
+                  onClick={handleSendEmail}
+                  disabled={sendingEmail || !emailSubject || !emailBody}
+                  className="flex-1 px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {sendingEmail ? (
+                    <>
+                      <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                      Sending...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                      </svg>
+                      Send Email
+                    </>
+                  )}
+                </button>
+                <a
+                  href={`mailto:${composingEmail.contactEmail}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`}
+                  className="px-4 py-2 bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300 rounded-lg hover:bg-zinc-300 dark:hover:bg-zinc-600 flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                  </svg>
+                  Open in Mail App
+                </a>
+              </div>
+              <p className="text-xs text-zinc-500 text-center">
+                Email will be sent from your configured SMTP account
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
