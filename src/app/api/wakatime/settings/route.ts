@@ -9,6 +9,7 @@ export interface WakaTimeConfig {
   showDailyAverage: boolean;
   showBestDay: boolean;
   showAllTime: boolean;
+  showYearlyStats: boolean;
   showLanguages: boolean;
   showEditors: boolean;
   showOS: boolean;
@@ -22,6 +23,7 @@ const DEFAULT_CONFIG: WakaTimeConfig = {
   showDailyAverage: true,
   showBestDay: true,
   showAllTime: true,
+  showYearlyStats: true,
   showLanguages: true,
   showEditors: true,
   showOS: true,
@@ -69,6 +71,7 @@ export async function PUT(request: Request) {
       showDailyAverage: typeof body.showDailyAverage === 'boolean' ? body.showDailyAverage : DEFAULT_CONFIG.showDailyAverage,
       showBestDay: typeof body.showBestDay === 'boolean' ? body.showBestDay : DEFAULT_CONFIG.showBestDay,
       showAllTime: typeof body.showAllTime === 'boolean' ? body.showAllTime : DEFAULT_CONFIG.showAllTime,
+      showYearlyStats: typeof body.showYearlyStats === 'boolean' ? body.showYearlyStats : DEFAULT_CONFIG.showYearlyStats,
       showLanguages: typeof body.showLanguages === 'boolean' ? body.showLanguages : DEFAULT_CONFIG.showLanguages,
       showEditors: typeof body.showEditors === 'boolean' ? body.showEditors : DEFAULT_CONFIG.showEditors,
       showOS: typeof body.showOS === 'boolean' ? body.showOS : DEFAULT_CONFIG.showOS,

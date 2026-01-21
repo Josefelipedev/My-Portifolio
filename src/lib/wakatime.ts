@@ -177,6 +177,88 @@ export async function getWakaTimeStats(): Promise<WakaTimeStats | null> {
   }
 }
 
+// Get yearly stats (last 365 days)
+export async function getWakaTimeYearlyStats(): Promise<WakaTimeStats | null> {
+  if (!WAKATIME_API_KEY) {
+    console.error('WAKATIME_API_KEY not configured');
+    return null;
+  }
+
+  try {
+    const response = await fetch(
+      `${WAKATIME_API_URL}/users/current/stats/last_year`,
+      {
+        headers: {
+          Authorization: `Basic ${Buffer.from(WAKATIME_API_KEY).toString('base64')}`,
+        },
+        next: { revalidate: 86400 }, // Cache for 24 hours
+      }
+    );
+
+    if (!response.ok) {
+      console.error('WakaTime API error:', response.status, response.statusText);
+      return null;
+    }
+
+    const data = await response.json();
+    const stats = data.data;
+
+    if (!stats) {
+      return null;
+    }
+
+    return {
+      totalSeconds: stats.total_seconds || 0,
+      totalHours: formatSeconds(stats.total_seconds || 0),
+      dailyAverage: formatSeconds(stats.daily_average || 0),
+      bestDay: stats.best_day ? {
+        date: stats.best_day.date,
+        totalSeconds: stats.best_day.total_seconds,
+        text: formatSeconds(stats.best_day.total_seconds),
+      } : null,
+      languages: (stats.languages || []).slice(0, 10).map((lang: { name: string; percent: number; total_seconds: number }) => ({
+        name: lang.name,
+        percent: Math.round(lang.percent * 10) / 10,
+        totalSeconds: lang.total_seconds,
+        text: formatSeconds(lang.total_seconds),
+        color: getLanguageColor(lang.name),
+      })),
+      editors: (stats.editors || []).slice(0, 5).map((editor: { name: string; percent: number; total_seconds: number }) => ({
+        name: editor.name,
+        percent: Math.round(editor.percent * 10) / 10,
+        totalSeconds: editor.total_seconds,
+        text: formatSeconds(editor.total_seconds),
+      })),
+      operatingSystems: (stats.operating_systems || []).slice(0, 5).map((os: { name: string; percent: number; total_seconds: number }) => ({
+        name: os.name,
+        percent: Math.round(os.percent * 10) / 10,
+        totalSeconds: os.total_seconds,
+        text: formatSeconds(os.total_seconds),
+      })),
+      projects: (stats.projects || []).slice(0, 10).map((project: { name: string; percent: number; total_seconds: number }) => ({
+        name: project.name,
+        percent: Math.round(project.percent * 10) / 10,
+        totalSeconds: project.total_seconds,
+        text: formatSeconds(project.total_seconds),
+      })),
+      categories: (stats.categories || []).slice(0, 5).map((cat: { name: string; percent: number; total_seconds: number }) => ({
+        name: cat.name,
+        percent: Math.round(cat.percent * 10) / 10,
+        totalSeconds: cat.total_seconds,
+        text: formatSeconds(cat.total_seconds),
+      })),
+      range: {
+        start: stats.start || '',
+        end: stats.end || '',
+        text: stats.human_readable_range || 'Last year',
+      },
+    };
+  } catch (error) {
+    console.error('Error fetching WakaTime yearly stats:', error);
+    return null;
+  }
+}
+
 // Get all-time stats
 export async function getWakaTimeAllTimeStats(): Promise<{ totalSeconds: number; text: string } | null> {
   if (!WAKATIME_API_KEY) {

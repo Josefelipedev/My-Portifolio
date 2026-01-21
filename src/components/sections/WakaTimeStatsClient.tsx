@@ -56,6 +56,7 @@ interface WakaTimeConfig {
   showDailyAverage: boolean;
   showBestDay: boolean;
   showAllTime: boolean;
+  showYearlyStats: boolean;
   showLanguages: boolean;
   showEditors: boolean;
   showOS: boolean;
@@ -66,6 +67,7 @@ interface WakaTimeConfig {
 interface Props {
   stats: WakaTimeStats;
   allTimeStats: { totalSeconds: number; text: string } | null;
+  yearlyStats: WakaTimeStats | null;
   config: WakaTimeConfig;
 }
 
@@ -246,7 +248,7 @@ function getOSIcon(name: string) {
   );
 }
 
-export function WakaTimeStatsClient({ stats, allTimeStats, config }: Props) {
+export function WakaTimeStatsClient({ stats, allTimeStats, yearlyStats, config }: Props) {
   const { language } = useLanguage();
 
   const texts = {
@@ -262,6 +264,10 @@ export function WakaTimeStatsClient({ stats, allTimeStats, config }: Props) {
     operatingSystems: language === 'pt' ? 'Sistemas Operacionais' : 'Operating Systems',
     projects: language === 'pt' ? 'Projetos' : 'Projects',
     viewProfile: language === 'pt' ? 'Ver perfil no WakaTime' : 'View WakaTime profile',
+    yearlyStats: language === 'pt' ? 'Estatísticas Anuais' : 'Yearly Stats',
+    yearlySubtitle: language === 'pt' ? 'Últimos 365 dias' : 'Last 365 days',
+    yearlyTotal: language === 'pt' ? 'Total Anual' : 'Yearly Total',
+    yearlyDailyAvg: language === 'pt' ? 'Média Diária (Ano)' : 'Daily Average (Year)',
   };
 
   return (
@@ -402,6 +408,88 @@ export function WakaTimeStatsClient({ stats, allTimeStats, config }: Props) {
           )}
         </div>
 
+        {/* Yearly Stats Section */}
+        {config.showYearlyStats && yearlyStats && (
+          <div className="mt-12">
+            <div className="text-center mb-8">
+              <h3 className="text-2xl font-bold text-white mb-2 flex items-center justify-center gap-2">
+                <CalendarIcon />
+                {texts.yearlyStats}
+              </h3>
+              <p className="text-slate-400 text-sm">{texts.yearlySubtitle}</p>
+            </div>
+
+            {/* Yearly Stats Cards */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+              <StatCard
+                icon={<ClockIcon />}
+                label={texts.yearlyTotal}
+                value={yearlyStats.totalHours}
+                color="from-violet-500 to-purple-500"
+              />
+              <StatCard
+                icon={<ChartIcon />}
+                label={texts.yearlyDailyAvg}
+                value={yearlyStats.dailyAverage}
+                color="from-fuchsia-500 to-pink-500"
+              />
+              {yearlyStats.bestDay && (
+                <StatCard
+                  icon={<TrophyIcon />}
+                  label={texts.bestDay}
+                  value={yearlyStats.bestDay.text}
+                  subtext={new Date(yearlyStats.bestDay.date).toLocaleDateString(language === 'pt' ? 'pt-BR' : 'en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                  color="from-rose-500 to-red-500"
+                />
+              )}
+              <div className="relative group">
+                <div className="absolute inset-0 bg-gradient-to-r from-sky-500 to-cyan-500 opacity-0 group-hover:opacity-10 rounded-xl transition-opacity" />
+                <div className="relative bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-xl p-4 hover:border-slate-600 transition-all h-full flex items-center justify-center">
+                  <div className="text-center">
+                    <p className="text-3xl font-bold text-white">{yearlyStats.languages.length}+</p>
+                    <p className="text-sm text-slate-400">{texts.languages}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Yearly Languages & Projects */}
+            <div className="grid md:grid-cols-2 gap-8">
+              {/* Yearly Languages */}
+              {yearlyStats.languages.length > 0 && (
+                <div className="bg-slate-800/30 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-6">
+                  <h4 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                    <CodeIcon />
+                    {texts.languages} ({texts.yearlySubtitle})
+                  </h4>
+                  <LanguageChart languages={yearlyStats.languages} />
+                </div>
+              )}
+
+              {/* Yearly Projects */}
+              {yearlyStats.projects.length > 0 && (
+                <div className="bg-slate-800/30 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-6">
+                  <h4 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                    <FolderIcon />
+                    {texts.projects} ({texts.yearlySubtitle})
+                  </h4>
+                  <div className="space-y-4">
+                    {yearlyStats.projects.slice(0, 5).map((project, index) => (
+                      <ProgressItem
+                        key={project.name}
+                        name={project.name}
+                        percent={project.percent}
+                        text={project.text}
+                        color={['#a855f7', '#ec4899', '#06b6d4', '#22c55e', '#eab308'][index % 5]}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* WakaTime Profile Link */}
         {config.profileUrl && (
           <div className="mt-8 text-center">
@@ -444,6 +532,12 @@ const TrophyIcon = () => (
 const InfinityIcon = () => (
   <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 12c-2-2.67-4-4-6-4a4 4 0 100 8c2 0 4-1.33 6-4zm0 0c2 2.67 4 4 6 4a4 4 0 000-8c-2 0-4 1.33-6 4z" />
+  </svg>
+);
+
+const CalendarIcon = () => (
+  <svg className="w-6 h-6 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
   </svg>
 );
 

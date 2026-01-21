@@ -1,4 +1,4 @@
-import { getWakaTimeStats, getWakaTimeAllTimeStats } from '@/lib/wakatime';
+import { getWakaTimeStats, getWakaTimeAllTimeStats, getWakaTimeYearlyStats } from '@/lib/wakatime';
 import { WakaTimeStatsClient } from './WakaTimeStatsClient';
 import prisma from '@/lib/prisma';
 
@@ -8,6 +8,7 @@ export interface WakaTimeConfig {
   showDailyAverage: boolean;
   showBestDay: boolean;
   showAllTime: boolean;
+  showYearlyStats: boolean;
   showLanguages: boolean;
   showEditors: boolean;
   showOS: boolean;
@@ -21,6 +22,7 @@ const DEFAULT_CONFIG: WakaTimeConfig = {
   showDailyAverage: true,
   showBestDay: true,
   showAllTime: true,
+  showYearlyStats: true,
   showLanguages: true,
   showEditors: true,
   showOS: true,
@@ -56,14 +58,15 @@ export async function WakaTimeStatsSection() {
     return null;
   }
 
-  const [stats, allTimeStats] = await Promise.all([
+  const [stats, allTimeStats, yearlyStats] = await Promise.all([
     getWakaTimeStats(),
     getWakaTimeAllTimeStats(),
+    config.showYearlyStats ? getWakaTimeYearlyStats() : Promise.resolve(null),
   ]);
 
   if (!stats) {
     return null; // Don't render if no WakaTime data
   }
 
-  return <WakaTimeStatsClient stats={stats} allTimeStats={allTimeStats} config={config} />;
+  return <WakaTimeStatsClient stats={stats} allTimeStats={allTimeStats} yearlyStats={yearlyStats} config={config} />;
 }
