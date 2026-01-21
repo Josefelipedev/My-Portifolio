@@ -37,7 +37,7 @@ export async function POST(request: Request) {
 
     const data = await request.json();
 
-    validateRequired(data, ['externalId', 'source', 'title', 'company', 'description', 'url']);
+    validateRequired(data, ['externalId', 'source', 'title', 'company', 'url']);
 
     // Check if already saved
     const existing = await prisma.savedJob.findUnique({
@@ -55,7 +55,7 @@ export async function POST(request: Request) {
         title: data.title,
         company: data.company,
         companyLogo: data.companyLogo,
-        description: data.description,
+        description: data.description || '',
         url: data.url,
         location: data.location,
         jobType: data.jobType,

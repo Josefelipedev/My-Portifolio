@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useToast } from '@/components/ui/Toast';
 
 interface JobListing {
   id: string;
@@ -86,6 +87,7 @@ const POPULAR_SEARCH_TERMS = [
 ];
 
 export default function JobSearch({ onJobSaved }: JobSearchProps) {
+  const toast = useToast();
   const [keyword, setKeyword] = useState('');
   const [selectedCountries, setSelectedCountries] = useState<Set<string>>(new Set(['all']));
   const [selectedSources, setSelectedSources] = useState<Set<string>>(new Set(['all']));
@@ -344,8 +346,9 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
         return newSet;
       });
       onJobSaved();
+      toast.showSuccess('Vaga salva com sucesso!');
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to save job');
+      toast.showError(err instanceof Error ? err.message : 'Erro ao salvar vaga');
     } finally {
       setSaving(null);
     }
@@ -770,9 +773,29 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
                 {/* Expanded Description */}
                 {expandedId === job.id && (
                   <div className="mt-4 pt-4 border-t border-zinc-200 dark:border-zinc-700">
-                    <p className="text-sm text-zinc-600 dark:text-zinc-400 whitespace-pre-wrap line-clamp-6">
-                      {stripHtml(job.description).substring(0, 1000)}...
-                    </p>
+                    {job.description && stripHtml(job.description).trim() ? (
+                      <p className="text-sm text-zinc-600 dark:text-zinc-400 whitespace-pre-wrap">
+                        {stripHtml(job.description).substring(0, 1500)}
+                        {stripHtml(job.description).length > 1500 && '...'}
+                      </p>
+                    ) : (
+                      <div className="text-center py-4">
+                        <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-3">
+                          Descricao nao disponivel. Clique abaixo para ver a vaga completa.
+                        </p>
+                        <a
+                          href={job.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                          </svg>
+                          Ver vaga no site original
+                        </a>
+                      </div>
+                    )}
                   </div>
                 )}
 
