@@ -74,7 +74,8 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
   const [composingEmail, setComposingEmail] = useState<SavedJob | null>(null);
   const [emailSubject, setEmailSubject] = useState('');
   const [emailBody, setEmailBody] = useState('');
-  const [sendingEmail, setSendingEmail] = useState(false);
+  const [generatingEmail, setGeneratingEmail] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     fetchSavedJobs();
@@ -198,50 +199,52 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
 
   const openEmailComposer = (job: SavedJob) => {
     setComposingEmail(job);
-    setEmailSubject(`Application for ${job.title} position`);
-    setEmailBody(`Hello,
-
-I am writing to express my interest in the ${job.title} position at ${job.company}.
-
-[Your message here]
-
-Best regards,
-[Your name]`);
+    setEmailSubject(`Candidatura: ${job.title} - ${job.company}`);
+    setEmailBody('');
+    setCopied(false);
   };
 
-  const handleSendEmail = async () => {
-    if (!composingEmail || !composingEmail.contactEmail) {
-      showError('No email address available');
-      return;
-    }
+  const generateEmailWithAI = async () => {
+    if (!composingEmail) return;
 
     try {
-      setSendingEmail(true);
-      const response = await fetch('/api/jobs/saved/send-email', {
+      setGeneratingEmail(true);
+      const response = await fetch('/api/jobs/generate-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          to: composingEmail.contactEmail,
-          subject: emailSubject,
-          body: emailBody,
-          jobId: composingEmail.id,
+          jobTitle: composingEmail.title,
+          company: composingEmail.company,
+          description: composingEmail.description,
+          jobUrl: composingEmail.url,
         }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to send email');
+        throw new Error(data.error || 'Failed to generate email');
       }
 
-      showSuccess('Email sent successfully!');
-      setComposingEmail(null);
-      setEmailSubject('');
-      setEmailBody('');
+      setEmailSubject(data.subject || emailSubject);
+      setEmailBody(data.body);
+      showSuccess('Email generated based on your resume!');
     } catch (err) {
-      showError(err instanceof Error ? err.message : 'Failed to send email');
+      showError(err instanceof Error ? err.message : 'Failed to generate email');
     } finally {
-      setSendingEmail(false);
+      setGeneratingEmail(false);
+    }
+  };
+
+  const copyEmailToClipboard = async () => {
+    const fullEmail = `Assunto: ${emailSubject}\n\n${emailBody}`;
+    try {
+      await navigator.clipboard.writeText(fullEmail);
+      setCopied(true);
+      showSuccess('Email copied to clipboard!');
+      setTimeout(() => setCopied(false), 3000);
+    } catch {
+      showError('Failed to copy to clipboard');
     }
   };
 
@@ -909,8 +912,8 @@ Best regards,
           <div className="bg-white dark:bg-zinc-800 rounded-xl max-w-2xl w-full overflow-hidden">
             <div className="flex items-center justify-between p-4 border-b border-zinc-200 dark:border-zinc-700">
               <div>
-                <h3 className="font-semibold text-zinc-900 dark:text-zinc-100">Send Email</h3>
-                <p className="text-sm text-zinc-500">To: {composingEmail.contactEmail}</p>
+                <h3 className="font-semibold text-zinc-900 dark:text-zinc-100">Compor Email</h3>
+                <p className="text-sm text-zinc-500">Para: {composingEmail.contactEmail || 'Email nao encontrado'}</p>
               </div>
               <button
                 onClick={() => setComposingEmail(null)}
@@ -922,9 +925,33 @@ Best regards,
               </button>
             </div>
             <div className="p-4 space-y-4">
+              {/* Generate with AI Button */}
+              <button
+                onClick={generateEmailWithAI}
+                disabled={generatingEmail}
+                className="w-full px-4 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:from-purple-600 hover:to-pink-600 disabled:opacity-50 flex items-center justify-center gap-2 font-medium"
+              >
+                {generatingEmail ? (
+                  <>
+                    <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    Gerando com base no seu curriculo...
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                    Gerar Email com IA (baseado no curriculo)
+                  </>
+                )}
+              </button>
+
               <div>
                 <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
-                  Subject
+                  Assunto
                 </label>
                 <input
                   type="text"
@@ -935,50 +962,56 @@ Best regards,
               </div>
               <div>
                 <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
-                  Message
+                  Mensagem
                 </label>
                 <textarea
                   value={emailBody}
                   onChange={(e) => setEmailBody(e.target.value)}
-                  rows={10}
+                  rows={12}
+                  placeholder="Clique em 'Gerar Email com IA' para criar uma mensagem personalizada baseada no seu curriculo..."
                   className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 font-mono text-sm"
                 />
               </div>
               <div className="flex gap-2 pt-2">
                 <button
-                  onClick={handleSendEmail}
-                  disabled={sendingEmail || !emailSubject || !emailBody}
-                  className="flex-1 px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 disabled:opacity-50 flex items-center justify-center gap-2"
+                  onClick={copyEmailToClipboard}
+                  disabled={!emailBody}
+                  className={`flex-1 px-4 py-2 rounded-lg flex items-center justify-center gap-2 transition-colors ${
+                    copied
+                      ? 'bg-green-500 text-white'
+                      : 'bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-300 dark:hover:bg-zinc-600 disabled:opacity-50'
+                  }`}
                 >
-                  {sendingEmail ? (
+                  {copied ? (
                     <>
-                      <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                       </svg>
-                      Sending...
+                      Copiado!
                     </>
                   ) : (
                     <>
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                       </svg>
-                      Send Email
+                      Copiar
                     </>
                   )}
                 </button>
-                <a
-                  href={`mailto:${composingEmail.contactEmail}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`}
-                  className="px-4 py-2 bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300 rounded-lg hover:bg-zinc-300 dark:hover:bg-zinc-600 flex items-center gap-2"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                  </svg>
-                  Open in Mail App
-                </a>
+                {composingEmail.contactEmail && (
+                  <a
+                    href={`mailto:${composingEmail.contactEmail}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`}
+                    className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center justify-center gap-2"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                    Abrir no App de Email
+                  </a>
+                )}
               </div>
               <p className="text-xs text-zinc-500 text-center">
-                Email will be sent from your configured SMTP account
+                A IA gera uma sugestao baseada no seu curriculo. Voce envia manualmente.
               </p>
             </div>
           </div>
