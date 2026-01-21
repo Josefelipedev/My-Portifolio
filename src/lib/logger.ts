@@ -1,6 +1,6 @@
 // System Logger - Centralized logging with database persistence
 
-import { prisma } from './prisma';
+import prisma from './prisma';
 
 export type LogLevel = 'error' | 'warn' | 'info' | 'debug';
 
