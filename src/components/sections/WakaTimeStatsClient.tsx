@@ -310,7 +310,7 @@ export function WakaTimeStatsClient({ stats, allTimeStats, yearlyStats, yearlySt
     <section id="wakatime" className="py-20 px-4 overflow-hidden bg-gradient-to-b from-slate-900 via-slate-900 to-slate-800">
       <div className="max-w-6xl mx-auto">
         {/* Section Header */}
-        <div className="text-center mb-12">
+        <div className="text-center mb-8">
           <h2 className="text-3xl md:text-4xl font-bold mb-4">
             <span className="bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
               {texts.title}
@@ -319,6 +319,37 @@ export function WakaTimeStatsClient({ stats, allTimeStats, yearlyStats, yearlySt
           <p className="text-slate-400 max-w-2xl mx-auto">
             {texts.subtitle}
           </p>
+
+          {/* Year Selection Buttons */}
+          {config.showYearlyStats && (availableYears.length > 0 || yearlyStats) && (
+            <div className="flex flex-wrap justify-center gap-2 mt-6">
+              {yearlyStats && (
+                <button
+                  onClick={() => setSelectedYear('last365')}
+                  className={`px-5 py-2.5 rounded-full text-sm font-medium transition-all ${
+                    selectedYear === 'last365'
+                      ? 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-lg shadow-purple-500/25'
+                      : 'bg-slate-800/50 text-slate-300 hover:bg-slate-700/50 border border-slate-700'
+                  }`}
+                >
+                  {texts.last365Days}
+                </button>
+              )}
+              {availableYears.map((year) => (
+                <button
+                  key={year}
+                  onClick={() => setSelectedYear(year)}
+                  className={`px-5 py-2.5 rounded-full text-sm font-medium transition-all ${
+                    selectedYear === year
+                      ? 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-lg shadow-purple-500/25'
+                      : 'bg-slate-800/50 text-slate-300 hover:bg-slate-700/50 border border-slate-700'
+                  }`}
+                >
+                  {year}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Stats Grid */}
@@ -450,39 +481,11 @@ export function WakaTimeStatsClient({ stats, allTimeStats, yearlyStats, yearlySt
             <div className="text-center mb-8">
               <h3 className="text-2xl font-bold text-white mb-2 flex items-center justify-center gap-2">
                 <CalendarIcon />
-                {texts.yearlyStats}
+                {texts.yearlyStats} {selectedYear !== 'last365' && `- ${selectedYear}`}
               </h3>
-
-              {/* Year Tabs */}
-              {(availableYears.length > 0 || yearlyStats) && (
-                <div className="flex justify-center gap-2 mt-4">
-                  {yearlyStats && (
-                    <button
-                      onClick={() => setSelectedYear('last365')}
-                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                        selectedYear === 'last365'
-                          ? 'bg-purple-500 text-white'
-                          : 'bg-slate-800/50 text-slate-400 hover:bg-slate-700/50'
-                      }`}
-                    >
-                      {texts.last365Days}
-                    </button>
-                  )}
-                  {availableYears.map((year) => (
-                    <button
-                      key={year}
-                      onClick={() => setSelectedYear(year)}
-                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                        selectedYear === year
-                          ? 'bg-purple-500 text-white'
-                          : 'bg-slate-800/50 text-slate-400 hover:bg-slate-700/50'
-                      }`}
-                    >
-                      {year}
-                    </button>
-                  ))}
-                </div>
-              )}
+              <p className="text-slate-400 text-sm">
+                {selectedYear === 'last365' ? texts.last365Days : `${language === 'pt' ? 'Ano de' : 'Year'} ${selectedYear}`}
+              </p>
             </div>
 
             {currentYearlyStats && (
