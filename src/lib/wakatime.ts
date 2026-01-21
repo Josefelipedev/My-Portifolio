@@ -1,3 +1,5 @@
+import prisma from '@/lib/prisma';
+
 const WAKATIME_API_KEY = process.env.WAKATIME_API_KEY;
 const WAKATIME_API_URL = 'https://wakatime.com/api/v1';
 
@@ -260,7 +262,20 @@ export async function getWakaTimeYearlyStats(): Promise<WakaTimeStats | null> {
 }
 
 // Get stats for a specific calendar year using the stats endpoint
-export async function getWakaTimeStatsForYear(year: number): Promise<WakaTimeStats | null> {
+// First checks cache, then fetches from API if needed
+export async function getWakaTimeStatsForYear(year: number, useCache = true): Promise<WakaTimeStats | null> {
+  // Try to get from cache first (for past years)
+  const currentYear = new Date().getFullYear();
+  const isPastYear = year < currentYear;
+
+  if (useCache && isPastYear) {
+    const cached = await getYearStatsFromCache(year);
+    if (cached) {
+      console.log(`WakaTime: Using cached data for ${year}`);
+      return cached;
+    }
+  }
+
   if (!WAKATIME_API_KEY) {
     console.error('WAKATIME_API_KEY not configured');
     return null;
@@ -274,7 +289,7 @@ export async function getWakaTimeStatsForYear(year: number): Promise<WakaTimeSta
         headers: {
           Authorization: `Basic ${Buffer.from(WAKATIME_API_KEY).toString('base64')}`,
         },
-        next: { revalidate: 86400 }, // Cache for 24 hours
+        next: { revalidate: isPastYear ? 604800 : 86400 }, // 7 days for past years, 1 day for current
       }
     );
 
@@ -290,7 +305,7 @@ export async function getWakaTimeStatsForYear(year: number): Promise<WakaTimeSta
       return null;
     }
 
-    return {
+    const result: WakaTimeStats = {
       totalSeconds: stats.total_seconds || 0,
       totalHours: formatSeconds(stats.total_seconds || 0),
       dailyAverage: formatSeconds(stats.daily_average || 0),
@@ -336,9 +351,125 @@ export async function getWakaTimeStatsForYear(year: number): Promise<WakaTimeSta
         text: stats.human_readable_range || `${year}`,
       },
     };
+
+    // Cache past years data in the database
+    if (useCache && isPastYear) {
+      await saveYearStatsToCache(year, result);
+    }
+
+    return result;
   } catch (error) {
     console.error(`Error fetching WakaTime stats for ${year}:`, error);
     return null;
+  }
+}
+
+// Save year stats to database cache
+async function saveYearStatsToCache(year: number, stats: WakaTimeStats): Promise<void> {
+  try {
+    await prisma.wakaTimeYearCache.upsert({
+      where: { year },
+      update: {
+        totalSeconds: stats.totalSeconds,
+        totalHours: stats.totalHours,
+        dailyAverage: stats.dailyAverage,
+        bestDayDate: stats.bestDay?.date || null,
+        bestDaySeconds: stats.bestDay?.totalSeconds || null,
+        bestDayText: stats.bestDay?.text || null,
+        languages: JSON.stringify(stats.languages),
+        editors: JSON.stringify(stats.editors),
+        operatingSystems: JSON.stringify(stats.operatingSystems),
+        projects: JSON.stringify(stats.projects),
+        categories: JSON.stringify(stats.categories),
+        rangeStart: stats.range.start,
+        rangeEnd: stats.range.end,
+        rangeText: stats.range.text,
+        cachedAt: new Date(),
+      },
+      create: {
+        id: `year_${year}`,
+        year,
+        totalSeconds: stats.totalSeconds,
+        totalHours: stats.totalHours,
+        dailyAverage: stats.dailyAverage,
+        bestDayDate: stats.bestDay?.date || null,
+        bestDaySeconds: stats.bestDay?.totalSeconds || null,
+        bestDayText: stats.bestDay?.text || null,
+        languages: JSON.stringify(stats.languages),
+        editors: JSON.stringify(stats.editors),
+        operatingSystems: JSON.stringify(stats.operatingSystems),
+        projects: JSON.stringify(stats.projects),
+        categories: JSON.stringify(stats.categories),
+        rangeStart: stats.range.start,
+        rangeEnd: stats.range.end,
+        rangeText: stats.range.text,
+      },
+    });
+    console.log(`WakaTime: Cached data for ${year}`);
+  } catch (error) {
+    console.error(`Error caching WakaTime stats for ${year}:`, error);
+  }
+}
+
+// Get year stats from database cache
+async function getYearStatsFromCache(year: number): Promise<WakaTimeStats | null> {
+  try {
+    const cached = await prisma.wakaTimeYearCache.findUnique({
+      where: { year },
+    });
+
+    if (!cached) {
+      return null;
+    }
+
+    return {
+      totalSeconds: cached.totalSeconds,
+      totalHours: cached.totalHours,
+      dailyAverage: cached.dailyAverage,
+      bestDay: cached.bestDayDate ? {
+        date: cached.bestDayDate,
+        totalSeconds: cached.bestDaySeconds || 0,
+        text: cached.bestDayText || '',
+      } : null,
+      languages: JSON.parse(cached.languages),
+      editors: JSON.parse(cached.editors),
+      operatingSystems: JSON.parse(cached.operatingSystems),
+      projects: JSON.parse(cached.projects),
+      categories: JSON.parse(cached.categories),
+      range: {
+        start: cached.rangeStart,
+        end: cached.rangeEnd,
+        text: cached.rangeText,
+      },
+    };
+  } catch (error) {
+    console.error(`Error getting cached WakaTime stats for ${year}:`, error);
+    return null;
+  }
+}
+
+// Clear cache for a specific year (useful for refreshing data)
+export async function clearWakaTimeYearCache(year: number): Promise<boolean> {
+  try {
+    await prisma.wakaTimeYearCache.delete({
+      where: { year },
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// Get all cached years
+export async function getCachedWakaTimeYears(): Promise<number[]> {
+  try {
+    const cached = await prisma.wakaTimeYearCache.findMany({
+      select: { year: true },
+      orderBy: { year: 'desc' },
+    });
+    return cached.map(c => c.year);
+  } catch {
+    return [];
   }
 }
 

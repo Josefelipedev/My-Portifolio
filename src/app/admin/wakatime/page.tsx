@@ -5,19 +5,31 @@ import Link from 'next/link';
 
 interface WakaTimeConfig {
   enabled: boolean;
+  // Weekly stats
   showTotalTime: boolean;
   showDailyAverage: boolean;
   showBestDay: boolean;
   showAllTime: boolean;
-  showYearlyStats: boolean;
-  showYearSelector: boolean;
   showLanguages: boolean;
   showEditors: boolean;
   showOS: boolean;
   showProjects: boolean;
-  profileUrl: string;
+  // Yearly stats
+  showYearlyStats: boolean;
+  showYearSelector: boolean;
   selectedYears: number[];
   yearlyStatsType: 'last365' | 'calendar';
+  // Yearly display options
+  showYearlyTotalTime: boolean;
+  showYearlyDailyAverage: boolean;
+  showYearlyBestDay: boolean;
+  showYearlyLanguages: boolean;
+  showYearlyEditors: boolean;
+  showYearlyOS: boolean;
+  showYearlyProjects: boolean;
+  // Other
+  profileUrl: string;
+  cacheYearlyData: boolean;
 }
 
 interface WakaTimePreview {
@@ -34,15 +46,23 @@ const DEFAULT_CONFIG: WakaTimeConfig = {
   showDailyAverage: true,
   showBestDay: true,
   showAllTime: true,
-  showYearlyStats: true,
-  showYearSelector: true,
   showLanguages: true,
   showEditors: true,
   showOS: true,
   showProjects: true,
-  profileUrl: 'https://wakatime.com/@josefelipe',
+  showYearlyStats: true,
+  showYearSelector: true,
   selectedYears: [],
   yearlyStatsType: 'last365',
+  showYearlyTotalTime: true,
+  showYearlyDailyAverage: true,
+  showYearlyBestDay: true,
+  showYearlyLanguages: true,
+  showYearlyEditors: true,
+  showYearlyOS: true,
+  showYearlyProjects: true,
+  profileUrl: 'https://wakatime.com/@josefelipedev',
+  cacheYearlyData: true,
 };
 
 // Generate available years (current year and last 4 years)
@@ -129,18 +149,27 @@ export default function WakaTimeAdminPage() {
     }
   };
 
-  const toggleOptions = [
-    { key: 'enabled', label: 'Habilitar Seção WakaTime', description: 'Mostra ou esconde toda a seção de estatísticas do WakaTime na página inicial' },
+  // Weekly stats options
+  const weeklyOptions = [
     { key: 'showTotalTime', label: 'Tempo Total (7 dias)', description: 'Mostra o total de horas codificadas nos últimos 7 dias' },
     { key: 'showDailyAverage', label: 'Média Diária', description: 'Mostra a média de horas por dia' },
     { key: 'showBestDay', label: 'Melhor Dia', description: 'Mostra o dia com mais horas de código' },
     { key: 'showAllTime', label: 'Tempo Total Geral', description: 'Mostra o total de horas desde o início do uso do WakaTime' },
-    { key: 'showYearlyStats', label: 'Estatísticas Anuais', description: 'Mostra uma seção com estatísticas anuais (linguagens, projetos, etc.)' },
-    { key: 'showYearSelector', label: 'Botões de Seleção de Ano', description: 'Mostra os botões para o visitante escolher qual ano visualizar' },
     { key: 'showLanguages', label: 'Linguagens', description: 'Mostra as linguagens de programação mais usadas' },
     { key: 'showEditors', label: 'Editores', description: 'Mostra os editores de código mais usados' },
     { key: 'showOS', label: 'Sistemas Operacionais', description: 'Mostra os sistemas operacionais utilizados' },
     { key: 'showProjects', label: 'Projetos', description: 'Mostra os projetos mais trabalhados' },
+  ] as const;
+
+  // Yearly stats display options
+  const yearlyDisplayOptions = [
+    { key: 'showYearlyTotalTime', label: 'Total Anual', description: 'Mostra o total de horas do ano' },
+    { key: 'showYearlyDailyAverage', label: 'Média Diária (Ano)', description: 'Mostra a média diária do ano' },
+    { key: 'showYearlyBestDay', label: 'Melhor Dia (Ano)', description: 'Mostra o melhor dia do ano' },
+    { key: 'showYearlyLanguages', label: 'Linguagens (Ano)', description: 'Mostra as linguagens usadas no ano' },
+    { key: 'showYearlyEditors', label: 'Editores (Ano)', description: 'Mostra os editores usados no ano' },
+    { key: 'showYearlyOS', label: 'Sistemas Operacionais (Ano)', description: 'Mostra os sistemas operacionais do ano' },
+    { key: 'showYearlyProjects', label: 'Projetos (Ano)', description: 'Mostra os projetos do ano' },
   ] as const;
 
   return (
@@ -309,39 +338,164 @@ export default function WakaTimeAdminPage() {
           </div>
         ) : (
           <div className="space-y-6">
-            {/* Toggle Options */}
+            {/* Main Toggle */}
             <div className="bg-white dark:bg-zinc-800 rounded-xl border border-zinc-200 dark:border-zinc-700 overflow-hidden">
-              {toggleOptions.map((option, index) => (
-                <div
-                  key={option.key}
-                  className={`p-4 flex items-center justify-between ${
-                    index !== toggleOptions.length - 1 ? 'border-b border-zinc-200 dark:border-zinc-700' : ''
-                  } ${option.key === 'enabled' ? 'bg-zinc-100 dark:bg-zinc-700' : ''}`}
+              <div className="p-4 flex items-center justify-between bg-zinc-100 dark:bg-zinc-700">
+                <div className="flex-1">
+                  <h3 className="font-medium text-lg text-zinc-900 dark:text-zinc-100">Habilitar Seção WakaTime</h3>
+                  <p className="text-sm text-zinc-500 dark:text-zinc-400">Mostra ou esconde toda a seção na página inicial</p>
+                </div>
+                <button
+                  onClick={() => handleToggle('enabled')}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    config.enabled ? 'bg-red-500' : 'bg-zinc-300 dark:bg-zinc-600'
+                  }`}
                 >
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    config.enabled ? 'translate-x-6' : 'translate-x-1'
+                  }`} />
+                </button>
+              </div>
+            </div>
+
+            {/* Weekly Stats Options */}
+            {config.enabled && (
+              <div className="bg-white dark:bg-zinc-800 rounded-xl border border-zinc-200 dark:border-zinc-700 overflow-hidden">
+                <div className="p-4 border-b border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/50">
+                  <h3 className="font-medium text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                    <svg className="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Estatísticas Semanais (Últimos 7 dias)
+                  </h3>
+                </div>
+                {weeklyOptions.map((option, index) => (
+                  <div
+                    key={option.key}
+                    className={`p-4 flex items-center justify-between ${
+                      index !== weeklyOptions.length - 1 ? 'border-b border-zinc-200 dark:border-zinc-700' : ''
+                    }`}
+                  >
+                    <div className="flex-1">
+                      <h3 className="font-medium text-zinc-900 dark:text-zinc-100">{option.label}</h3>
+                      <p className="text-sm text-zinc-500 dark:text-zinc-400">{option.description}</p>
+                    </div>
+                    <button
+                      onClick={() => handleToggle(option.key)}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                        config[option.key] ? 'bg-red-500' : 'bg-zinc-300 dark:bg-zinc-600'
+                      }`}
+                    >
+                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        config[option.key] ? 'translate-x-6' : 'translate-x-1'
+                      }`} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Yearly Stats Toggle */}
+            {config.enabled && (
+              <div className="bg-white dark:bg-zinc-800 rounded-xl border border-zinc-200 dark:border-zinc-700 overflow-hidden">
+                <div className="p-4 flex items-center justify-between bg-zinc-50 dark:bg-zinc-800/50 border-b border-zinc-200 dark:border-zinc-700">
                   <div className="flex-1">
-                    <h3 className={`font-medium ${option.key === 'enabled' ? 'text-lg' : ''} text-zinc-900 dark:text-zinc-100`}>
-                      {option.label}
+                    <h3 className="font-medium text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                      <svg className="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                      Estatísticas Anuais
                     </h3>
-                    <p className="text-sm text-zinc-500 dark:text-zinc-400">{option.description}</p>
+                    <p className="text-sm text-zinc-500 dark:text-zinc-400">Mostra seção de estatísticas por ano</p>
                   </div>
                   <button
-                    onClick={() => handleToggle(option.key)}
-                    disabled={option.key !== 'enabled' && !config.enabled}
+                    onClick={() => handleToggle('showYearlyStats')}
                     className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                      config[option.key]
-                        ? 'bg-red-500'
-                        : 'bg-zinc-300 dark:bg-zinc-600'
-                    } ${option.key !== 'enabled' && !config.enabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      config.showYearlyStats ? 'bg-red-500' : 'bg-zinc-300 dark:bg-zinc-600'
+                    }`}
                   >
-                    <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                        config[option.key] ? 'translate-x-6' : 'translate-x-1'
-                      }`}
-                    />
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      config.showYearlyStats ? 'translate-x-6' : 'translate-x-1'
+                    }`} />
                   </button>
                 </div>
-              ))}
-            </div>
+
+                {/* Year Selector Toggle */}
+                <div className={`p-4 flex items-center justify-between border-b border-zinc-200 dark:border-zinc-700 ${!config.showYearlyStats ? 'opacity-50' : ''}`}>
+                  <div className="flex-1">
+                    <h3 className="font-medium text-zinc-900 dark:text-zinc-100">Botões de Seleção de Ano</h3>
+                    <p className="text-sm text-zinc-500 dark:text-zinc-400">Permite o visitante escolher qual ano visualizar</p>
+                  </div>
+                  <button
+                    onClick={() => handleToggle('showYearSelector')}
+                    disabled={!config.showYearlyStats}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      config.showYearSelector ? 'bg-red-500' : 'bg-zinc-300 dark:bg-zinc-600'
+                    } ${!config.showYearlyStats ? 'cursor-not-allowed' : ''}`}
+                  >
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      config.showYearSelector ? 'translate-x-6' : 'translate-x-1'
+                    }`} />
+                  </button>
+                </div>
+
+                {/* Yearly Display Options */}
+                {config.showYearlyStats && (
+                  <>
+                    <div className="p-3 bg-zinc-100 dark:bg-zinc-700/50 border-b border-zinc-200 dark:border-zinc-700">
+                      <p className="text-sm font-medium text-zinc-600 dark:text-zinc-400">O que mostrar nas estatísticas anuais:</p>
+                    </div>
+                    {yearlyDisplayOptions.map((option, index) => (
+                      <div
+                        key={option.key}
+                        className={`p-4 flex items-center justify-between ${
+                          index !== yearlyDisplayOptions.length - 1 ? 'border-b border-zinc-200 dark:border-zinc-700' : ''
+                        }`}
+                      >
+                        <div className="flex-1">
+                          <h3 className="font-medium text-zinc-900 dark:text-zinc-100">{option.label}</h3>
+                          <p className="text-sm text-zinc-500 dark:text-zinc-400">{option.description}</p>
+                        </div>
+                        <button
+                          onClick={() => handleToggle(option.key)}
+                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                            config[option.key] ? 'bg-red-500' : 'bg-zinc-300 dark:bg-zinc-600'
+                          }`}
+                        >
+                          <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                            config[option.key] ? 'translate-x-6' : 'translate-x-1'
+                          }`} />
+                        </button>
+                      </div>
+                    ))}
+                  </>
+                )}
+
+                {/* Cache Option */}
+                <div className={`p-4 flex items-center justify-between border-t border-zinc-200 dark:border-zinc-700 ${!config.showYearlyStats ? 'opacity-50' : ''}`}>
+                  <div className="flex-1">
+                    <h3 className="font-medium text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                      <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
+                      </svg>
+                      Cache no Banco de Dados
+                    </h3>
+                    <p className="text-sm text-zinc-500 dark:text-zinc-400">Salva dados de anos anteriores para carregamento mais rápido</p>
+                  </div>
+                  <button
+                    onClick={() => handleToggle('cacheYearlyData')}
+                    disabled={!config.showYearlyStats}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      config.cacheYearlyData ? 'bg-green-500' : 'bg-zinc-300 dark:bg-zinc-600'
+                    } ${!config.showYearlyStats ? 'cursor-not-allowed' : ''}`}
+                  >
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      config.cacheYearlyData ? 'translate-x-6' : 'translate-x-1'
+                    }`} />
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Year Configuration - Always visible when enabled */}
             {config.enabled && (
