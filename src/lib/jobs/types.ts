@@ -25,6 +25,7 @@ export type JobSourceType =
   | 'jooble'
   | 'jsearch'
   | 'netempregos'
+  | 'itjobs'
   | 'vagascombr'
   | 'linkedin'
   | 'geekhunter';

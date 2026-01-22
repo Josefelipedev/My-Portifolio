@@ -14,6 +14,7 @@ import { searchAdzuna } from './apis/adzuna';
 import { searchJooble } from './apis/jooble';
 import { searchJSearch } from './apis/jsearch';
 import { searchNetEmpregos } from './apis/net-empregos';
+import { searchITJobs } from './apis/itjobs';
 import { searchVagasComBr } from './apis/vagas';
 import { searchLinkedIn } from './apis/linkedin';
 import { searchGeekHunter } from './apis/geekhunter';
@@ -91,6 +92,11 @@ export async function searchJobs(
   // Portugal-specific: Net-Empregos
   if (sources.includes('netempregos') || (isAllSources && shouldSearchCountry('pt'))) {
     searches.push(searchNetEmpregos(params));
+  }
+
+  // Portugal-specific: ITJobs.pt
+  if (sources.includes('itjobs') || (isAllSources && shouldSearchCountry('pt'))) {
+    searches.push(searchITJobs(params));
   }
 
   // Brazil-specific: Vagas.com.br (JS scraper with Python fallback)
@@ -190,6 +196,7 @@ export function getApiStatus(): ApiStatus[] {
     { name: 'Remotive', configured: true, needsKey: false },
     { name: 'Arbeitnow', configured: true, needsKey: false },
     { name: 'Net-Empregos', configured: true, needsKey: false },
+    { name: 'ITJobs.pt', configured: true, needsKey: false },
     { name: 'Vagas.com.br', configured: true, needsKey: false },
     { name: 'LinkedIn', configured: true, needsKey: false },
     { name: 'GeekHunter', configured: true, needsKey: false },
