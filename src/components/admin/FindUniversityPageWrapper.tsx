@@ -36,7 +36,7 @@ interface Course {
   university: { name: string };
 }
 
-interface EduPortugalPageWrapperProps {
+interface FindUniversityPageWrapperProps {
   universitiesCount: number;
   coursesCount: number;
   coursesByLevel: Record<string, number>;
@@ -59,7 +59,7 @@ const COURSE_LEVEL_LABELS: Record<string, string> = {
   'curso-tecnico': 'Curso Tecnico',
 };
 
-export default function EduPortugalPageWrapper({
+export default function FindUniversityPageWrapper({
   universitiesCount: initialUniversitiesCount,
   coursesCount: initialCoursesCount,
   coursesByLevel,
@@ -68,7 +68,7 @@ export default function EduPortugalPageWrapper({
   runningSync: initialRunningSync,
   recentSyncs: initialRecentSyncs,
   error,
-}: EduPortugalPageWrapperProps) {
+}: FindUniversityPageWrapperProps) {
   const [universitiesCount, setUniversitiesCount] = useState(initialUniversitiesCount);
   const [coursesCount, setCoursesCount] = useState(initialCoursesCount);
   const [isImporting, setIsImporting] = useState(!!initialRunningSync);
@@ -83,7 +83,7 @@ export default function EduPortugalPageWrapper({
   // Poll for import status
   const checkImportStatus = useCallback(async () => {
     try {
-      const response = await fetch('/api/admin/eduportugal/status');
+      const response = await fetch('/api/admin/finduniversity/status');
       const data = await response.json();
 
       if (data.runningSync) {
@@ -148,14 +148,14 @@ export default function EduPortugalPageWrapper({
   };
 
   const startImport = async (syncType: string) => {
-    if (!confirm(`This will import ${syncType === 'full' ? 'universities and courses' : syncType} from eduportugal.eu. Continue?`)) {
+    if (!confirm(`This will import ${syncType === 'full' ? 'universities and courses' : syncType} from source. Continue?`)) {
       return;
     }
 
     setIsImporting(true);
 
     try {
-      const response = await fetch('/api/admin/eduportugal/sync', {
+      const response = await fetch('/api/admin/finduniversity/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ syncType }),
@@ -376,7 +376,7 @@ export default function EduPortugalPageWrapper({
                 <div className="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
                   <h3 className="font-semibold text-amber-700 dark:text-amber-400 mb-2">Initial Import</h3>
                   <p className="text-sm text-amber-600 dark:text-amber-400 mb-3">
-                    Database is empty. Import data from eduportugal.eu to get started.
+                    Database is empty. Import data from source to get started.
                   </p>
 
                   {isImporting && importProgress && (
