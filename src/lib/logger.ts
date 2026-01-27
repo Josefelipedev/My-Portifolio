@@ -20,6 +20,7 @@ export type LogSource =
   | 'ai-extraction'
   | 'job-enrichment'
   | 'job-alerts'
+  | 'eduportugal'
   | 'api'
   | 'auth'
   | 'cron'
