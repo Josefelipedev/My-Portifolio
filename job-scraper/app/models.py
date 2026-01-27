@@ -46,7 +46,7 @@ class SearchResponse(BaseModel):
 # ==========================================
 
 class CourseLevel(str, Enum):
-    GRADUACAO = "graduacao"
+    LICENCIATURA = "licenciatura"
     MESTRADO = "mestrado"
     MESTRADO_INTEGRADO = "mestrado-integrado"
     DOUTORADO = "doutorado"
@@ -54,6 +54,10 @@ class CourseLevel(str, Enum):
     MBA = "mba"
     POS_GRADUACAO = "pos-graduacao"
     CURSO_TECNICO = "curso-tecnico"
+    B_LEARNING = "b-learning"
+    E_LEARNING = "e-learning"
+    FORMACAO_EXECUTIVA = "formacao-executiva"
+    ESPECIALIZACAO = "especializacao"
 
 
 class UniversityListing(BaseModel):

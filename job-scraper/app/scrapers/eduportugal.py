@@ -40,14 +40,18 @@ class EduPortugalScraper:
 
     # Mapeamento de níveis de curso para URLs
     COURSE_LEVELS = {
-        "graduacao": "/cursos-estudo/graduacao/",
+        "licenciatura": "/cursos-estudo/licenciatura/",
         "mestrado": "/cursos-estudo/mestrado/",
         "mestrado-integrado": "/cursos-estudo/mestrado-integrado/",
         "doutorado": "/cursos-estudo/doutorado/",
         "pos-doutorado": "/cursos-estudo/pos-doutorado/",
         "mba": "/cursos-estudo/mba/",
         "pos-graduacao": "/cursos-estudo/pos-graduacao/",
-        "curso-tecnico": "/cursos-estudo/curso-tecnico-superior-profissional/",
+        "curso-tecnico": "/cursos-estudo/cursos-tecnicos-profissionais/",
+        "b-learning": "/cursos-estudo/b-learning/",
+        "e-learning": "/cursos-estudo/e-learning/",
+        "formacao-executiva": "/cursos-estudo/formacao-executiva-mba/",
+        "especializacao": "/cursos-estudo/cursos-de-especializacao/",
     }
 
     # Delay entre requisições (segundos)
