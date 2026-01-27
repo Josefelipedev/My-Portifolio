@@ -4,6 +4,32 @@ import EduPortugalPageWrapper from '@/components/admin/EduPortugalPageWrapper';
 // Force dynamic to avoid build errors when tables don't exist yet
 export const dynamic = 'force-dynamic';
 
+// Helper to serialize sync log dates to strings
+function serializeSyncLog(sync: {
+  id: string;
+  syncType: string;
+  status: string;
+  startedAt: Date;
+  completedAt: Date | null;
+  universitiesFound: number;
+  universitiesCreated: number;
+  universitiesUpdated: number;
+  coursesFound: number;
+  coursesCreated: number;
+  coursesUpdated: number;
+  currentPage: number;
+  totalPages: number;
+  currentLevel: string | null;
+  errors: string | null;
+} | null) {
+  if (!sync) return null;
+  return {
+    ...sync,
+    startedAt: sync.startedAt.toISOString(),
+    completedAt: sync.completedAt?.toISOString() || null,
+  };
+}
+
 async function getEduPortugalStats() {
   try {
     const [
@@ -63,9 +89,9 @@ async function getEduPortugalStats() {
           .filter((item) => item.type)
           .map((item) => [item.type as string, item._count.id])
       ),
-      latestSync,
-      runningSync,
-      recentSyncs,
+      latestSync: serializeSyncLog(latestSync),
+      runningSync: serializeSyncLog(runningSync),
+      recentSyncs: recentSyncs.map((s) => serializeSyncLog(s)!),
       error: null,
     };
   } catch (error) {
