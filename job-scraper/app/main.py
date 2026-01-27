@@ -7,9 +7,10 @@ import logging
 import time
 import os
 
-from models import SearchParams, SearchResponse, JobListing
+from models import SearchParams, SearchResponse, JobListing, EduPortugalSearchResponse
 from scrapers.geekhunter import GeekHunterScraper
 from scrapers.vagas import VagasComBrScraper
+from scrapers.eduportugal import EduPortugalScraper, eduportugal_scraper
 from agents.orchestrator import AgentOrchestrator, report_execution
 from config import config
 
@@ -367,3 +368,215 @@ async def search_with_agents_detailed(
     except Exception as e:
         logger.error(f"Agent detailed search error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# EduPortugal - Universities & Courses Endpoints
+# ============================================================================
+
+# Track running syncs
+eduportugal_syncs: dict = {}
+
+
+@app.get("/eduportugal/levels")
+async def get_course_levels():
+    """List available course levels for EduPortugal."""
+    return {
+        "levels": list(EduPortugalScraper.COURSE_LEVELS.keys()),
+        "urls": EduPortugalScraper.COURSE_LEVELS,
+        "descriptions": {
+            "graduacao": "Graduacao / Licenciatura (3-4 anos)",
+            "mestrado": "Mestrado (1-2 anos)",
+            "mestrado-integrado": "Mestrado Integrado (5-6 anos)",
+            "doutorado": "Doutorado / PhD (3-4 anos)",
+            "pos-doutorado": "Pos-Doutorado",
+            "mba": "MBA - Master of Business Administration",
+            "pos-graduacao": "Pos-Graduacao / Especializacao",
+            "curso-tecnico": "Curso Tecnico Superior Profissional",
+        },
+    }
+
+
+@app.get("/eduportugal/universities")
+async def scrape_universities(
+    max_pages: int = Query(default=None, description="Limite de paginas"),
+    sync_id: str = Query(default=None, description="ID do sync para tracking"),
+):
+    """
+    Scrape universities from EduPortugal.
+
+    Retorna lista de universidades portuguesas com informacoes de contato,
+    localizacao e link para a pagina no eduportugal.
+    """
+    stats["requests_total"] += 1
+
+    async def progress_callback(progress: dict):
+        if sync_id and sync_id in eduportugal_syncs:
+            eduportugal_syncs[sync_id].update(progress)
+
+    try:
+        logger.info(f"Scraping universities (max_pages={max_pages})")
+
+        universities = await eduportugal_scraper.scrape_universities(
+            max_pages=max_pages,
+            progress_callback=progress_callback if sync_id else None,
+        )
+
+        stats["requests_success"] += 1
+
+        return {
+            "universities": [u.model_dump() for u in universities],
+            "total": len(universities),
+            "timestamp": datetime.utcnow().isoformat(),
+        }
+
+    except Exception as e:
+        stats["requests_failed"] += 1
+        logger.error(f"EduPortugal universities error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/eduportugal/courses")
+async def scrape_courses(
+    levels: str = Query(default=None, description="Niveis separados por virgula"),
+    max_pages: int = Query(default=None, description="Limite de paginas por nivel"),
+    sync_id: str = Query(default=None, description="ID do sync para tracking"),
+):
+    """
+    Scrape courses from EduPortugal.
+
+    Parametros:
+    - levels: Niveis de curso separados por virgula (ex: "mestrado,doutorado")
+              Se nao especificado, busca todos os niveis.
+    - max_pages: Limite de paginas por nivel (util para testes)
+    - sync_id: ID para tracking de progresso
+
+    Retorna lista de cursos com informacoes detalhadas.
+    """
+    stats["requests_total"] += 1
+
+    levels_list = levels.split(",") if levels else None
+
+    async def progress_callback(progress: dict):
+        if sync_id and sync_id in eduportugal_syncs:
+            eduportugal_syncs[sync_id].update(progress)
+
+    try:
+        logger.info(f"Scraping courses (levels={levels_list}, max_pages={max_pages})")
+
+        courses = await eduportugal_scraper.scrape_courses(
+            levels=levels_list,
+            max_pages_per_level=max_pages,
+            progress_callback=progress_callback if sync_id else None,
+        )
+
+        stats["requests_success"] += 1
+
+        # Group by level for stats
+        by_level = {}
+        for course in courses:
+            level = course.level
+            by_level[level] = by_level.get(level, 0) + 1
+
+        return {
+            "courses": [c.model_dump() for c in courses],
+            "total": len(courses),
+            "by_level": by_level,
+            "timestamp": datetime.utcnow().isoformat(),
+        }
+
+    except Exception as e:
+        stats["requests_failed"] += 1
+        logger.error(f"EduPortugal courses error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/eduportugal/course/details")
+async def get_course_details(
+    url: str = Query(..., description="URL do curso no eduportugal"),
+):
+    """
+    Get detailed information about a specific course.
+
+    Busca informacoes adicionais como creditos ECTS, requisitos,
+    precos, etc. diretamente da pagina do curso.
+    """
+    try:
+        logger.info(f"Getting course details: {url}")
+
+        details = await eduportugal_scraper.scrape_course_details(url)
+
+        if not details:
+            raise HTTPException(status_code=404, detail="Could not fetch course details")
+
+        return {
+            "details": details,
+            "source_url": url,
+            "timestamp": datetime.utcnow().isoformat(),
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Course details error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/eduportugal/sync/start")
+async def start_eduportugal_sync(
+    sync_type: str = Query(default="full", description="full, universities, ou courses"),
+    levels: str = Query(default=None, description="Niveis para sync de cursos"),
+):
+    """
+    Start a sync operation and return sync ID for tracking.
+
+    Tipos de sync:
+    - full: Sincroniza universidades e todos os cursos
+    - universities: Apenas universidades
+    - courses: Apenas cursos (pode filtrar por nivel)
+    """
+    import uuid
+    sync_id = str(uuid.uuid4())
+
+    eduportugal_syncs[sync_id] = {
+        "sync_id": sync_id,
+        "sync_type": sync_type,
+        "status": "started",
+        "started_at": datetime.utcnow().isoformat(),
+        "current_page": 0,
+        "total_pages": 0,
+        "universities_found": 0,
+        "courses_found": 0,
+        "current_level": None,
+        "errors": [],
+    }
+
+    logger.info(f"Started EduPortugal sync: {sync_id} ({sync_type})")
+
+    return {
+        "sync_id": sync_id,
+        "status": "started",
+        "sync_type": sync_type,
+        "message": f"Sync {sync_type} started. Use /eduportugal/sync/{sync_id}/status to track progress.",
+    }
+
+
+@app.get("/eduportugal/sync/{sync_id}/status")
+async def get_sync_status(sync_id: str):
+    """Get status of a running sync operation."""
+    if sync_id not in eduportugal_syncs:
+        raise HTTPException(status_code=404, detail="Sync not found")
+
+    return eduportugal_syncs[sync_id]
+
+
+@app.get("/eduportugal/stats")
+async def get_eduportugal_stats():
+    """Get EduPortugal scraper statistics."""
+    return {
+        "available_levels": len(EduPortugalScraper.COURSE_LEVELS),
+        "levels": list(EduPortugalScraper.COURSE_LEVELS.keys()),
+        "active_syncs": len([s for s in eduportugal_syncs.values() if s.get("status") == "running"]),
+        "total_syncs": len(eduportugal_syncs),
+        "rate_limit_delay": EduPortugalScraper.RATE_LIMIT_DELAY,
+    }
