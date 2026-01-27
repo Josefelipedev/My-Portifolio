@@ -405,6 +405,7 @@ async def get_course_levels():
 async def scrape_universities(
     max_pages: int = Query(default=None, description="Limite de paginas"),
     sync_id: str = Query(default=None, description="ID do sync para tracking"),
+    save_to_file: bool = Query(default=True, description="Salvar resultado em arquivo JSON"),
 ):
     """
     Scrape universities from EduPortugal.
@@ -412,6 +413,9 @@ async def scrape_universities(
     Retorna lista de universidades portuguesas com informacoes de contato,
     localizacao e link para a pagina no eduportugal.
     """
+    import json
+    import os
+
     stats["requests_total"] += 1
 
     async def progress_callback(progress: dict):
@@ -428,11 +432,23 @@ async def scrape_universities(
 
         stats["requests_success"] += 1
 
-        return {
+        result = {
             "universities": [u.model_dump() for u in universities],
             "total": len(universities),
             "timestamp": datetime.utcnow().isoformat(),
         }
+
+        # Auto-save to file
+        if save_to_file and universities:
+            os.makedirs("/app/data", exist_ok=True)
+            timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+            filename = f"/app/data/universities_{timestamp}.json"
+            with open(filename, "w", encoding="utf-8") as f:
+                json.dump(result, f, ensure_ascii=False, indent=2)
+            logger.info(f"Saved {len(universities)} universities to {filename}")
+            result["saved_to_file"] = filename
+
+        return result
 
     except Exception as e:
         stats["requests_failed"] += 1
@@ -445,6 +461,7 @@ async def scrape_courses(
     levels: str = Query(default=None, description="Niveis separados por virgula"),
     max_pages: int = Query(default=None, description="Limite de paginas por nivel"),
     sync_id: str = Query(default=None, description="ID do sync para tracking"),
+    save_to_file: bool = Query(default=True, description="Salvar resultado em arquivo JSON"),
 ):
     """
     Scrape courses from EduPortugal.
@@ -454,9 +471,13 @@ async def scrape_courses(
               Se nao especificado, busca todos os niveis.
     - max_pages: Limite de paginas por nivel (util para testes)
     - sync_id: ID para tracking de progresso
+    - save_to_file: Salvar automaticamente em /app/data/courses_TIMESTAMP.json
 
     Retorna lista de cursos com informacoes detalhadas.
     """
+    import json
+    import os
+
     stats["requests_total"] += 1
 
     levels_list = levels.split(",") if levels else None
@@ -482,12 +503,24 @@ async def scrape_courses(
             level = course.level
             by_level[level] = by_level.get(level, 0) + 1
 
-        return {
+        result = {
             "courses": [c.model_dump() for c in courses],
             "total": len(courses),
             "by_level": by_level,
             "timestamp": datetime.utcnow().isoformat(),
         }
+
+        # Auto-save to file
+        if save_to_file and courses:
+            os.makedirs("/app/data", exist_ok=True)
+            timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+            filename = f"/app/data/courses_{timestamp}.json"
+            with open(filename, "w", encoding="utf-8") as f:
+                json.dump(result, f, ensure_ascii=False, indent=2)
+            logger.info(f"Saved {len(courses)} courses to {filename}")
+            result["saved_to_file"] = filename
+
+        return result
 
     except Exception as e:
         stats["requests_failed"] += 1
@@ -584,3 +617,56 @@ async def get_eduportugal_stats():
         "total_syncs": len(eduportugal_syncs),
         "rate_limit_delay": EduPortugalScraper.RATE_LIMIT_DELAY,
     }
+
+
+@app.get("/eduportugal/files")
+async def list_saved_files():
+    """List all saved JSON files from scraping."""
+    import os
+    import glob
+
+    data_dir = "/app/data"
+    if not os.path.exists(data_dir):
+        return {"files": [], "message": "No data directory yet"}
+
+    files = []
+    for filepath in glob.glob(f"{data_dir}/*.json"):
+        stat = os.stat(filepath)
+        files.append({
+            "filename": os.path.basename(filepath),
+            "path": filepath,
+            "size_bytes": stat.st_size,
+            "size_mb": round(stat.st_size / 1024 / 1024, 2),
+            "created_at": datetime.fromtimestamp(stat.st_ctime).isoformat(),
+        })
+
+    files.sort(key=lambda x: x["created_at"], reverse=True)
+
+    return {
+        "files": files,
+        "total": len(files),
+        "data_dir": data_dir,
+    }
+
+
+@app.get("/eduportugal/files/{filename}")
+async def get_saved_file(filename: str):
+    """Download a specific saved JSON file."""
+    import os
+    import json
+    from fastapi.responses import FileResponse
+
+    filepath = f"/app/data/{filename}"
+
+    if not os.path.exists(filepath):
+        raise HTTPException(status_code=404, detail="File not found")
+
+    # Security check - prevent path traversal
+    if ".." in filename or "/" in filename:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+
+    return FileResponse(
+        filepath,
+        media_type="application/json",
+        filename=filename,
+    )
