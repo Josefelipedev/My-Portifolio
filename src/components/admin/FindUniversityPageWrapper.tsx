@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import AdminLayout from './AdminLayout';
+import { fetchWithCSRF } from '@/lib/csrf-client';
 
 interface SyncLog {
   id: string;
@@ -155,7 +156,7 @@ export default function FindUniversityPageWrapper({
     setIsImporting(true);
 
     try {
-      const response = await fetch('/api/admin/finduniversity/sync', {
+      const response = await fetchWithCSRF('/api/admin/finduniversity/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ syncType }),
@@ -193,7 +194,7 @@ export default function FindUniversityPageWrapper({
     if (!confirm(`Delete "${name}" and all its courses?`)) return;
 
     try {
-      const response = await fetch(`/api/universities/${id}`, { method: 'DELETE' });
+      const response = await fetchWithCSRF(`/api/universities/${id}`, { method: 'DELETE' });
       if (response.ok) {
         setUniversities(universities.filter((u) => u.id !== id));
         setUniversitiesCount((c) => c - 1);
@@ -210,7 +211,7 @@ export default function FindUniversityPageWrapper({
     if (!confirm(`Delete course "${name}"?`)) return;
 
     try {
-      const response = await fetch(`/api/courses/${id}`, { method: 'DELETE' });
+      const response = await fetchWithCSRF(`/api/courses/${id}`, { method: 'DELETE' });
       if (response.ok) {
         setCourses(courses.filter((c) => c.id !== id));
         setCoursesCount((c) => c - 1);
