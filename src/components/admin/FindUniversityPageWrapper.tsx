@@ -4,6 +4,40 @@ import React, { useState, useEffect, useCallback } from 'react';
 import AdminLayout from './AdminLayout';
 import { fetchWithCSRF } from '@/lib/csrf-client';
 
+// AI Features Types
+interface AISearchResult {
+  query: string;
+  interpreted: Record<string, unknown>;
+  explanation: string;
+  totalResults: number;
+  courses: Array<{
+    id: string;
+    name: string;
+    level: string;
+    area: string | null;
+    city: string | null;
+    university: { name: string };
+  }>;
+}
+
+interface AIRecommendation {
+  course: {
+    id: string;
+    name: string;
+    level: string;
+    area: string | null;
+    city: string | null;
+    university: { name: string };
+  };
+  matchScore: number;
+  reasons: string[];
+}
+
+interface AISummaryStats {
+  courses: { withoutDescription: number; total: number };
+  universities: { withoutDescription: number; total: number };
+}
+
 interface SyncLog {
   id: string;
   syncType: string;
@@ -76,10 +110,26 @@ export default function FindUniversityPageWrapper({
   const [importProgress, setImportProgress] = useState<SyncLog | null>(initialRunningSync);
   const [recentSyncs, setRecentSyncs] = useState<SyncLog[]>(initialRecentSyncs);
   const [exportLoading, setExportLoading] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'overview' | 'universities' | 'courses'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'universities' | 'courses' | 'ai'>('overview');
   const [universities, setUniversities] = useState<University[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
   const [loadingData, setLoadingData] = useState(false);
+
+  // AI Features State
+  const [aiSearchQuery, setAiSearchQuery] = useState('');
+  const [aiSearchResults, setAiSearchResults] = useState<AISearchResult | null>(null);
+  const [aiSearchLoading, setAiSearchLoading] = useState(false);
+  const [aiRecommendInterests, setAiRecommendInterests] = useState<string[]>([]);
+  const [aiRecommendCity, setAiRecommendCity] = useState('');
+  const [aiRecommendLevel, setAiRecommendLevel] = useState('');
+  const [aiRecommendations, setAiRecommendations] = useState<AIRecommendation[]>([]);
+  const [aiRecommendLoading, setAiRecommendLoading] = useState(false);
+  const [aiSummaryStats, setAiSummaryStats] = useState<AISummaryStats | null>(null);
+  const [aiSummaryLoading, setAiSummaryLoading] = useState(false);
+  const [aiCompareIds, setAiCompareIds] = useState<string[]>([]);
+  const [aiCompareResult, setAiCompareResult] = useState<Record<string, unknown> | null>(null);
+  const [aiCompareLoading, setAiCompareLoading] = useState(false);
+  const [newInterest, setNewInterest] = useState('');
 
   // Poll for import status
   const checkImportStatus = useCallback(async () => {
@@ -261,6 +311,164 @@ export default function FindUniversityPageWrapper({
     });
   };
 
+  // AI Functions
+  const loadAiSummaryStats = useCallback(async () => {
+    try {
+      const response = await fetch('/api/admin/finduniversity/ai/summary');
+      if (response.ok) {
+        const data = await response.json();
+        setAiSummaryStats(data);
+      }
+    } catch (err) {
+      console.error('Failed to load AI summary stats:', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === 'ai' && !aiSummaryStats) {
+      loadAiSummaryStats();
+    }
+  }, [activeTab, aiSummaryStats, loadAiSummaryStats]);
+
+  const handleAiSearch = async () => {
+    if (!aiSearchQuery.trim()) return;
+    setAiSearchLoading(true);
+    setAiSearchResults(null);
+
+    try {
+      const response = await fetchWithCSRF('/api/admin/finduniversity/ai/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: aiSearchQuery }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setAiSearchResults(data);
+      } else {
+        const error = await response.json();
+        alert(error.error || 'Search failed');
+      }
+    } catch (err) {
+      console.error('AI search error:', err);
+      alert('Search failed');
+    } finally {
+      setAiSearchLoading(false);
+    }
+  };
+
+  const handleAiRecommend = async () => {
+    if (aiRecommendInterests.length === 0) {
+      alert('Add at least one interest');
+      return;
+    }
+    setAiRecommendLoading(true);
+    setAiRecommendations([]);
+
+    try {
+      const response = await fetchWithCSRF('/api/admin/finduniversity/ai/recommend', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          interests: aiRecommendInterests,
+          preferences: {
+            city: aiRecommendCity || undefined,
+            level: aiRecommendLevel || undefined,
+          },
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setAiRecommendations(data.recommendations || []);
+      } else {
+        const error = await response.json();
+        alert(error.error || 'Recommendation failed');
+      }
+    } catch (err) {
+      console.error('AI recommend error:', err);
+      alert('Recommendation failed');
+    } finally {
+      setAiRecommendLoading(false);
+    }
+  };
+
+  const handleGenerateDescriptions = async (type: 'course' | 'university') => {
+    if (!confirm(`Generate descriptions for ${type}s without description?`)) return;
+    setAiSummaryLoading(true);
+
+    try {
+      const response = await fetchWithCSRF('/api/admin/finduniversity/ai/summary', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type, batchMode: true, batchLimit: 5 }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        alert(`Generated ${data.generated} descriptions`);
+        loadAiSummaryStats();
+      } else {
+        const error = await response.json();
+        alert(error.error || 'Generation failed');
+      }
+    } catch (err) {
+      console.error('AI summary error:', err);
+      alert('Generation failed');
+    } finally {
+      setAiSummaryLoading(false);
+    }
+  };
+
+  const handleAiCompare = async () => {
+    if (aiCompareIds.length < 2) {
+      alert('Select at least 2 courses to compare');
+      return;
+    }
+    setAiCompareLoading(true);
+    setAiCompareResult(null);
+
+    try {
+      const response = await fetchWithCSRF('/api/admin/finduniversity/ai/compare', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'courses', ids: aiCompareIds }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setAiCompareResult(data);
+      } else {
+        const error = await response.json();
+        alert(error.error || 'Comparison failed');
+      }
+    } catch (err) {
+      console.error('AI compare error:', err);
+      alert('Comparison failed');
+    } finally {
+      setAiCompareLoading(false);
+    }
+  };
+
+  const addInterest = () => {
+    if (newInterest.trim() && !aiRecommendInterests.includes(newInterest.trim())) {
+      setAiRecommendInterests([...aiRecommendInterests, newInterest.trim()]);
+      setNewInterest('');
+    }
+  };
+
+  const removeInterest = (interest: string) => {
+    setAiRecommendInterests(aiRecommendInterests.filter((i) => i !== interest));
+  };
+
+  const toggleCourseForCompare = (courseId: string) => {
+    if (aiCompareIds.includes(courseId)) {
+      setAiCompareIds(aiCompareIds.filter((id) => id !== courseId));
+    } else if (aiCompareIds.length < 5) {
+      setAiCompareIds([...aiCompareIds, courseId]);
+    }
+  };
+
   return (
     <AdminLayout
       title="Universities & Courses"
@@ -300,7 +508,7 @@ export default function FindUniversityPageWrapper({
       <div className="bg-white dark:bg-zinc-800 rounded-xl border border-zinc-200 dark:border-zinc-700 mb-6">
         <div className="border-b border-zinc-200 dark:border-zinc-700">
           <nav className="flex gap-4 px-4">
-            {(['overview', 'universities', 'courses'] as const).map((tab) => (
+            {(['overview', 'universities', 'courses', 'ai'] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -495,12 +703,21 @@ export default function FindUniversityPageWrapper({
                 <div className="space-y-2">
                   {courses.map((course) => (
                     <div key={course.id} className="flex items-center justify-between p-3 bg-zinc-50 dark:bg-zinc-900 rounded-lg">
-                      <div>
-                        <p className="font-medium">{course.name}</p>
-                        <p className="text-xs text-zinc-500">
-                          {course.university?.name} - {COURSE_LEVEL_LABELS[course.level] || course.level}
-                          {course.city && ` - ${course.city}`}
-                        </p>
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="checkbox"
+                          checked={aiCompareIds.includes(course.id)}
+                          onChange={() => toggleCourseForCompare(course.id)}
+                          className="w-4 h-4 rounded border-zinc-300"
+                          title="Selecionar para comparacao"
+                        />
+                        <div>
+                          <p className="font-medium">{course.name}</p>
+                          <p className="text-xs text-zinc-500">
+                            {course.university?.name} - {COURSE_LEVEL_LABELS[course.level] || course.level}
+                            {course.city && ` - ${course.city}`}
+                          </p>
+                        </div>
                       </div>
                       <button
                         onClick={() => deleteCourse(course.id, course.name)}
@@ -512,6 +729,229 @@ export default function FindUniversityPageWrapper({
                   ))}
                 </div>
               )}
+            </div>
+          )}
+
+          {/* AI Tab */}
+          {activeTab === 'ai' && (
+            <div className="space-y-6">
+              {/* Smart Search */}
+              <div className="p-4 bg-zinc-50 dark:bg-zinc-900 rounded-lg">
+                <h3 className="font-semibold mb-3 flex items-center gap-2">
+                  <span className="text-lg">🔍</span> Busca Inteligente
+                </h3>
+                <div className="flex gap-2 mb-3">
+                  <input
+                    type="text"
+                    value={aiSearchQuery}
+                    onChange={(e) => setAiSearchQuery(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleAiSearch()}
+                    placeholder="Ex: mestrado em IA em Lisboa presencial"
+                    className="flex-1 px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-800 text-sm"
+                  />
+                  <button
+                    onClick={handleAiSearch}
+                    disabled={aiSearchLoading || !aiSearchQuery.trim()}
+                    className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 text-sm"
+                  >
+                    {aiSearchLoading ? '...' : 'Buscar'}
+                  </button>
+                </div>
+                {aiSearchResults && (
+                  <div className="mt-3">
+                    <p className="text-sm text-zinc-600 dark:text-zinc-400 mb-2">
+                      {aiSearchResults.explanation}
+                    </p>
+                    {aiSearchResults.interpreted && (
+                      <div className="flex flex-wrap gap-1 mb-3">
+                        {Object.entries(aiSearchResults.interpreted)
+                          .filter(([, v]) => v)
+                          .map(([k, v]) => (
+                            <span key={k} className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 text-xs rounded">
+                              {k}: {String(v)}
+                            </span>
+                          ))}
+                      </div>
+                    )}
+                    <div className="max-h-60 overflow-y-auto space-y-1">
+                      {aiSearchResults.courses.slice(0, 10).map((course) => (
+                        <div key={course.id} className="p-2 bg-white dark:bg-zinc-800 rounded text-sm">
+                          <p className="font-medium">{course.name}</p>
+                          <p className="text-xs text-zinc-500">
+                            {course.university.name} - {course.level}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Generate Descriptions */}
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="p-4 bg-zinc-50 dark:bg-zinc-900 rounded-lg">
+                  <h3 className="font-semibold mb-3 flex items-center gap-2">
+                    <span className="text-lg">📝</span> Gerar Descricoes
+                  </h3>
+                  {aiSummaryStats ? (
+                    <>
+                      <div className="text-sm space-y-2 mb-3">
+                        <p>Universidades sem descricao: <strong>{aiSummaryStats.universities.withoutDescription}</strong></p>
+                        <p>Cursos sem descricao: <strong>{aiSummaryStats.courses.withoutDescription}</strong></p>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleGenerateDescriptions('university')}
+                          disabled={aiSummaryLoading || aiSummaryStats.universities.withoutDescription === 0}
+                          className="px-3 py-1.5 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 disabled:opacity-50"
+                        >
+                          {aiSummaryLoading ? '...' : 'Universidades'}
+                        </button>
+                        <button
+                          onClick={() => handleGenerateDescriptions('course')}
+                          disabled={aiSummaryLoading || aiSummaryStats.courses.withoutDescription === 0}
+                          className="px-3 py-1.5 bg-green-500 text-white text-sm rounded hover:bg-green-600 disabled:opacity-50"
+                        >
+                          {aiSummaryLoading ? '...' : 'Cursos'}
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <p className="text-sm text-zinc-500">Carregando...</p>
+                  )}
+                </div>
+
+                {/* Compare Courses */}
+                <div className="p-4 bg-zinc-50 dark:bg-zinc-900 rounded-lg">
+                  <h3 className="font-semibold mb-3 flex items-center gap-2">
+                    <span className="text-lg">⚖️</span> Comparar Cursos
+                  </h3>
+                  <p className="text-xs text-zinc-500 mb-2">
+                    Selecione cursos na aba Courses e volte aqui ({aiCompareIds.length}/5 selecionados)
+                  </p>
+                  {aiCompareIds.length > 0 && (
+                    <div className="mb-2 flex flex-wrap gap-1">
+                      {aiCompareIds.map((id) => (
+                        <span key={id} className="px-2 py-0.5 bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300 text-xs rounded">
+                          {id.slice(0, 8)}...
+                          <button onClick={() => toggleCourseForCompare(id)} className="ml-1">×</button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  <button
+                    onClick={handleAiCompare}
+                    disabled={aiCompareLoading || aiCompareIds.length < 2}
+                    className="px-3 py-1.5 bg-purple-500 text-white text-sm rounded hover:bg-purple-600 disabled:opacity-50"
+                  >
+                    {aiCompareLoading ? 'Comparando...' : 'Comparar'}
+                  </button>
+                  {aiCompareResult && (
+                    <div className="mt-3 p-3 bg-white dark:bg-zinc-800 rounded text-sm">
+                      <p className="font-medium mb-2">
+                        {(aiCompareResult.comparison as { summary?: string })?.summary || 'Comparacao concluida'}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Recommendations */}
+              <div className="p-4 bg-zinc-50 dark:bg-zinc-900 rounded-lg">
+                <h3 className="font-semibold mb-3 flex items-center gap-2">
+                  <span className="text-lg">🎯</span> Recomendacoes Personalizadas
+                </h3>
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-xs text-zinc-500 block mb-1">Interesses</label>
+                    <div className="flex gap-2 mb-2">
+                      <input
+                        type="text"
+                        value={newInterest}
+                        onChange={(e) => setNewInterest(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && addInterest()}
+                        placeholder="Ex: programacao, IA, tecnologia"
+                        className="flex-1 px-3 py-1.5 border border-zinc-300 dark:border-zinc-600 rounded bg-white dark:bg-zinc-800 text-sm"
+                      />
+                      <button
+                        onClick={addInterest}
+                        className="px-3 py-1.5 bg-zinc-200 dark:bg-zinc-700 rounded text-sm hover:bg-zinc-300"
+                      >
+                        +
+                      </button>
+                    </div>
+                    {aiRecommendInterests.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {aiRecommendInterests.map((interest) => (
+                          <span key={interest} className="px-2 py-0.5 bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-300 text-xs rounded">
+                            {interest}
+                            <button onClick={() => removeInterest(interest)} className="ml-1">×</button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-xs text-zinc-500 block mb-1">Cidade</label>
+                      <input
+                        type="text"
+                        value={aiRecommendCity}
+                        onChange={(e) => setAiRecommendCity(e.target.value)}
+                        placeholder="Ex: Lisboa"
+                        className="w-full px-3 py-1.5 border border-zinc-300 dark:border-zinc-600 rounded bg-white dark:bg-zinc-800 text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-zinc-500 block mb-1">Nivel</label>
+                      <select
+                        value={aiRecommendLevel}
+                        onChange={(e) => setAiRecommendLevel(e.target.value)}
+                        className="w-full px-3 py-1.5 border border-zinc-300 dark:border-zinc-600 rounded bg-white dark:bg-zinc-800 text-sm"
+                      >
+                        <option value="">Todos</option>
+                        <option value="mestrado">Mestrado</option>
+                        <option value="doutorado">Doutorado</option>
+                        <option value="graduacao">Graduacao</option>
+                        <option value="mba">MBA</option>
+                      </select>
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleAiRecommend}
+                    disabled={aiRecommendLoading || aiRecommendInterests.length === 0}
+                    className="px-4 py-2 bg-amber-500 text-white rounded hover:bg-amber-600 disabled:opacity-50 text-sm"
+                  >
+                    {aiRecommendLoading ? 'Gerando...' : 'Gerar Recomendacoes'}
+                  </button>
+                </div>
+                {aiRecommendations.length > 0 && (
+                  <div className="mt-4 space-y-2">
+                    {aiRecommendations.map((rec, idx) => (
+                      <div key={rec.course.id} className="p-3 bg-white dark:bg-zinc-800 rounded">
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <p className="font-medium">{rec.course.name}</p>
+                            <p className="text-xs text-zinc-500">
+                              {rec.course.university.name} - {rec.course.level}
+                            </p>
+                          </div>
+                          <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded">
+                            {rec.matchScore}%
+                          </span>
+                        </div>
+                        {rec.reasons.length > 0 && (
+                          <ul className="mt-2 text-xs text-zinc-600 dark:text-zinc-400 list-disc list-inside">
+                            {rec.reasons.slice(0, 3).map((reason, i) => (
+                              <li key={i}>{reason}</li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
