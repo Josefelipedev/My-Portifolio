@@ -23,7 +23,12 @@ export type AIFeature =
   | 'resume-analysis'
   | 'alert-suggestions'
   | 'wakatime-ranking'
-  | 'generate-email';
+  | 'generate-email'
+  | 'finduniversity-summary'
+  | 'finduniversity-search'
+  | 'finduniversity-recommend'
+  | 'finduniversity-extract'
+  | 'finduniversity-compare';
 
 interface TrackingParams {
   feature: AIFeature;
