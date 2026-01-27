@@ -385,7 +385,7 @@ async def get_course_levels():
         "levels": list(EduPortugalScraper.COURSE_LEVELS.keys()),
         "urls": EduPortugalScraper.COURSE_LEVELS,
         "descriptions": {
-            "graduacao": "Graduacao / Licenciatura (3-4 anos)",
+            "licenciatura": "Licenciatura / Graduacao (3-4 anos)",
             "mestrado": "Mestrado (1-2 anos)",
             "mestrado-integrado": "Mestrado Integrado (5-6 anos)",
             "doutorado": "Doutorado / PhD (3-4 anos)",
@@ -393,6 +393,10 @@ async def get_course_levels():
             "mba": "MBA - Master of Business Administration",
             "pos-graduacao": "Pos-Graduacao / Especializacao",
             "curso-tecnico": "Curso Tecnico Superior Profissional",
+            "b-learning": "B-Learning (Blended Learning)",
+            "e-learning": "E-Learning (Online)",
+            "formacao-executiva": "Formacao Executiva / MBA",
+            "especializacao": "Cursos de Especializacao",
         },
     }
 
