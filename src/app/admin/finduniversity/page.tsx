@@ -1,5 +1,5 @@
 import prisma from '@/lib/prisma';
-import EduPortugalPageWrapper from '@/components/admin/EduPortugalPageWrapper';
+import FindUniversityPageWrapper from '@/components/admin/FindUniversityPageWrapper';
 
 // Force dynamic to avoid build errors when tables don't exist yet
 export const dynamic = 'force-dynamic';
@@ -30,7 +30,7 @@ function serializeSyncLog(sync: {
   };
 }
 
-async function getEduPortugalStats() {
+async function getFindUniversityStats() {
   try {
     const [
       universitiesCount,
@@ -59,15 +59,15 @@ async function getEduPortugalStats() {
         by: ['type'],
         _count: { id: true },
       }),
-      prisma.eduPortugalSyncLog.findFirst({
+      prisma.findUniversitySyncLog.findFirst({
         where: { status: 'completed' },
         orderBy: { completedAt: 'desc' },
       }),
-      prisma.eduPortugalSyncLog.findFirst({
+      prisma.findUniversitySyncLog.findFirst({
         where: { status: 'running' },
         orderBy: { startedAt: 'desc' },
       }),
-      prisma.eduPortugalSyncLog.findMany({
+      prisma.findUniversitySyncLog.findMany({
         orderBy: { startedAt: 'desc' },
         take: 10,
       }),
@@ -95,7 +95,7 @@ async function getEduPortugalStats() {
       error: null,
     };
   } catch (error) {
-    console.error('Error fetching EduPortugal stats:', error);
+    console.error('Error fetching FindUniversity stats:', error);
     return {
       universitiesCount: 0,
       coursesCount: 0,
@@ -110,8 +110,8 @@ async function getEduPortugalStats() {
   }
 }
 
-export default async function EduPortugalAdminPage() {
-  const stats = await getEduPortugalStats();
+export default async function FindUniversityAdminPage() {
+  const stats = await getFindUniversityStats();
 
-  return <EduPortugalPageWrapper {...stats} />;
+  return <FindUniversityPageWrapper {...stats} />;
 }

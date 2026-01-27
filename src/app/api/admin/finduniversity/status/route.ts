@@ -3,9 +3,9 @@ import prisma from '@/lib/prisma';
 import { isAuthenticated } from '@/lib/auth';
 
 /**
- * GET /api/admin/eduportugal/status
+ * GET /api/admin/finduniversity/status
  *
- * Get current EduPortugal sync status and statistics.
+ * Get current sync status and statistics.
  * Requires authentication.
  *
  * Query params:
@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
 
     // If specific sync requested
     if (syncId) {
-      const sync = await prisma.eduPortugalSyncLog.findUnique({
+      const sync = await prisma.findUniversitySyncLog.findUnique({
         where: { id: syncId },
       });
 
@@ -35,11 +35,11 @@ export async function GET(request: NextRequest) {
 
     // Get overall status
     const [latestSync, runningSync, stats, recentSyncs] = await Promise.all([
-      prisma.eduPortugalSyncLog.findFirst({
+      prisma.findUniversitySyncLog.findFirst({
         where: { status: 'completed' },
         orderBy: { completedAt: 'desc' },
       }),
-      prisma.eduPortugalSyncLog.findFirst({
+      prisma.findUniversitySyncLog.findFirst({
         where: { status: 'running' },
         orderBy: { startedAt: 'desc' },
       }),
@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
           _count: { id: true },
         }),
       ]),
-      prisma.eduPortugalSyncLog.findMany({
+      prisma.findUniversitySyncLog.findMany({
         orderBy: { startedAt: 'desc' },
         take: 5,
       }),

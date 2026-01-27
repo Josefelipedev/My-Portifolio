@@ -50,9 +50,9 @@ interface CourseData {
 }
 
 /**
- * POST /api/admin/eduportugal/sync
+ * POST /api/admin/finduniversity/sync
  *
- * Import data from EduPortugal (one-time import).
+ * Import data (one-time import).
  * Use this to initially populate the database, then manage manually.
  *
  * Body:
@@ -69,14 +69,14 @@ export async function POST(request: NextRequest) {
     const { syncType = 'full', maxPages } = body;
 
     // Create sync log entry
-    const syncLog = await prisma.eduPortugalSyncLog.create({
+    const syncLog = await prisma.findUniversitySyncLog.create({
       data: {
         syncType,
         status: 'running',
       },
     });
 
-    logger.info('eduportugal', `Starting initial import: ${syncType}`, { syncId: syncLog.id });
+    logger.info('finduniversity', `Starting initial import: ${syncType}`, { syncId: syncLog.id });
 
     // Start async import process (don't await)
     importInBackground(syncLog.id, syncType, maxPages);
@@ -85,10 +85,10 @@ export async function POST(request: NextRequest) {
       success: true,
       syncId: syncLog.id,
       message: `Import started: ${syncType}`,
-      checkStatusUrl: `/api/admin/eduportugal/status?syncId=${syncLog.id}`,
+      checkStatusUrl: `/api/admin/finduniversity/status?syncId=${syncLog.id}`,
     });
   } catch (error) {
-    logger.error('eduportugal', 'Failed to start import', { error: String(error) });
+    logger.error('finduniversity', 'Failed to start import', { error: String(error) });
     return NextResponse.json({ error: 'Failed to start import' }, { status: 500 });
   }
 }
@@ -111,7 +111,7 @@ async function importInBackground(
 
     // Import universities
     if (syncType === 'full' || syncType === 'universities') {
-      logger.info('eduportugal', 'Importing universities...');
+      logger.info('finduniversity', 'Importing universities...');
 
       const url = new URL(`${SCRAPER_URL}/eduportugal/universities`);
       url.searchParams.set('sync_id', syncId);
@@ -172,7 +172,7 @@ async function importInBackground(
           }
         }
 
-        await prisma.eduPortugalSyncLog.update({
+        await prisma.findUniversitySyncLog.update({
           where: { id: syncId },
           data: {
             universitiesFound: universitiesData.length,
@@ -181,18 +181,18 @@ async function importInBackground(
           },
         });
 
-        logger.info('eduportugal', `Universities imported: ${universitiesData.length}`, {
+        logger.info('finduniversity', `Universities imported: ${universitiesData.length}`, {
           created: universitiesCreated,
           updated: universitiesUpdated,
         });
       } else {
-        logger.error('eduportugal', `Failed to fetch universities: ${response.status}`);
+        logger.error('finduniversity', `Failed to fetch universities: ${response.status}`);
       }
     }
 
     // Import courses
     if (syncType === 'full' || syncType === 'courses') {
-      logger.info('eduportugal', 'Importing courses...');
+      logger.info('finduniversity', 'Importing courses...');
 
       const url = new URL(`${SCRAPER_URL}/eduportugal/courses`);
       url.searchParams.set('sync_id', syncId);
@@ -235,7 +235,7 @@ async function importInBackground(
           }
 
           if (!universityId) {
-            logger.warn('eduportugal', `University not found for course: ${course.name}`, {
+            logger.warn('finduniversity', `University not found for course: ${course.name}`, {
               university_slug: course.university_slug,
               university_name: course.university_name,
             });
@@ -288,7 +288,7 @@ async function importInBackground(
           }
         }
 
-        await prisma.eduPortugalSyncLog.update({
+        await prisma.findUniversitySyncLog.update({
           where: { id: syncId },
           data: {
             coursesFound: coursesData.length,
@@ -297,17 +297,17 @@ async function importInBackground(
           },
         });
 
-        logger.info('eduportugal', `Courses imported: ${coursesData.length}`, {
+        logger.info('finduniversity', `Courses imported: ${coursesData.length}`, {
           created: coursesCreated,
           updated: coursesUpdated,
         });
       } else {
-        logger.error('eduportugal', `Failed to fetch courses: ${response.status}`);
+        logger.error('finduniversity', `Failed to fetch courses: ${response.status}`);
       }
     }
 
     // Mark import as completed
-    await prisma.eduPortugalSyncLog.update({
+    await prisma.findUniversitySyncLog.update({
       where: { id: syncId },
       data: {
         status: 'completed',
@@ -315,15 +315,15 @@ async function importInBackground(
       },
     });
 
-    logger.info('eduportugal', `Import completed`, {
+    logger.info('finduniversity', `Import completed`, {
       syncId,
       universities: universitiesData.length,
       courses: coursesData.length,
     });
   } catch (error) {
-    logger.error('eduportugal', `Import failed`, { syncId, error: String(error) });
+    logger.error('finduniversity', `Import failed`, { syncId, error: String(error) });
 
-    await prisma.eduPortugalSyncLog.update({
+    await prisma.findUniversitySyncLog.update({
       where: { id: syncId },
       data: {
         status: 'failed',
@@ -335,7 +335,7 @@ async function importInBackground(
 }
 
 /**
- * GET /api/admin/eduportugal/sync
+ * GET /api/admin/finduniversity/sync
  *
  * Get import history.
  */
@@ -349,7 +349,7 @@ export async function GET(request: NextRequest) {
     const limit = Math.min(50, parseInt(searchParams.get('limit') || '10'));
 
     const [syncs, stats] = await Promise.all([
-      prisma.eduPortugalSyncLog.findMany({
+      prisma.findUniversitySyncLog.findMany({
         orderBy: { startedAt: 'desc' },
         take: limit,
       }),

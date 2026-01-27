@@ -491,7 +491,7 @@ model AgentExecution {
 }
 
 // ==========================================
-// EduPortugal - Universities & Courses
+// FindUniversity - Universities & Courses
 // ==========================================
 
 model University {
@@ -589,7 +589,7 @@ model Course {
   @@index([universityId])
 }
 
-model EduPortugalSyncLog {
+model FindUniversitySyncLog {
   id              String    @id @default(cuid())
   syncType        String    // "full", "universities", "courses"
   status          String    // "running", "completed", "failed"
