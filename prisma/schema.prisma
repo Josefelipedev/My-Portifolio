@@ -489,3 +489,130 @@ model AgentExecution {
   @@index([status])
   @@index([createdAt])
 }
+
+// ==========================================
+// EduPortugal - Universities & Courses
+// ==========================================
+
+model University {
+  id          String   @id @default(cuid())
+  externalId  String   @unique
+  name        String
+  slug        String   @unique
+  shortName   String?              // Sigla (ex: "UPorto", "ISCTE")
+  description String?  @db.Text
+
+  // URLs
+  website     String?              // Site oficial da universidade
+  sourceUrl   String               // URL no eduportugal
+
+  // Localização
+  city        String?              // Cidade (ex: "Lisboa", "Porto")
+  region      String?              // Região (ex: "Norte", "Centro")
+  country     String   @default("Portugal")
+  address     String?              // Endereço completo
+
+  // Mídia
+  logoUrl     String?
+
+  // Contato
+  email       String?
+  phone       String?
+
+  // Tipo de instituição
+  type        String?              // "publica", "privada", "politecnico"
+
+  courses     Course[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([name])
+  @@index([city])
+  @@index([type])
+}
+
+model Course {
+  id            String    @id @default(cuid())
+  externalId    String    @unique
+  name          String
+  slug          String
+  description   String?   @db.Text
+
+  // Classificação
+  level         String    // graduacao, mestrado, doutorado, etc.
+  area          String?   // Área de estudo (ex: "Engenharia", "Medicina")
+  subArea       String?   // Sub-área (ex: "Engenharia Informática")
+
+  // Duração e formato
+  duration      String?   // "3 anos", "4 semestres"
+  durationMonths Int?     // Duração em meses (para filtros)
+  credits       Int?      // Créditos ECTS
+  modality      String?   // presencial, online, hibrido
+  schedule      String?   // "diurno", "noturno", "pos-laboral"
+
+  // Idioma
+  language      String?   // "pt", "en", "pt/en"
+
+  // Localização do curso
+  city          String?   // Cidade onde é lecionado
+  campus        String?   // Campus específico
+
+  // Datas
+  startDate     String?   // Data de início
+  applicationDeadline String? // Prazo de candidatura
+
+  // Custos
+  price         String?   // Valor das propinas
+  currency      String?   @default("EUR")
+
+  // URLs
+  sourceUrl     String    // URL no eduportugal
+  officialUrl   String?   // URL oficial do curso na universidade
+  applicationUrl String?  // URL para candidatura
+
+  // Requisitos
+  requirements  String?   @db.Text  // JSON com requisitos de entrada
+
+  // Tags e keywords
+  tags          String?   // Palavras-chave separadas por vírgula
+
+  universityId  String
+  university    University @relation(fields: [universityId], references: [id], onDelete: Cascade)
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([level])
+  @@index([area])
+  @@index([city])
+  @@index([universityId])
+}
+
+model EduPortugalSyncLog {
+  id              String    @id @default(cuid())
+  syncType        String    // "full", "universities", "courses"
+  status          String    // "running", "completed", "failed"
+  startedAt       DateTime  @default(now())
+  completedAt     DateTime?
+
+  // Estatísticas
+  universitiesFound   Int   @default(0)
+  universitiesCreated Int   @default(0)
+  universitiesUpdated Int   @default(0)
+  coursesFound        Int   @default(0)
+  coursesCreated      Int   @default(0)
+  coursesUpdated      Int   @default(0)
+
+  // Progresso
+  currentPage     Int       @default(0)
+  totalPages      Int       @default(0)
+  currentLevel    String?   // Qual nível de curso está sendo processado
+
+  // Erros
+  errors          String?   @db.Text // JSON array de erros
+
+  @@index([status])
+  @@index([startedAt])
+  @@index([syncType])
+}
