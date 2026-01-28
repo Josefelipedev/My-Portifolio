@@ -143,7 +143,7 @@ export default function FindUniversityPageWrapper({
   const [importProgress, setImportProgress] = useState<SyncLog | null>(initialRunningSync);
   const [recentSyncs, setRecentSyncs] = useState<SyncLog[]>(initialRecentSyncs);
   const [exportLoading, setExportLoading] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'overview' | 'universities' | 'courses' | 'files' | 'ai'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'universities' | 'courses' | 'files' | 'research' | 'ai'>('overview');
   const [universities, setUniversities] = useState<University[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
   const [loadingData, setLoadingData] = useState(false);
@@ -174,6 +174,19 @@ export default function FindUniversityPageWrapper({
   const [editingResearchUrl, setEditingResearchUrl] = useState<string | null>(null);
   const [researchUrlInput, setResearchUrlInput] = useState('');
   const [savingResearchUrl, setSavingResearchUrl] = useState(false);
+
+  // Research Tab State
+  const [researchUrls, setResearchUrls] = useState<Array<{
+    id: string;
+    name: string;
+    researchUrl: string | null;
+    officialUrl: string | null;
+    universityName: string | null;
+  }>>([]);
+  const [researchUrlsLoading, setResearchUrlsLoading] = useState(false);
+
+  // Job Control State
+  const [stoppingJob, setStoppingJob] = useState(false);
 
   // AI Features State
   const [aiSearchQuery, setAiSearchQuery] = useState('');
@@ -231,6 +244,8 @@ export default function FindUniversityPageWrapper({
       loadCourses();
     } else if (activeTab === 'files' && files.length === 0) {
       loadFiles();
+    } else if (activeTab === 'research' && researchUrls.length === 0) {
+      loadResearchUrls();
     }
   }, [activeTab]);
 
@@ -469,6 +484,76 @@ export default function FindUniversityPageWrapper({
       alert('Failed to save research URL');
     } finally {
       setSavingResearchUrl(false);
+    }
+  };
+
+  // Research URLs functions
+  const loadResearchUrls = async () => {
+    setResearchUrlsLoading(true);
+    try {
+      const response = await fetch('/api/admin/finduniversity/research-url?type=course');
+      const data = await response.json();
+      setResearchUrls(data.courses || []);
+    } catch (err) {
+      console.error('Failed to load research URLs:', err);
+    } finally {
+      setResearchUrlsLoading(false);
+    }
+  };
+
+  const saveResearchUrlForCourse = async (courseId: string, url: string) => {
+    try {
+      const response = await fetchWithCSRF('/api/admin/finduniversity/research-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'course',
+          id: courseId,
+          researchUrl: url.trim() || null,
+        }),
+      });
+
+      if (response.ok) {
+        // Update local state
+        setResearchUrls(researchUrls.map(c =>
+          c.id === courseId ? { ...c, researchUrl: url.trim() || null } : c
+        ));
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.error('Failed to save research URL:', err);
+      return false;
+    }
+  };
+
+  // Job control functions
+  const stopRunningJob = async () => {
+    if (!importProgress?.id) return;
+    setStoppingJob(true);
+    try {
+      const response = await fetchWithCSRF('/api/admin/finduniversity/job', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'stop',
+          syncId: importProgress.id,
+        }),
+      });
+
+      if (response.ok) {
+        setIsImporting(false);
+        setImportProgress(null);
+        checkImportStatus();
+      } else {
+        const error = await response.json();
+        alert(error.error || 'Failed to stop job');
+      }
+    } catch (err) {
+      console.error('Failed to stop job:', err);
+      alert('Failed to stop job');
+    } finally {
+      setStoppingJob(false);
     }
   };
 
@@ -818,7 +903,7 @@ export default function FindUniversityPageWrapper({
       <div className="bg-white dark:bg-zinc-800 rounded-xl border border-zinc-200 dark:border-zinc-700 mb-6">
         <div className="border-b border-zinc-200 dark:border-zinc-700">
           <nav className="flex gap-4 px-4 overflow-x-auto">
-            {(['overview', 'universities', 'courses', 'files', 'ai'] as const).map((tab) => (
+            {(['overview', 'universities', 'courses', 'files', 'research', 'ai'] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -828,7 +913,7 @@ export default function FindUniversityPageWrapper({
                     : 'border-transparent text-zinc-500 hover:text-zinc-700'
                 }`}
               >
-                {tab === 'ai' ? 'AI Tools' : tab.charAt(0).toUpperCase() + tab.slice(1)}
+                {tab === 'ai' ? 'AI Tools' : tab === 'research' ? 'Research URLs' : tab.charAt(0).toUpperCase() + tab.slice(1)}
               </button>
             ))}
           </nav>
@@ -890,6 +975,46 @@ export default function FindUniversityPageWrapper({
                 </div>
               </div>
 
+              {/* Running Job Indicator */}
+              {isImporting && importProgress && universitiesCount > 0 && (
+                <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <div className="animate-spin w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full" />
+                      <h3 className="font-semibold text-blue-700 dark:text-blue-400">Job em Execucao</h3>
+                    </div>
+                    <button
+                      onClick={stopRunningJob}
+                      disabled={stoppingJob}
+                      className="px-3 py-1.5 text-xs bg-red-500 text-white rounded hover:bg-red-600 disabled:opacity-50"
+                    >
+                      {stoppingJob ? 'Parando...' : 'Parar Job'}
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <p className="text-zinc-500 dark:text-zinc-400">Tipo</p>
+                      <p className="font-medium">{importProgress.syncType}</p>
+                    </div>
+                    <div>
+                      <p className="text-zinc-500 dark:text-zinc-400">Status</p>
+                      <p className="font-medium text-blue-600">{importProgress.status}</p>
+                    </div>
+                    <div>
+                      <p className="text-zinc-500 dark:text-zinc-400">Universidades</p>
+                      <p className="font-medium">{importProgress.universitiesFound} encontradas</p>
+                    </div>
+                    <div>
+                      <p className="text-zinc-500 dark:text-zinc-400">Cursos</p>
+                      <p className="font-medium">{importProgress.coursesFound} encontrados</p>
+                    </div>
+                  </div>
+                  <p className="text-xs text-zinc-500 mt-2">
+                    Iniciado em: {formatDate(importProgress.startedAt)}
+                  </p>
+                </div>
+              )}
+
               {/* Initial Import (one-time) */}
               {universitiesCount === 0 && (
                 <div className="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
@@ -900,9 +1025,18 @@ export default function FindUniversityPageWrapper({
 
                   {isImporting && importProgress && (
                     <div className="mb-3 p-3 bg-white dark:bg-zinc-800 rounded">
-                      <div className="flex items-center gap-2 mb-1">
-                        <div className="animate-spin w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full" />
-                        <span className="text-sm font-medium">Importing...</span>
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center gap-2">
+                          <div className="animate-spin w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full" />
+                          <span className="text-sm font-medium">Importing...</span>
+                        </div>
+                        <button
+                          onClick={stopRunningJob}
+                          disabled={stoppingJob}
+                          className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200 disabled:opacity-50"
+                        >
+                          {stoppingJob ? 'Parando...' : 'Parar'}
+                        </button>
                       </div>
                       <p className="text-xs text-zinc-500">
                         Universities: {importProgress.universitiesFound} | Courses: {importProgress.coursesFound}
@@ -1237,6 +1371,97 @@ export default function FindUniversityPageWrapper({
                       </button>
                     </div>
                   </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Research URLs Tab */}
+          {activeTab === 'research' && (
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-semibold text-zinc-600 dark:text-zinc-400">
+                  URLs de Pesquisa dos Cursos
+                </h3>
+                <button
+                  onClick={loadResearchUrls}
+                  disabled={researchUrlsLoading}
+                  className="px-3 py-1.5 text-xs bg-zinc-200 dark:bg-zinc-700 rounded hover:bg-zinc-300 disabled:opacity-50"
+                >
+                  {researchUrlsLoading ? 'Carregando...' : 'Atualizar'}
+                </button>
+              </div>
+
+              <p className="text-xs text-zinc-500 mb-4">
+                Configure URLs customizadas para cada curso. Essas URLs serao usadas para extrair informacoes detalhadas como precos, prazos de candidatura e documentos.
+              </p>
+
+              {researchUrlsLoading ? (
+                <div className="text-center py-8 text-zinc-500">Carregando...</div>
+              ) : researchUrls.length === 0 ? (
+                <div className="text-center py-8 text-zinc-500">
+                  Nenhum curso encontrado. Importe cursos primeiro.
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {researchUrls.map((course) => (
+                    <div key={course.id} className="p-3 bg-zinc-50 dark:bg-zinc-900 rounded-lg">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm truncate">{course.name}</p>
+                          <p className="text-xs text-zinc-500 truncate">
+                            {course.universityName || 'Sem universidade'}
+                          </p>
+                          {course.officialUrl && (
+                            <p className="text-xs text-zinc-400 truncate mt-1">
+                              Official: <a href={course.officialUrl} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">{course.officialUrl}</a>
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex-shrink-0">
+                          {course.researchUrl ? (
+                            <span className="px-2 py-0.5 text-xs bg-green-100 text-green-700 rounded">Configurado</span>
+                          ) : (
+                            <span className="px-2 py-0.5 text-xs bg-zinc-100 text-zinc-500 rounded">Nao configurado</span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="mt-2">
+                        <div className="flex gap-2">
+                          <input
+                            type="url"
+                            defaultValue={course.researchUrl || ''}
+                            placeholder="https://universidade.pt/curso/..."
+                            className="flex-1 px-2 py-1 text-xs border border-zinc-300 dark:border-zinc-600 rounded bg-white dark:bg-zinc-800"
+                            onBlur={(e) => {
+                              if (e.target.value !== (course.researchUrl || '')) {
+                                saveResearchUrlForCourse(course.id, e.target.value);
+                              }
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                const target = e.target as HTMLInputElement;
+                                if (target.value !== (course.researchUrl || '')) {
+                                  saveResearchUrlForCourse(course.id, target.value);
+                                }
+                                target.blur();
+                              }
+                            }}
+                          />
+                          {course.researchUrl && (
+                            <a
+                              href={course.researchUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
+                            >
+                              Abrir
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
