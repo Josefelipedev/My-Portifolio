@@ -20,7 +20,6 @@ export type LogSource =
   | 'ai-extraction'
   | 'job-enrichment'
   | 'job-alerts'
-  | 'finduniversity'
   | 'api'
   | 'auth'
   | 'cron'
