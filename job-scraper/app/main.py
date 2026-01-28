@@ -12,6 +12,7 @@ from models import SearchParams, SearchResponse, JobListing
 from scrapers.geekhunter import GeekHunterScraper
 from scrapers.vagas import VagasComBrScraper
 from agents.orchestrator import AgentOrchestrator, report_execution
+from agents.agno_job_extractor import get_agno_job_extractor
 from config import config
 
 # Custom log handler to store logs in memory
@@ -368,3 +369,29 @@ async def search_with_agents_detailed(
     except Exception as e:
         logger.error(f"Agent detailed search error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# AI Extraction Stats
+# ============================================================================
+
+
+@app.get("/ai/stats")
+async def get_ai_stats():
+    """
+    Get AI extraction statistics.
+
+    Returns usage stats including:
+    - Total extractions attempted
+    - Successful extractions
+    - Total tokens used
+    - Jobs found via AI
+    """
+    extractor = get_agno_job_extractor()
+    return {
+        "ai_extraction": extractor.get_stats(),
+        "config": {
+            "ai_fallback_enabled": os.getenv("ENABLE_AI_FALLBACK", "true") == "true",
+            "ai_fallback_threshold": int(os.getenv("AI_FALLBACK_THRESHOLD", "3")),
+        },
+    }
