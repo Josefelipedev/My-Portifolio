@@ -28,5 +28,5 @@ jobs:
 
             # Start/restart job-scraper Docker container
             cd job-scraper
-            docker-compose up -d --build
+            docker compose up -d --build
             echo "Deploy complete!"
