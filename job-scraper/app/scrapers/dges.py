@@ -270,24 +270,73 @@ class DGESScraper:
         Returns:
             JSON corrigido ou None se não for possível
         """
-        # Conta brackets abertos
-        open_braces = json_str.count('{') - json_str.count('}')
-        open_brackets = json_str.count('[') - json_str.count(']')
+        # Rastreia a ordem de abertura para fechar na ordem correta
+        stack = []
+        in_string = False
+        escape_next = False
 
-        logger.info(f"JSON truncado: {open_braces} chaves abertas, {open_brackets} colchetes abertos")
+        for char in json_str:
+            if escape_next:
+                escape_next = False
+                continue
 
-        if open_braces == 0 and open_brackets == 0:
-            return None  # Não parece truncado
+            if char == '\\' and in_string:
+                escape_next = True
+                continue
 
-        # Remove última vírgula pendente
+            if char == '"' and not escape_next:
+                in_string = not in_string
+                continue
+
+            if in_string:
+                continue
+
+            if char == '{':
+                stack.append('}')
+            elif char == '[':
+                stack.append(']')
+            elif char == '}':
+                if stack and stack[-1] == '}':
+                    stack.pop()
+            elif char == ']':
+                if stack and stack[-1] == ']':
+                    stack.pop()
+
+        if not stack:
+            logger.info("JSON parece completo, nada a corrigir")
+            return None
+
+        logger.info(f"JSON truncado: precisa fechar {len(stack)} estruturas: {''.join(reversed(stack))}")
+
+        # Remove conteúdo incompleto no final
         fixed = json_str.rstrip()
-        if fixed.endswith(','):
+
+        # Remove string incompleta (se termina com aspas abertas)
+        if in_string:
+            # Tenta encontrar o início da string incompleta e remover
+            last_quote = fixed.rfind('"')
+            if last_quote > 0:
+                fixed = fixed[:last_quote] + '"'
+                logger.info("Fechou string incompleta")
+
+        # Remove vírgulas e dois-pontos pendentes
+        while fixed and fixed[-1] in ',:\n\t\r ':
             fixed = fixed[:-1]
 
-        # Fecha estruturas abertas
-        # Primeiro fecha arrays, depois objetos
-        fixed += ']' * open_brackets
-        fixed += '}' * open_braces
+        # Se termina com uma chave/valor incompleto, tenta limpar
+        # Ex: "name": "Algo   -> precisa fechar a string
+        if fixed.endswith(':'):
+            fixed = fixed[:-1].rstrip()
+            # Remove a chave também
+            last_quote = fixed.rfind('"')
+            if last_quote > 0:
+                prev_quote = fixed.rfind('"', 0, last_quote)
+                if prev_quote >= 0:
+                    fixed = fixed[:prev_quote].rstrip().rstrip(',')
+
+        # Fecha as estruturas na ordem correta (inversa da abertura)
+        closing = ''.join(reversed(stack))
+        fixed += closing
 
         return fixed
 
@@ -357,7 +406,8 @@ IMPORTANTE:
         logger.info(f"Iniciando extração por IA para {region_name} (HTML: {len(html)} chars)")
 
         prompt = self._get_dges_extraction_prompt(html, region_name)
-        ai_response = await self._call_ai(prompt)
+        # Aumenta max_tokens para evitar truncamento - DGES tem muitas instituições
+        ai_response = await self._call_ai(prompt, max_tokens=16000)
 
         if not ai_response:
             logger.warning("AI extraction failed - no response")
