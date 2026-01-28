@@ -57,7 +57,9 @@ interface CourseData {
  *
  * Body:
  * - syncType: "full" | "universities" | "courses" (default: "full")
+ * - source: "dges" | "eduportugal" (default: "dges")
  * - maxPages: number - Limit pages per level (optional, for testing)
+ * - regions: string - For DGES, comma-separated region codes (optional)
  */
 export async function POST(request: NextRequest) {
   try {
@@ -66,25 +68,26 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json().catch(() => ({}));
-    const { syncType = 'full', maxPages } = body;
+    const { syncType = 'full', source = 'dges', maxPages, regions } = body;
 
     // Create sync log entry
     const syncLog = await prisma.findUniversitySyncLog.create({
       data: {
-        syncType,
+        syncType: `${source}:${syncType}`,
         status: 'running',
       },
     });
 
-    logger.info('finduniversity', `Starting initial import: ${syncType}`, { syncId: syncLog.id });
+    logger.info('finduniversity', `Starting import from ${source}: ${syncType}`, { syncId: syncLog.id });
 
     // Start async import process (don't await)
-    importInBackground(syncLog.id, syncType, maxPages);
+    importInBackground(syncLog.id, syncType, source, maxPages, regions);
 
     return NextResponse.json({
       success: true,
       syncId: syncLog.id,
-      message: `Import started: ${syncType}`,
+      source,
+      message: `Import started from ${source}: ${syncType}`,
       checkStatusUrl: `/api/admin/finduniversity/status?syncId=${syncLog.id}`,
     });
   } catch (error) {
@@ -99,7 +102,9 @@ export async function POST(request: NextRequest) {
 async function importInBackground(
   syncId: string,
   syncType: string,
-  maxPages?: number
+  source: string,
+  maxPages?: number,
+  regions?: string
 ) {
   try {
     let universitiesData: UniversityData[] = [];
@@ -109,13 +114,18 @@ async function importInBackground(
     let coursesCreated = 0;
     let coursesUpdated = 0;
 
+    // Determine endpoint based on source
+    const isDGES = source === 'dges';
+    const baseEndpoint = isDGES ? '/dges' : '/eduportugal';
+
     // Import universities
     if (syncType === 'full' || syncType === 'universities') {
-      logger.info('finduniversity', 'Importing universities...');
+      logger.info('finduniversity', `Importing universities from ${source}...`);
 
-      const url = new URL(`${SCRAPER_URL}/eduportugal/universities`);
+      const url = new URL(`${SCRAPER_URL}${baseEndpoint}/universities`);
       url.searchParams.set('sync_id', syncId);
       if (maxPages) url.searchParams.set('max_pages', String(maxPages));
+      if (isDGES && regions) url.searchParams.set('regions', regions);
 
       const response = await fetch(url.toString(), {
         signal: AbortSignal.timeout(600000), // 10 min timeout
@@ -192,11 +202,12 @@ async function importInBackground(
 
     // Import courses
     if (syncType === 'full' || syncType === 'courses') {
-      logger.info('finduniversity', 'Importing courses...');
+      logger.info('finduniversity', `Importing courses from ${source}...`);
 
-      const url = new URL(`${SCRAPER_URL}/eduportugal/courses`);
+      const url = new URL(`${SCRAPER_URL}${baseEndpoint}/courses`);
       url.searchParams.set('sync_id', syncId);
       if (maxPages) url.searchParams.set('max_pages', String(maxPages));
+      if (isDGES && regions) url.searchParams.set('regions', regions);
 
       const response = await fetch(url.toString(), {
         signal: AbortSignal.timeout(1800000), // 30 min timeout for courses

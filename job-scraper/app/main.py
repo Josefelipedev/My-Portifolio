@@ -11,6 +11,7 @@ from models import SearchParams, SearchResponse, JobListing, EduPortugalSearchRe
 from scrapers.geekhunter import GeekHunterScraper
 from scrapers.vagas import VagasComBrScraper
 from scrapers.eduportugal import EduPortugalScraper, eduportugal_scraper
+from scrapers.dges import DGESScraper, dges_scraper
 from agents.orchestrator import AgentOrchestrator, report_execution
 from config import config
 
@@ -670,3 +671,281 @@ async def get_saved_file(filename: str):
         media_type="application/json",
         filename=filename,
     )
+
+
+# ============================================================================
+# DGES - Fonte Oficial do Ensino Superior em Portugal
+# ============================================================================
+
+# Track running syncs
+dges_syncs: dict = {}
+
+
+@app.get("/dges/regions")
+async def get_dges_regions():
+    """List available regions for DGES scraping."""
+    return {
+        "regions": DGESScraper.REGIONS,
+        "institution_types": DGESScraper.INSTITUTION_TYPES,
+        "source": "Direção-Geral do Ensino Superior (DGES)",
+        "website": "https://www.dges.gov.pt",
+    }
+
+
+@app.get("/dges/universities")
+async def scrape_dges_universities(
+    regions: str = Query(default=None, description="Códigos de região separados por vírgula (ex: 11,13)"),
+    sync_id: str = Query(default=None, description="ID do sync para tracking"),
+    save_to_file: bool = Query(default=True, description="Salvar resultado em arquivo JSON"),
+):
+    """
+    Scrape universities from DGES (official government source).
+
+    Regiões disponíveis:
+    - 11: Lisboa
+    - 12: Centro
+    - 13: Norte
+    - 14: Alentejo
+    - 15: Algarve
+    - 16: Açores
+    - 17: Madeira
+    """
+    import json
+    import os
+
+    stats["requests_total"] += 1
+
+    regions_list = regions.split(",") if regions else None
+
+    async def progress_callback(progress: dict):
+        if sync_id and sync_id in dges_syncs:
+            dges_syncs[sync_id].update(progress)
+
+    try:
+        logger.info(f"DGES: Scraping universities (regions={regions_list})")
+
+        universities = await dges_scraper.scrape_universities(
+            regions=regions_list,
+            progress_callback=progress_callback if sync_id else None,
+        )
+
+        stats["requests_success"] += 1
+
+        result = {
+            "universities": [u.model_dump() for u in universities],
+            "total": len(universities),
+            "source": "DGES",
+            "timestamp": datetime.utcnow().isoformat(),
+        }
+
+        # Auto-save to file
+        if save_to_file and universities:
+            os.makedirs("/app/data", exist_ok=True)
+            timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+            filename = f"/app/data/dges_universities_{timestamp}.json"
+            with open(filename, "w", encoding="utf-8") as f:
+                json.dump(result, f, ensure_ascii=False, indent=2)
+            logger.info(f"Saved {len(universities)} DGES universities to {filename}")
+            result["saved_to_file"] = filename
+
+        return result
+
+    except Exception as e:
+        stats["requests_failed"] += 1
+        logger.error(f"DGES universities error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/dges/courses")
+async def scrape_dges_courses(
+    regions: str = Query(default=None, description="Códigos de região separados por vírgula"),
+    levels: str = Query(default=None, description="Níveis separados por vírgula (licenciatura,mestrado,doutorado)"),
+    max_per_institution: int = Query(default=None, description="Limite de cursos por instituição"),
+    sync_id: str = Query(default=None, description="ID do sync para tracking"),
+    save_to_file: bool = Query(default=True, description="Salvar resultado em arquivo JSON"),
+):
+    """
+    Scrape courses from DGES (official government source).
+
+    Fonte oficial com dados de:
+    - Vagas disponíveis
+    - Requisitos de entrada
+    - Notas de corte históricas
+    - Informações de propinas
+    """
+    import json
+    import os
+
+    stats["requests_total"] += 1
+
+    regions_list = regions.split(",") if regions else None
+    levels_list = levels.split(",") if levels else None
+
+    async def progress_callback(progress: dict):
+        if sync_id and sync_id in dges_syncs:
+            dges_syncs[sync_id].update(progress)
+
+    try:
+        logger.info(f"DGES: Scraping courses (regions={regions_list}, levels={levels_list})")
+
+        courses = await dges_scraper.scrape_courses(
+            regions=regions_list,
+            levels=levels_list,
+            max_per_institution=max_per_institution,
+            progress_callback=progress_callback if sync_id else None,
+        )
+
+        stats["requests_success"] += 1
+
+        # Group by level for stats
+        by_level = {}
+        for course in courses:
+            level = course.level
+            by_level[level] = by_level.get(level, 0) + 1
+
+        result = {
+            "courses": [c.model_dump() for c in courses],
+            "total": len(courses),
+            "by_level": by_level,
+            "source": "DGES",
+            "timestamp": datetime.utcnow().isoformat(),
+        }
+
+        # Auto-save to file
+        if save_to_file and courses:
+            os.makedirs("/app/data", exist_ok=True)
+            timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+            filename = f"/app/data/dges_courses_{timestamp}.json"
+            with open(filename, "w", encoding="utf-8") as f:
+                json.dump(result, f, ensure_ascii=False, indent=2)
+            logger.info(f"Saved {len(courses)} DGES courses to {filename}")
+            result["saved_to_file"] = filename
+
+        return result
+
+    except Exception as e:
+        stats["requests_failed"] += 1
+        logger.error(f"DGES courses error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/dges/all")
+async def scrape_dges_all(
+    regions: str = Query(default=None, description="Códigos de região separados por vírgula"),
+    max_courses_per_institution: int = Query(default=None, description="Limite de cursos por instituição"),
+    fetch_details: bool = Query(default=False, description="Buscar detalhes de cada curso (mais lento)"),
+    sync_id: str = Query(default=None, description="ID do sync para tracking"),
+    save_to_file: bool = Query(default=True, description="Salvar resultado em arquivo JSON"),
+):
+    """
+    Scrape all universities and courses from DGES.
+
+    Esta é a fonte oficial do governo português para dados de ensino superior.
+    Retorna dados mais completos e confiáveis que o EduPortugal.
+    """
+    import json
+    import os
+
+    stats["requests_total"] += 1
+
+    regions_list = regions.split(",") if regions else None
+
+    async def progress_callback(progress: dict):
+        if sync_id and sync_id in dges_syncs:
+            dges_syncs[sync_id].update(progress)
+
+    try:
+        logger.info(f"DGES: Full scrape (regions={regions_list})")
+
+        result_data = await dges_scraper.scrape_all(
+            regions=regions_list,
+            max_courses_per_institution=max_courses_per_institution,
+            fetch_details=fetch_details,
+            progress_callback=progress_callback if sync_id else None,
+        )
+
+        stats["requests_success"] += 1
+
+        # Group courses by level
+        by_level = {}
+        for course in result_data["courses"]:
+            level = course.level
+            by_level[level] = by_level.get(level, 0) + 1
+
+        result = {
+            "universities": [u.model_dump() for u in result_data["universities"]],
+            "courses": [c.model_dump() for c in result_data["courses"]],
+            "total_universities": len(result_data["universities"]),
+            "total_courses": len(result_data["courses"]),
+            "courses_by_level": by_level,
+            "source": "DGES",
+            "timestamp": datetime.utcnow().isoformat(),
+        }
+
+        # Auto-save to file
+        if save_to_file:
+            os.makedirs("/app/data", exist_ok=True)
+            timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+            filename = f"/app/data/dges_full_{timestamp}.json"
+            with open(filename, "w", encoding="utf-8") as f:
+                json.dump(result, f, ensure_ascii=False, indent=2)
+            logger.info(f"Saved DGES data to {filename}")
+            result["saved_to_file"] = filename
+
+        return result
+
+    except Exception as e:
+        stats["requests_failed"] += 1
+        logger.error(f"DGES full scrape error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/dges/course/details")
+async def get_dges_course_details(
+    url: str = Query(..., description="URL do curso na DGES"),
+):
+    """
+    Get detailed information about a specific course from DGES.
+
+    Retorna informações detalhadas incluindo:
+    - Créditos ECTS
+    - Duração
+    - Vagas
+    - Requisitos de entrada
+    - Provas de ingresso
+    - Contatos da instituição
+    """
+    try:
+        logger.info(f"DGES: Getting course details: {url}")
+
+        details = await dges_scraper.fetch_course_details(url)
+
+        if not details:
+            raise HTTPException(status_code=404, detail="Could not fetch course details")
+
+        return {
+            "details": details,
+            "source_url": url,
+            "source": "DGES",
+            "timestamp": datetime.utcnow().isoformat(),
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"DGES course details error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/dges/stats")
+async def get_dges_stats():
+    """Get DGES scraper statistics."""
+    return {
+        "available_regions": len(DGESScraper.REGIONS),
+        "regions": DGESScraper.REGIONS,
+        "institution_types": list(DGESScraper.INSTITUTION_TYPES.values()),
+        "active_syncs": len([s for s in dges_syncs.values() if s.get("status") == "running"]),
+        "total_syncs": len(dges_syncs),
+        "rate_limit_delay": DGESScraper.RATE_LIMIT_DELAY,
+        "source": "Direção-Geral do Ensino Superior",
+    }
