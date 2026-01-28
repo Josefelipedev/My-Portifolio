@@ -34,6 +34,9 @@ TOGETHER_API_KEY = os.getenv("TOGETHER_API_KEY", "")
 TOGETHER_API_URL = "https://api.together.xyz/v1/chat/completions"
 AI_MODEL = "meta-llama/Llama-3.3-70B-Instruct-Turbo"
 
+# URL base configurável via variável de ambiente
+EDUPORTUGAL_BASE_URL = os.getenv("EDUPORTUGAL_BASE_URL", "https://eduportugal.eu")
+
 
 class EduPortugalScraper:
     """
@@ -43,10 +46,11 @@ class EduPortugalScraper:
     - Rate limiting: 2 segundos entre requisições
     - Suporte a paginação automática
     - Callback de progresso para tracking
+    - URL base configurável via EDUPORTUGAL_BASE_URL
     """
 
     name = "eduportugal"
-    base_url = "https://eduportugal.eu"
+    base_url = EDUPORTUGAL_BASE_URL
 
     # Mapeamento de níveis de curso para URLs
     COURSE_LEVELS = {

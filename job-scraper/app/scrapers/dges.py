@@ -31,6 +31,9 @@ TOGETHER_API_KEY = os.getenv("TOGETHER_API_KEY", "")
 TOGETHER_API_URL = "https://api.together.xyz/v1/chat/completions"
 AI_MODEL = "meta-llama/Llama-3.3-70B-Instruct-Turbo"
 
+# URL base configurável via variável de ambiente
+DGES_BASE_URL = os.getenv("DGES_BASE_URL", "https://www.dges.gov.pt")
+
 
 class DGESScraper:
     """
@@ -40,10 +43,11 @@ class DGESScraper:
     - Dados oficiais do governo português
     - Informações de vagas, requisitos, notas de corte
     - Rate limiting: 1 segundo entre requisições
+    - URL base configurável via DGES_BASE_URL
     """
 
     name = "dges"
-    base_url = "https://www.dges.gov.pt"
+    base_url = DGES_BASE_URL
 
     # Regiões disponíveis
     REGIONS = {

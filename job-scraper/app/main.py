@@ -10,8 +10,8 @@ import os
 from models import SearchParams, SearchResponse, JobListing, EduPortugalSearchResponse
 from scrapers.geekhunter import GeekHunterScraper
 from scrapers.vagas import VagasComBrScraper
-from scrapers.eduportugal import EduPortugalScraper, eduportugal_scraper
-from scrapers.dges import DGESScraper, dges_scraper
+from scrapers.eduportugal import EduPortugalScraper, eduportugal_scraper, EDUPORTUGAL_BASE_URL
+from scrapers.dges import DGESScraper, dges_scraper, DGES_BASE_URL
 from agents.orchestrator import AgentOrchestrator, report_execution
 from config import config
 
@@ -71,6 +71,32 @@ orchestrator = AgentOrchestrator()
 @app.get("/health")
 async def health_check():
     return {"status": "healthy", "timestamp": datetime.utcnow()}
+
+
+@app.get("/config")
+async def get_scraper_config():
+    """Get current scraper configuration including source URLs."""
+    return {
+        "sources": {
+            "dges": {
+                "name": "DGES - Direção-Geral do Ensino Superior",
+                "base_url": DGES_BASE_URL,
+                "description": "Fonte oficial do governo português",
+                "configurable_via": "DGES_BASE_URL",
+            },
+            "eduportugal": {
+                "name": "EduPortugal",
+                "base_url": EDUPORTUGAL_BASE_URL,
+                "description": "Agregador privado de cursos",
+                "configurable_via": "EDUPORTUGAL_BASE_URL",
+            },
+        },
+        "ai": {
+            "model": "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+            "provider": "Together AI",
+        },
+        "timestamp": datetime.utcnow().isoformat(),
+    }
 
 
 @app.get("/search", response_model=SearchResponse)
