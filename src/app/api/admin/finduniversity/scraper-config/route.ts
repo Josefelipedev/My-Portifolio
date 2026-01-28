@@ -2,6 +2,21 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { isAuthenticated } from '@/lib/auth';
 
+/**
+ * Extract only the origin (protocol + domain) from a URL.
+ * This prevents users from accidentally including paths that would cause duplication.
+ * Example: "https://www.dges.gov.pt/guias/indest.asp" -> "https://www.dges.gov.pt"
+ */
+function extractBaseUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    return parsed.origin; // Returns "https://www.dges.gov.pt"
+  } catch {
+    // If URL parsing fails, just remove trailing slash
+    return url.replace(/\/$/, '');
+  }
+}
+
 const DEFAULT_CONFIG = {
   dgesBaseUrl: 'https://www.dges.gov.pt',
   dgesEnabled: true,
@@ -92,13 +107,15 @@ export async function PUT(request: NextRequest) {
     const updateData: Record<string, string | boolean> = {};
 
     if (dges?.baseUrl !== undefined) {
-      updateData.dgesBaseUrl = dges.baseUrl.replace(/\/$/, ''); // Remove trailing slash
+      // Extract only origin to prevent path duplication issues
+      updateData.dgesBaseUrl = extractBaseUrl(dges.baseUrl);
     }
     if (dges?.enabled !== undefined) {
       updateData.dgesEnabled = dges.enabled;
     }
     if (eduportugal?.baseUrl !== undefined) {
-      updateData.eduportugalBaseUrl = eduportugal.baseUrl.replace(/\/$/, '');
+      // Extract only origin to prevent path duplication issues
+      updateData.eduportugalBaseUrl = extractBaseUrl(eduportugal.baseUrl);
     }
     if (eduportugal?.enabled !== undefined) {
       updateData.eduportugalEnabled = eduportugal.enabled;
