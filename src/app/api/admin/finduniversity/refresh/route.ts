@@ -178,7 +178,7 @@ export async function POST(request: NextRequest) {
 
     // Check if it's a batch request
     if (body.courseIds && Array.isArray(body.courseIds)) {
-      const { courseIds, useAI = true } = body as BatchRefreshRequest;
+      const { courseIds, useAI = true, source = 'auto' } = body as BatchRefreshRequest;
 
       if (courseIds.length === 0) {
         return NextResponse.json({ error: 'No course IDs provided' }, { status: 400 });
@@ -191,28 +191,48 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Fetch courses with their URLs
-      const courses = await prisma.course.findMany({
-        where: { id: { in: courseIds } },
-        select: {
-          id: true,
-          name: true,
-          sourceUrl: true,
-          officialUrl: true,
-        },
-      });
+      // Fetch courses with their URLs using raw query to include researchUrl
+      const courses = await prisma.$queryRaw<Array<{
+        id: string;
+        name: string;
+        sourceUrl: string | null;
+        officialUrl: string | null;
+        researchUrl: string | null;
+      }>>`
+        SELECT "id", "name", "sourceUrl", "officialUrl", "researchUrl"
+        FROM "Course"
+        WHERE "id" = ANY(${courseIds})
+      `;
 
       const results = [];
       const errors = [];
 
       for (const course of courses) {
-        const url = course.officialUrl || course.sourceUrl;
+        // Determine URL based on source parameter
+        let url: string | null = null;
+
+        switch (source) {
+          case 'sourceUrl':
+            url = course.sourceUrl;
+            break;
+          case 'officialUrl':
+            url = course.officialUrl;
+            break;
+          case 'researchUrl':
+            url = course.researchUrl;
+            break;
+          case 'auto':
+          default:
+            // Auto: prefer researchUrl, then officialUrl, fallback to sourceUrl
+            url = course.researchUrl || course.officialUrl || course.sourceUrl;
+            break;
+        }
 
         if (!url) {
           errors.push({
             courseId: course.id,
             name: course.name,
-            error: 'No source URL available',
+            error: `No URL available for source "${source}". Available: sourceUrl=${!!course.sourceUrl}, officialUrl=${!!course.officialUrl}, researchUrl=${!!course.researchUrl}`,
           });
           continue;
         }
@@ -225,12 +245,14 @@ export async function POST(request: NextRequest) {
             name: course.name,
             fieldsUpdated: result.fieldsUpdated,
             confidence: result.extracted?.confidence,
+            urlUsed: url,
           });
         } else {
           errors.push({
             courseId: result.courseId,
             name: course.name,
             error: result.error,
+            urlUsed: url,
           });
         }
 
@@ -244,6 +266,7 @@ export async function POST(request: NextRequest) {
         failed: errors.length,
         results,
         errors: errors.length > 0 ? errors : undefined,
+        sourceUsed: source,
       });
     }
 
