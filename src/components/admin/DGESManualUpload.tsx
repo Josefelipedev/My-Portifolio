@@ -107,7 +107,7 @@ export default function DGESManualUpload({ onSuccess, showToast }: DGESManualUpl
     setResult(null);
 
     try {
-      const response = await fetch(EXTRACT_API_URL, {
+      const response = await fetchWithCSRF(EXTRACT_API_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
