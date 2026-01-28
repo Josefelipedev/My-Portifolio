@@ -558,6 +558,12 @@ IMPORTANTE:
         """
         Faz parsing de uma página de listagem de universidades.
 
+        Extrai diretamente do HTML (0 tokens de AI):
+        - Nome da instituição
+        - Logo/imagem
+        - Website oficial (ex: www.ipmaia.pt)
+        - Link no EduPortugal
+
         Args:
             html: HTML da página
 
@@ -572,16 +578,22 @@ IMPORTANTE:
             "article.type-instituicao, .institution-card, .university-item, "
             ".listing-item, article[class*='instituicao'], "
             ".wpbf-post-style-boxed, "
-            # Novos seletores
+            # Novos seletores Elementor/Jet
             ".elementor-post, .jet-listing-grid__item, "
             ".e-loop-item, div[data-elementor-type='loop-item'], "
             ".elementor-posts-container article, "
-            ".jet-smart-listing__post, .jet-posts__item"
+            ".jet-smart-listing__post, .jet-posts__item, "
+            # Containers genéricos com imagem e link
+            ".elementor-widget-container:has(img):has(a[href*='instituicao'])"
         )
 
         # Se não encontrar cards específicos, tenta artigos genéricos
         if not cards:
             cards = soup.select("article, .elementor-element a[href*='/instituicao']")
+
+        # Estratégia alternativa: buscar grupos de elementos relacionados
+        if not cards or len(cards) < 2:
+            cards = self._find_university_groups(soup)
 
         # Debug: Log what was found
         logger.info(f"Universities page: Found {len(cards)} potential cards using primary selectors")
@@ -615,6 +627,7 @@ IMPORTANTE:
                 if name and len(name) > 2:
                     slug = href.rstrip("/").split("/")[-1]
                     if slug and slug != "instituicoes-de-ensino":
+                        full_url = href if href.startswith("http") else urljoin(self.base_url, href)
                         universities.append(UniversityListing(
                             id=self.generate_id(slug),
                             name=name[:200],  # Limita tamanho
@@ -622,7 +635,8 @@ IMPORTANTE:
                             description=None,
                             city=None,
                             logo_url=None,
-                            source_url=href if href.startswith("http") else urljoin(self.base_url, href),
+                            source_url=full_url,
+                            individual_page_url=full_url,  # URL da página individual
                         ))
 
             if universities:
@@ -680,6 +694,9 @@ IMPORTANTE:
                     if logo_url and not logo_url.startswith("http"):
                         logo_url = urljoin(self.base_url, logo_url)
 
+                # Website oficial (ex: www.ipmaia.pt) - extrai diretamente do card
+                website = self._extract_website_from_card(card)
+
                 universities.append(UniversityListing(
                     id=self.generate_id(slug),
                     name=name,
@@ -688,6 +705,8 @@ IMPORTANTE:
                     city=city,
                     logo_url=logo_url,
                     source_url=url,
+                    individual_page_url=url,  # URL da página individual no EduPortugal
+                    website=website,
                 ))
 
             except Exception as e:
@@ -695,6 +714,75 @@ IMPORTANTE:
                 continue
 
         return universities
+
+    def _extract_website_from_card(self, card) -> Optional[str]:
+        """
+        Extrai o website oficial de um card de universidade.
+
+        O EduPortugal mostra o website diretamente no card (ex: www.ipmaia.pt).
+        Esta extração é GRATUITA (0 tokens de AI).
+        """
+        # Padrões de URL de website
+        website_patterns = [
+            r'(?:www\.)?[a-zA-Z0-9][-a-zA-Z0-9]*\.[a-zA-Z]{2,}(?:\.[a-zA-Z]{2,})?',
+        ]
+
+        # 1. Procura links externos (não EduPortugal)
+        for link in card.find_all('a', href=True):
+            href = link.get('href', '')
+            if href and 'eduportugal' not in href.lower():
+                if href.startswith('http') and not any(x in href for x in ['facebook', 'instagram', 'linkedin', 'twitter', 'youtube']):
+                    return href
+
+        # 2. Procura texto que parece URL (www.xxx.pt)
+        card_text = card.get_text()
+        for pattern in website_patterns:
+            matches = re.findall(pattern, card_text)
+            for match in matches:
+                # Filtra domínios do próprio EduPortugal
+                if 'eduportugal' not in match.lower() and '.' in match:
+                    # Normaliza URL
+                    if not match.startswith('http'):
+                        match = f"https://{match}"
+                    return match
+
+        return None
+
+    def _find_university_groups(self, soup) -> list:
+        """
+        Encontra grupos de elementos que representam universidades.
+
+        Usa heurística para detectar padrões repetidos (imagem + nome + link).
+        """
+        groups = []
+
+        # Procura containers com imagem e link para instituição
+        containers = soup.find_all(['div', 'article', 'section'], recursive=True)
+
+        for container in containers:
+            # Verifica se tem imagem E link para instituição
+            has_img = container.find('img')
+            has_inst_link = container.find('a', href=re.compile(r'/instituicoes-de-ensino/[^/]+/?$'))
+
+            if has_img and has_inst_link:
+                # Verifica se não é um container muito grande (página inteira)
+                text_len = len(container.get_text(strip=True))
+                if 10 < text_len < 500:  # Tamanho razoável para um card
+                    groups.append(container)
+
+        # Remove duplicatas (containers aninhados)
+        unique_groups = []
+        for group in groups:
+            is_nested = False
+            for other in groups:
+                if other != group and group in other.descendants:
+                    is_nested = True
+                    break
+            if not is_nested:
+                unique_groups.append(group)
+
+        logger.info(f"Found {len(unique_groups)} university groups using heuristics")
+        return unique_groups
 
     def _extract_city(self, text: str) -> Optional[str]:
         """Extrai cidade de um texto de localização."""
@@ -1059,6 +1147,324 @@ IMPORTANTE:
         if self.browser:
             await self.browser.close()
             self.browser = None
+
+    # ==========================================
+    # Hierarchical Scraping (University → Courses)
+    # ==========================================
+
+    async def scrape_university_courses(
+        self,
+        university: "UniversityListing",
+        use_ai: bool = True,
+    ) -> List[CourseListing]:
+        """
+        Visita página individual de uma universidade e extrai seus cursos.
+
+        Args:
+            university: Universidade com source_url para visitar
+            use_ai: Usar AI como fallback
+
+        Returns:
+            Lista de cursos com university_name e university_slug preenchidos
+        """
+        if not university.source_url:
+            logger.warning(f"Universidade {university.name} sem source_url")
+            return []
+
+        logger.info(f"Buscando cursos da universidade: {university.name}")
+
+        try:
+            html = await self._fetch_page(university.source_url)
+            courses = self._parse_university_page_courses(html, university)
+
+            # Fallback para AI se necessário
+            if not courses and use_ai:
+                logger.info(f"Usando AI para extrair cursos de {university.name}")
+                courses = await self._extract_university_courses_with_ai(html, university)
+
+            logger.info(f"Encontrados {len(courses)} cursos para {university.name}")
+            return courses
+
+        except Exception as e:
+            logger.error(f"Erro ao buscar cursos de {university.name}: {e}")
+            return []
+
+    def _parse_university_page_courses(
+        self,
+        html: str,
+        university: "UniversityListing",
+    ) -> List[CourseListing]:
+        """
+        Parse de cursos na página individual de uma universidade.
+
+        Args:
+            html: HTML da página da universidade
+            university: Dados da universidade para vincular
+
+        Returns:
+            Lista de CourseListing com vínculo à universidade
+        """
+        courses = []
+        soup = BeautifulSoup(html, "lxml")
+
+        # Seletores para links de cursos na página da universidade
+        course_selectors = [
+            "a[href*='/cursos/']",
+            "a[href*='/curso/']",
+            "a[href*='/course/']",
+            ".course-item a",
+            ".curso-item a",
+            ".listing-courses a",
+            "article.course a",
+            ".elementor-post a[href*='curso']",
+        ]
+
+        seen_urls = set()
+        course_links = []
+
+        for selector in course_selectors:
+            links = soup.select(selector)
+            for link in links:
+                href = link.get("href", "")
+                if href and href not in seen_urls and "eduportugal" in href.lower():
+                    seen_urls.add(href)
+                    course_links.append(link)
+
+        logger.info(f"Encontrados {len(course_links)} links de cursos na página de {university.name}")
+
+        for link in course_links:
+            try:
+                href = link.get("href", "")
+                name = link.get_text(strip=True)
+
+                # Tenta pegar nome do parent se link está vazio
+                if not name or len(name) < 3:
+                    parent = link.find_parent(["article", "div", "li"])
+                    if parent:
+                        title_elem = parent.select_one("h2, h3, h4, .title")
+                        if title_elem:
+                            name = title_elem.get_text(strip=True)
+
+                if not name or len(name) < 3:
+                    continue
+
+                # Extrair nível do curso do texto ou URL
+                level = self._detect_course_level(name, href)
+
+                # Gerar slug
+                slug = self._slugify(name)
+
+                # URL completa
+                if not href.startswith("http"):
+                    href = urljoin(self.base_url, href)
+
+                courses.append(CourseListing(
+                    id=self.generate_id(f"{university.slug}-{slug}"),
+                    name=name,
+                    slug=slug,
+                    level=level,
+                    source_url=href,
+                    university_name=university.name,
+                    university_slug=university.slug,
+                ))
+
+            except Exception as e:
+                logger.debug(f"Erro ao parsear link de curso: {e}")
+                continue
+
+        return courses
+
+    def _detect_course_level(self, name: str, url: str) -> str:
+        """Detecta nível do curso a partir do nome ou URL."""
+        text = f"{name} {url}".lower()
+
+        if "doutorado" in text or "doutoramento" in text or "phd" in text:
+            return "doutorado"
+        elif "mestrado-integrado" in text or "mestrado integrado" in text:
+            return "mestrado-integrado"
+        elif "mestrado" in text or "master" in text:
+            return "mestrado"
+        elif "pos-graduacao" in text or "pós-graduação" in text or "especialização" in text:
+            return "pos-graduacao"
+        elif "licenciatura" in text or "bachelor" in text:
+            return "licenciatura"
+        elif "mba" in text:
+            return "mba"
+        elif "tecnico" in text or "técnico" in text or "ctesp" in text:
+            return "curso-tecnico"
+        else:
+            return "outro"
+
+    async def _extract_university_courses_with_ai(
+        self,
+        html: str,
+        university: "UniversityListing",
+    ) -> List[CourseListing]:
+        """
+        Extrai cursos usando AI como fallback.
+
+        Args:
+            html: HTML da página
+            university: Dados da universidade
+
+        Returns:
+            Lista de CourseListing
+        """
+        # Limpar HTML
+        soup = BeautifulSoup(html, "lxml")
+        for tag in soup.select("script, style, nav, footer, header"):
+            tag.decompose()
+        text_content = soup.get_text(separator="\n", strip=True)[:15000]
+
+        prompt = f"""Extraia todos os cursos da página desta universidade: {university.name}
+
+CONTEÚDO:
+{text_content}
+
+Retorne APENAS JSON válido:
+{{
+  "courses": [
+    {{"name": "Nome do Curso", "level": "licenciatura|mestrado|doutorado|outro", "duration": "duração"}}
+  ]
+}}"""
+
+        response = await self._call_ai(prompt, max_tokens=2000)
+        if not response:
+            return []
+
+        try:
+            json_match = re.search(r'\{[\s\S]*\}', response)
+            if not json_match:
+                return []
+
+            data = json.loads(json_match.group())
+            courses = []
+
+            for course_data in data.get("courses", []):
+                name = course_data.get("name", "").strip()
+                if not name or len(name) < 3:
+                    continue
+
+                slug = self._slugify(name)
+                courses.append(CourseListing(
+                    id=self.generate_id(f"{university.slug}-{slug}"),
+                    name=name,
+                    slug=slug,
+                    level=course_data.get("level", "outro"),
+                    duration=course_data.get("duration"),
+                    source_url=university.source_url,
+                    university_name=university.name,
+                    university_slug=university.slug,
+                ))
+
+            return courses
+
+        except Exception as e:
+            logger.error(f"Erro ao parsear resposta AI: {e}")
+            return []
+
+    async def scrape_full_hierarchy(
+        self,
+        max_universities: Optional[int] = None,
+        max_courses_per_university: Optional[int] = None,
+        progress_callback: Optional[Callable] = None,
+        use_ai: bool = True,
+        delay_between_universities: float = 2.0,
+    ) -> Dict[str, Any]:
+        """
+        Scraping hierárquico completo: Universidades → Cursos por universidade.
+
+        Fluxo:
+        1. Scrape listagem de universidades
+        2. Para cada universidade, visita página individual
+        3. Extrai cursos dessa universidade
+        4. Retorna hierarquia completa
+
+        Args:
+            max_universities: Limite de universidades
+            max_courses_per_university: Limite de cursos por universidade
+            progress_callback: Callback de progresso
+            use_ai: Usar AI como fallback
+            batch_size: Universidades processadas em paralelo
+            delay_between_universities: Delay entre universidades (rate limiting)
+
+        Returns:
+            Dict com universities, courses, hierarchy e stats
+        """
+        if progress_callback:
+            self._progress_callback = progress_callback
+
+        start_time = __import__("time").time()
+
+        # 1. Scrape universidades
+        logger.info("Fase 1: Buscando universidades...")
+        await self._report_progress({
+            "phase": "universities",
+            "status": "starting",
+        })
+
+        universities = await self.scrape_universities(
+            max_pages=None,
+            progress_callback=progress_callback,
+            use_ai=use_ai,
+        )
+
+        if max_universities:
+            universities = universities[:max_universities]
+
+        logger.info(f"Encontradas {len(universities)} universidades")
+
+        # 2. Para cada universidade, buscar cursos
+        logger.info("Fase 2: Buscando cursos por universidade...")
+        all_courses = []
+        hierarchy = {}  # university_id -> [course_ids]
+
+        for i, university in enumerate(universities):
+            await self._report_progress({
+                "phase": "courses",
+                "current_university": i + 1,
+                "total_universities": len(universities),
+                "university_name": university.name,
+            })
+
+            courses = await self.scrape_university_courses(university, use_ai=use_ai)
+
+            if max_courses_per_university:
+                courses = courses[:max_courses_per_university]
+
+            all_courses.extend(courses)
+            hierarchy[university.id] = [c.id for c in courses]
+
+            logger.info(f"[{i+1}/{len(universities)}] {university.name}: {len(courses)} cursos")
+
+            # Rate limiting
+            if i < len(universities) - 1:
+                await asyncio.sleep(delay_between_universities)
+
+        # 3. Montar resultado
+        elapsed_time = __import__("time").time() - start_time
+
+        result = {
+            "universities": universities,
+            "courses": all_courses,
+            "hierarchy": hierarchy,
+            "stats": {
+                "total_universities": len(universities),
+                "total_courses": len(all_courses),
+                "avg_courses_per_university": len(all_courses) / len(universities) if universities else 0,
+                "elapsed_seconds": round(elapsed_time, 2),
+            }
+        }
+
+        await self._report_progress({
+            "phase": "completed",
+            "total_universities": len(universities),
+            "total_courses": len(all_courses),
+        })
+
+        logger.info(f"Scraping hierárquico concluído: {len(universities)} universidades, {len(all_courses)} cursos")
+
+        return result
 
 
 # Instância global do scraper

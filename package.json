@@ -27,6 +27,11 @@
     "db:reset": "prisma migrate reset",
     "update": "bash scripts/update.sh",
     "setup": "bash scripts/setup-hooks.sh",
+    "scraper:build": "cd job-scraper && docker compose build",
+    "scraper:up": "cd job-scraper && docker compose up -d",
+    "scraper:down": "cd job-scraper && docker compose down",
+    "scraper:logs": "cd job-scraper && docker compose logs -f",
+    "scraper:restart": "cd job-scraper && docker compose down && docker compose build && docker compose up -d",
     "postinstall": "prisma generate"
   },
   "dependencies": {

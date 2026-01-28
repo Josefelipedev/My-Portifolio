@@ -69,7 +69,11 @@ export async function PUT(
     const updateData: Record<string, unknown> = {};
     const allowedFields = [
       'name', 'shortName', 'description', 'website', 'sourceUrl',
-      'city', 'region', 'address', 'logoUrl', 'email', 'phone', 'type'
+      'city', 'region', 'address', 'logoUrl', 'email', 'phone', 'type',
+      // Redes sociais
+      'instagramUrl', 'linkedinUrl', 'facebookUrl', 'twitterUrl', 'youtubeUrl',
+      // Enriquecimento
+      'enrichedAt', 'enrichError'
     ];
 
     for (const field of allowedFields) {
