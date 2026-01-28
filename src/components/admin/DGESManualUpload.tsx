@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { fetchWithCSRF } from '@/lib/csrf-client';
 
 // Types
@@ -69,10 +69,36 @@ export default function DGESManualUpload({ onSuccess, showToast }: DGESManualUpl
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ExtractionResult | null>(null);
   const [saving, setSaving] = useState(false);
+  const [scraperOnline, setScraperOnline] = useState<boolean | null>(null);
+  const [checkingHealth, setCheckingHealth] = useState(false);
+
+  // Check scraper health on mount and periodically
+  useEffect(() => {
+    checkScraperHealth();
+  }, []);
+
+  const checkScraperHealth = async () => {
+    setCheckingHealth(true);
+    try {
+      const response = await fetch('/api/admin/finduniversity/health');
+      const data = await response.json();
+      setScraperOnline(data.online === true);
+    } catch {
+      setScraperOnline(false);
+    } finally {
+      setCheckingHealth(false);
+    }
+  };
 
   const handleExtract = async () => {
     if (!content.trim()) {
       showToast('Por favor, insere o conteudo para extrair', 'error');
+      return;
+    }
+
+    // Check if scraper is online
+    if (scraperOnline === false) {
+      showToast('Scraper Python nao esta disponivel. Execute: cd job-scraper && docker-compose up -d', 'error');
       return;
     }
 
@@ -183,6 +209,44 @@ export default function DGESManualUpload({ onSuccess, showToast }: DGESManualUpl
             Cola HTML, texto ou URL para extrair dados de universidades e cursos
           </p>
         </div>
+      </div>
+
+      {/* Scraper Status */}
+      <div className={`p-3 rounded-lg ${
+        scraperOnline === null ? 'bg-gray-100 dark:bg-gray-700' :
+        scraperOnline ? 'bg-green-50 dark:bg-green-900/20' : 'bg-red-50 dark:bg-red-900/20'
+      }`}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            {checkingHealth ? (
+              <div className="animate-spin w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full" />
+            ) : (
+              <span className={`w-3 h-3 rounded-full ${
+                scraperOnline === null ? 'bg-gray-400' :
+                scraperOnline ? 'bg-green-500' : 'bg-red-500'
+              }`} />
+            )}
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              Scraper Python: {
+                checkingHealth ? 'Verificando...' :
+                scraperOnline === null ? 'Desconhecido' :
+                scraperOnline ? 'Online' : 'Offline'
+              }
+            </span>
+          </div>
+          <button
+            onClick={checkScraperHealth}
+            disabled={checkingHealth}
+            className="text-xs text-blue-500 hover:text-blue-600 disabled:opacity-50"
+          >
+            Verificar
+          </button>
+        </div>
+        {scraperOnline === false && (
+          <p className="text-xs text-red-600 dark:text-red-400 mt-2">
+            Execute: <code className="bg-red-100 dark:bg-red-900/50 px-1 rounded">cd job-scraper && docker-compose up -d</code>
+          </p>
+        )}
       </div>
 
       {/* Form */}
