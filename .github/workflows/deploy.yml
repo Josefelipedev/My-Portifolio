@@ -25,4 +25,8 @@ jobs:
             npx prisma db push
             npm run build
             pm2 restart myportfolio
+
+            # Start/restart job-scraper Docker container
+            cd job-scraper
+            docker-compose up -d --build
             echo "Deploy complete!"
