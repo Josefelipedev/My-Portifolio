@@ -208,6 +208,17 @@ export default function FindUniversityPageWrapper({
   // Import Source State
   const [importSource, setImportSource] = useState<'dges' | 'eduportugal'>('dges');
 
+  // Scraper Config State
+  const [scraperConfig, setScraperConfig] = useState<{
+    sources: {
+      dges: { name: string; base_url: string; description: string };
+      eduportugal: { name: string; base_url: string; description: string };
+    };
+  } | null>(null);
+  const [showUrlConfig, setShowUrlConfig] = useState(false);
+  const [customDgesUrl, setCustomDgesUrl] = useState('');
+  const [customEduportugalUrl, setCustomEduportugalUrl] = useState('');
+
   // AI Features State
   const [aiSearchQuery, setAiSearchQuery] = useState('');
   const [aiSearchResults, setAiSearchResults] = useState<AISearchResult | null>(null);
@@ -255,6 +266,11 @@ export default function FindUniversityPageWrapper({
     const interval = setInterval(checkImportStatus, 5000);
     return () => clearInterval(interval);
   }, [isImporting, checkImportStatus]);
+
+  // Load scraper config on mount
+  useEffect(() => {
+    loadScraperConfig();
+  }, []);
 
   // Load data when tab changes
   useEffect(() => {
@@ -313,6 +329,25 @@ export default function FindUniversityPageWrapper({
       console.error('Failed to load files:', err);
     } finally {
       setFilesLoading(false);
+    }
+  };
+
+  const loadScraperConfig = async () => {
+    try {
+      const response = await fetch('/api/admin/finduniversity/config');
+      if (response.ok) {
+        const config = await response.json();
+        setScraperConfig(config);
+        // Initialize custom URL inputs with current values
+        if (config.sources?.dges?.base_url) {
+          setCustomDgesUrl(config.sources.dges.base_url);
+        }
+        if (config.sources?.eduportugal?.base_url) {
+          setCustomEduportugalUrl(config.sources.eduportugal.base_url);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load scraper config:', err);
     }
   };
 
@@ -1162,6 +1197,89 @@ export default function FindUniversityPageWrapper({
                     {exportLoading === 'courses-csv' ? '...' : 'Courses CSV'}
                   </button>
                 </div>
+              </div>
+
+              {/* Scraper Configuration */}
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-semibold text-zinc-600 dark:text-zinc-400">Configuracao do Scraper</h3>
+                  <button
+                    onClick={() => setShowUrlConfig(!showUrlConfig)}
+                    className="text-xs text-blue-500 hover:text-blue-600"
+                  >
+                    {showUrlConfig ? 'Ocultar Detalhes' : 'Ver Detalhes'}
+                  </button>
+                </div>
+
+                {scraperConfig ? (
+                  <div className="space-y-3">
+                    {/* DGES URL */}
+                    <div className="p-3 bg-zinc-50 dark:bg-zinc-900 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium">DGES</p>
+                          <p className="text-xs text-zinc-500">{scraperConfig.sources.dges.description}</p>
+                        </div>
+                        <span className="px-2 py-0.5 text-xs bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 rounded">
+                          Ativo
+                        </span>
+                      </div>
+                      {showUrlConfig && (
+                        <div className="mt-2 pt-2 border-t border-zinc-200 dark:border-zinc-700">
+                          <label className="text-xs text-zinc-500 block mb-1">URL Base</label>
+                          <input
+                            type="text"
+                            value={customDgesUrl}
+                            onChange={(e) => setCustomDgesUrl(e.target.value)}
+                            className="w-full px-2 py-1 text-xs bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-600 rounded"
+                            placeholder="https://www.dges.gov.pt"
+                          />
+                          <p className="text-xs text-zinc-400 mt-1">
+                            Atual: {scraperConfig.sources.dges.base_url}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* EduPortugal URL */}
+                    <div className="p-3 bg-zinc-50 dark:bg-zinc-900 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium">EduPortugal</p>
+                          <p className="text-xs text-zinc-500">{scraperConfig.sources.eduportugal.description}</p>
+                        </div>
+                        <span className="px-2 py-0.5 text-xs bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 rounded">
+                          Ativo
+                        </span>
+                      </div>
+                      {showUrlConfig && (
+                        <div className="mt-2 pt-2 border-t border-zinc-200 dark:border-zinc-700">
+                          <label className="text-xs text-zinc-500 block mb-1">URL Base</label>
+                          <input
+                            type="text"
+                            value={customEduportugalUrl}
+                            onChange={(e) => setCustomEduportugalUrl(e.target.value)}
+                            className="w-full px-2 py-1 text-xs bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-600 rounded"
+                            placeholder="https://eduportugal.eu"
+                          />
+                          <p className="text-xs text-zinc-400 mt-1">
+                            Atual: {scraperConfig.sources.eduportugal.base_url}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    {showUrlConfig && (
+                      <p className="text-xs text-zinc-500 italic">
+                        Para alterar as URLs permanentemente, atualize as variaveis de ambiente DGES_BASE_URL e EDUPORTUGAL_BASE_URL no servidor.
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <div className="p-3 bg-zinc-50 dark:bg-zinc-900 rounded-lg text-center">
+                    <p className="text-sm text-zinc-500">Carregando configuracao...</p>
+                  </div>
+                )}
               </div>
 
               {/* Running Job Indicator */}
