@@ -220,6 +220,8 @@ class DGESScraper:
             logger.warning("TOGETHER_API_KEY não configurada - usando extração tradicional")
             return None
 
+        logger.info(f"Chamando IA com prompt de {len(prompt)} caracteres, max_tokens={max_tokens}")
+
         try:
             async with httpx.AsyncClient(timeout=60.0) as client:
                 response = await client.post(
@@ -238,14 +240,56 @@ class DGESScraper:
 
                 if response.status_code == 200:
                     data = response.json()
-                    return data["choices"][0]["message"]["content"]
+                    content = data["choices"][0]["message"]["content"]
+                    finish_reason = data["choices"][0].get("finish_reason", "unknown")
+                    usage = data.get("usage", {})
+
+                    logger.info(f"IA respondeu: {len(content)} chars, finish_reason={finish_reason}, "
+                               f"tokens_usados={usage.get('completion_tokens', '?')}/{usage.get('total_tokens', '?')}")
+
+                    # Se a resposta foi cortada, avisa
+                    if finish_reason == "length":
+                        logger.warning("Resposta da IA foi TRUNCADA (finish_reason=length) - JSON pode estar incompleto!")
+
+                    return content
                 else:
-                    logger.error(f"AI API error: {response.status_code} - {response.text}")
+                    logger.error(f"AI API error: {response.status_code} - {response.text[:500]}")
                     return None
 
         except Exception as e:
             logger.error(f"AI call failed: {e}")
             return None
+
+    def _try_fix_truncated_json(self, json_str: str) -> Optional[str]:
+        """
+        Tenta corrigir JSON truncado fechando arrays e objetos abertos.
+
+        Args:
+            json_str: String JSON possivelmente truncada
+
+        Returns:
+            JSON corrigido ou None se não for possível
+        """
+        # Conta brackets abertos
+        open_braces = json_str.count('{') - json_str.count('}')
+        open_brackets = json_str.count('[') - json_str.count(']')
+
+        logger.info(f"JSON truncado: {open_braces} chaves abertas, {open_brackets} colchetes abertos")
+
+        if open_braces == 0 and open_brackets == 0:
+            return None  # Não parece truncado
+
+        # Remove última vírgula pendente
+        fixed = json_str.rstrip()
+        if fixed.endswith(','):
+            fixed = fixed[:-1]
+
+        # Fecha estruturas abertas
+        # Primeiro fecha arrays, depois objetos
+        fixed += ']' * open_brackets
+        fixed += '}' * open_braces
+
+        return fixed
 
     def _get_dges_extraction_prompt(self, html_content: str, region_name: str) -> str:
         """Gera prompt para extrair universidades e cursos do HTML do DGES."""
@@ -310,6 +354,8 @@ IMPORTANTE:
         universities: List[UniversityListing] = []
         courses: List[CourseListing] = []
 
+        logger.info(f"Iniciando extração por IA para {region_name} (HTML: {len(html)} chars)")
+
         prompt = self._get_dges_extraction_prompt(html, region_name)
         ai_response = await self._call_ai(prompt)
 
@@ -317,14 +363,21 @@ IMPORTANTE:
             logger.warning("AI extraction failed - no response")
             return {"universities": universities, "courses": courses}
 
+        logger.info(f"Resposta da IA recebida: {len(ai_response)} caracteres")
+        logger.debug(f"Primeiros 500 chars da resposta: {ai_response[:500]}")
+
         try:
             # Extrai JSON da resposta (pode vir com texto extra)
             json_match = re.search(r'\{[\s\S]*\}', ai_response)
             if not json_match:
-                logger.warning("AI response doesn't contain valid JSON")
+                logger.warning("AI response doesn't contain valid JSON structure")
+                logger.warning(f"Resposta completa (primeiros 1000 chars): {ai_response[:1000]}")
                 return {"universities": universities, "courses": courses}
 
-            data = json.loads(json_match.group())
+            json_str = json_match.group()
+            logger.info(f"JSON extraído: {len(json_str)} caracteres")
+
+            data = json.loads(json_str)
             institutions = data.get("institutions", [])
 
             logger.info(f"AI extracted {len(institutions)} institutions from {region_name}")
@@ -383,8 +436,79 @@ IMPORTANTE:
 
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse AI JSON response: {e}")
+            # Mostra contexto do erro
+            error_pos = e.pos if hasattr(e, 'pos') else 0
+            start = max(0, error_pos - 100)
+            end = min(len(json_str), error_pos + 100)
+            logger.error(f"Contexto do erro (posição {error_pos}):")
+            logger.error(f"...{json_str[start:error_pos]}<<<ERRO AQUI>>>{json_str[error_pos:end]}...")
+
+            # Tenta corrigir JSON truncado
+            logger.info("Tentando corrigir JSON truncado...")
+            try:
+                # Tenta fechar arrays/objetos abertos
+                fixed_json = self._try_fix_truncated_json(json_str)
+                if fixed_json:
+                    data = json.loads(fixed_json)
+                    institutions = data.get("institutions", [])
+                    logger.info(f"JSON corrigido! Extraídas {len(institutions)} instituições")
+
+                    for inst in institutions:
+                        inst_code = inst.get("code", "")
+                        inst_name = inst.get("name", "")
+                        inst_type = inst.get("type", "outro")
+
+                        if not inst_name:
+                            continue
+
+                        inst_slug = self._slugify(inst_name)
+
+                        universities.append(UniversityListing(
+                            id=self.generate_id(f"{inst_code}-{inst_slug}"),
+                            name=inst_name,
+                            slug=inst_slug,
+                            short_name=None,
+                            description=None,
+                            city=region_name,
+                            logo_url=None,
+                            source_url=f"{self.base_url}/guias/indest.asp",
+                            type=inst_type,
+                        ))
+
+                        for course in inst.get("courses", []):
+                            course_code = course.get("code", "")
+                            course_name = course.get("name", "")
+                            course_level = course.get("level", "outro")
+
+                            if not course_name:
+                                continue
+
+                            course_slug = self._slugify(course_name)
+
+                            courses.append(CourseListing(
+                                id=self.generate_id(f"{course_code}-{course_slug}"),
+                                name=course_name,
+                                slug=course_slug,
+                                description=None,
+                                level=course_level,
+                                duration=None,
+                                city=region_name,
+                                modality="presencial",
+                                start_date=None,
+                                price=None,
+                                source_url=f"{self.base_url}/guias/detcursopi.asp?codc={course_code}&code={inst_code}",
+                                university_name=inst_name,
+                                university_slug=inst_slug,
+                            ))
+
+                    logger.info(f"Após correção: {len(universities)} universidades, {len(courses)} cursos")
+            except Exception as fix_error:
+                logger.error(f"Não foi possível corrigir JSON: {fix_error}")
+
         except Exception as e:
             logger.error(f"AI extraction error: {e}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
 
         return {"universities": universities, "courses": courses}
 
