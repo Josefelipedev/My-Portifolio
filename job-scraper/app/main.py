@@ -3,16 +3,24 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
 from datetime import datetime
 from collections import deque
+from typing import Optional, List, Dict, Any
 import logging
 import time
 import os
 
-from models import SearchParams, SearchResponse, JobListing, EduPortugalSearchResponse
+from models import (
+    SearchParams, SearchResponse, JobListing, EduPortugalSearchResponse,
+    UniversityEnrichment, ManualUploadRequest, ExtractionResponse,
+    ContentType, ExtractionMode, HierarchyScrapingResult,
+)
 from scrapers.geekhunter import GeekHunterScraper
 from scrapers.vagas import VagasComBrScraper
 from scrapers.eduportugal import EduPortugalScraper, eduportugal_scraper
 from scrapers.dges import DGESScraper, dges_scraper
+from scrapers.enricher import UniversityEnricher, get_enricher
+from scrapers.dges_manual import get_dges_manual_extractor
 from agents.orchestrator import AgentOrchestrator, report_execution
+from agents.agno_extractor import get_agno_agent
 from config import config
 
 # Custom log handler to store logs in memory
@@ -585,6 +593,126 @@ async def get_course_details(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/eduportugal/hierarchy")
+async def scrape_eduportugal_hierarchy(
+    max_universities: int = Query(default=None, description="Limite de universidades"),
+    max_courses_per_university: int = Query(default=None, description="Limite de cursos por universidade"),
+    save_to_file: bool = Query(default=True, description="Salvar resultado em arquivo JSON"),
+    sync_id: str = Query(default=None, description="ID do sync para tracking"),
+):
+    """
+    Scraping hierárquico: visita cada página de universidade para extrair cursos.
+
+    Fluxo:
+    1. Scrape listagem de universidades
+    2. Para cada universidade, visita página individual
+    3. Extrai cursos dessa universidade
+    4. Retorna hierarquia completa University → Courses
+    """
+    import json
+
+    stats["requests_total"] += 1
+
+    async def progress_callback(progress: dict):
+        if sync_id and sync_id in eduportugal_syncs:
+            eduportugal_syncs[sync_id].update(progress)
+
+    try:
+        logger.info(f"Starting hierarchical scrape: max_unis={max_universities}")
+
+        result = await eduportugal_scraper.scrape_full_hierarchy(
+            max_universities=max_universities,
+            max_courses_per_university=max_courses_per_university,
+            progress_callback=progress_callback if sync_id else None,
+            use_ai=True,
+        )
+
+        stats["requests_success"] += 1
+
+        response = {
+            "universities": [u.model_dump() for u in result["universities"]],
+            "courses": [c.model_dump() for c in result["courses"]],
+            "hierarchy": result["hierarchy"],
+            "stats": result["stats"],
+            "timestamp": datetime.utcnow().isoformat(),
+        }
+
+        # Auto-save
+        if save_to_file and (result["universities"] or result["courses"]):
+            os.makedirs("/app/data", exist_ok=True)
+            timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+            filename = f"/app/data/eduportugal_hierarchy_{timestamp}.json"
+            with open(filename, "w", encoding="utf-8") as f:
+                json.dump(response, f, ensure_ascii=False, indent=2)
+            logger.info(f"Saved hierarchy to {filename}")
+            response["saved_to_file"] = filename
+
+        return response
+
+    except Exception as e:
+        stats["requests_failed"] += 1
+        logger.error(f"Hierarchy scrape error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/eduportugal/university/{slug}/courses")
+async def scrape_university_courses(
+    slug: str,
+    save_to_file: bool = Query(default=False, description="Salvar resultado"),
+):
+    """
+    Scrape cursos de uma universidade específica.
+
+    Visita a página individual da universidade no EduPortugal
+    e extrai todos os cursos listados.
+    """
+    import json
+
+    stats["requests_total"] += 1
+
+    try:
+        # Primeiro buscar a universidade pelo slug
+        universities = await eduportugal_scraper.scrape_universities(max_pages=10, use_ai=False)
+
+        university = None
+        for uni in universities:
+            if uni.slug == slug:
+                university = uni
+                break
+
+        if not university:
+            raise HTTPException(status_code=404, detail=f"Universidade não encontrada: {slug}")
+
+        # Buscar cursos
+        courses = await eduportugal_scraper.scrape_university_courses(university)
+
+        stats["requests_success"] += 1
+
+        response = {
+            "university": university.model_dump(),
+            "courses": [c.model_dump() for c in courses],
+            "total_courses": len(courses),
+            "timestamp": datetime.utcnow().isoformat(),
+        }
+
+        if save_to_file and courses:
+            os.makedirs("/app/data", exist_ok=True)
+            timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+            filename = f"/app/data/university_{slug}_courses_{timestamp}.json"
+            with open(filename, "w", encoding="utf-8") as f:
+                json.dump(response, f, ensure_ascii=False, indent=2)
+            response["saved_to_file"] = filename
+
+        return response
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        stats["requests_failed"] += 1
+        logger.error(f"University courses error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/eduportugal/sync/start")
 async def start_eduportugal_sync(
     sync_type: str = Query(default="full", description="full, universities, ou courses"),
@@ -1020,4 +1148,350 @@ async def get_dges_stats():
         "total_syncs": len(dges_syncs),
         "rate_limit_delay": DGESScraper.RATE_LIMIT_DELAY,
         "source": "Direção-Geral do Ensino Superior",
+    }
+
+
+@app.post("/dges/extract")
+async def dges_manual_extract(
+    content_type: str = Query(..., description="Tipo: text, html, ou url"),
+    content: str = Query(..., description="Conteúdo para extrair"),
+    extraction_mode: str = Query(default="mixed", description="Modo: universities, courses, ou mixed"),
+    region: str = Query(default=None, description="Hint de região"),
+):
+    """
+    Upload manual de dados DGES com extração inteligente.
+
+    Aceita:
+    - text: Texto bruto (descrições de cursos, conteúdo copiado)
+    - html: HTML de páginas salvas
+    - url: URL para buscar e extrair
+
+    Retorna dados extraídos + comparação com banco para evitar duplicatas.
+
+    Exemplo:
+    ```
+    POST /dges/extract?content_type=text&content=Universidade de Lisboa...
+    ```
+    """
+    from models import ManualUploadRequest, ContentType as CT, ExtractionMode as EM
+
+    stats["requests_total"] += 1
+
+    try:
+        # Converter para enums
+        try:
+            ct = CT(content_type)
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"content_type inválido: {content_type}. Use: text, html, url")
+
+        try:
+            em = EM(extraction_mode)
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"extraction_mode inválido: {extraction_mode}. Use: universities, courses, mixed")
+
+        # Criar request
+        request = ManualUploadRequest(
+            content_type=ct,
+            content=content,
+            extraction_mode=em,
+            region=region,
+        )
+
+        # Processar extração
+        extractor = get_dges_manual_extractor()
+        result = await extractor.extract(request)
+
+        stats["requests_success"] += 1
+
+        return result.model_dump()
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        stats["requests_failed"] += 1
+        logger.error(f"DGES manual extract error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/dges/extract/stats")
+async def get_dges_extract_stats():
+    """
+    Estatísticas do extractor manual DGES.
+
+    Inclui informações sobre uso de tokens e modelo Agno.
+    """
+    agno = get_agno_agent()
+    return {
+        "agno_stats": agno.get_stats(),
+        "description": "Estatísticas de extração manual via Agno",
+    }
+
+
+# Modelo para JSON body
+from pydantic import BaseModel as PydanticBaseModel
+
+class DGESManualUploadBody(PydanticBaseModel):
+    """Body para upload manual DGES com conteúdos grandes."""
+    content_type: str  # "text", "html", "url"
+    content: str  # O conteúdo a extrair
+    extraction_mode: str = "mixed"  # "universities", "courses", "mixed"
+    region: Optional[str] = None  # Hint de região
+
+
+@app.post("/dges/manual/extract")
+async def dges_manual_extract_json(body: DGESManualUploadBody):
+    """
+    Upload manual de dados DGES com JSON body (para conteúdos grandes).
+
+    Endpoint preferido para uploads de HTML ou texto extenso.
+
+    Body:
+    ```json
+    {
+        "content_type": "html",
+        "content": "<html>...</html>",
+        "extraction_mode": "mixed",
+        "region": "Lisboa"
+    }
+    ```
+
+    Retorna:
+    - extracted: {universities: [...], courses: [...]}
+    - comparison: {new: [...], existing: [...], updated: [...]}
+    - stats: {tokens_used, model_used, extraction_time_ms}
+    """
+    from models import ManualUploadRequest, ContentType as CT, ExtractionMode as EM
+
+    stats["requests_total"] += 1
+
+    try:
+        # Converter para enums
+        try:
+            ct = CT(body.content_type)
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail=f"content_type inválido: {body.content_type}. Use: text, html, url"
+            )
+
+        try:
+            em = EM(body.extraction_mode)
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail=f"extraction_mode inválido: {body.extraction_mode}. Use: universities, courses, mixed"
+            )
+
+        # Criar request
+        request = ManualUploadRequest(
+            content_type=ct,
+            content=body.content,
+            extraction_mode=em,
+            region=body.region,
+        )
+
+        # Processar extração
+        extractor = get_dges_manual_extractor()
+        result = await extractor.extract(request)
+
+        stats["requests_success"] += 1
+
+        return result.model_dump()
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        stats["requests_failed"] += 1
+        logger.error(f"DGES manual extract (JSON) error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# University Enricher - Extração inteligente de dados extras
+# ============================================================================
+
+@app.post("/enrich/university")
+async def enrich_university(
+    website_url: str = Query(..., description="URL do site oficial da universidade"),
+    force: bool = Query(default=False, description="Ignorar cache e forçar nova extração"),
+):
+    """
+    Enriquece dados de uma universidade a partir do seu site oficial.
+
+    Estratégia de economia de tokens:
+    1. HTML parsing primeiro (0 tokens)
+    2. Micro-prompt AI apenas se necessário (~500 tokens)
+
+    Extrai:
+    - Logo URL
+    - Redes sociais (Instagram, LinkedIn, Facebook, Twitter, YouTube)
+    - Email e telefone de contacto
+    """
+    enricher = get_enricher()
+
+    try:
+        result = await enricher.enrich(website_url, force=force)
+        return {
+            "success": True,
+            "data": result.model_dump(),
+            "stats": enricher.get_stats(),
+        }
+    except Exception as e:
+        logger.error(f"Enrich error for {website_url}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/enrich/batch")
+async def enrich_universities_batch(
+    universities: list = Query(..., description="Lista de universidades com 'id' e 'website'"),
+    max_concurrent: int = Query(default=3, description="Máximo de requisições simultâneas"),
+    delay_seconds: float = Query(default=1.0, description="Delay entre batches"),
+):
+    """
+    Enriquece um lote de universidades com rate limiting.
+
+    Exemplo de entrada:
+    [
+        {"id": "uni-1", "website": "https://www.ipmaia.pt"},
+        {"id": "uni-2", "website": "https://www.umaia.pt"}
+    ]
+    """
+    enricher = get_enricher()
+
+    try:
+        results = await enricher.enrich_batch(
+            universities=universities,
+            max_concurrent=max_concurrent,
+            delay_seconds=delay_seconds,
+        )
+        return {
+            "success": True,
+            "results": results,
+            "total": len(results),
+            "stats": enricher.get_stats(),
+        }
+    except Exception as e:
+        logger.error(f"Batch enrich error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/enrich/stats")
+async def get_enricher_stats():
+    """
+    Retorna estatísticas do enricher.
+
+    Inclui:
+    - Total enriquecido
+    - Quantos usaram apenas HTML (0 tokens)
+    - Quantos precisaram de AI
+    - Total de tokens usados
+    - Cache hits
+    """
+    enricher = get_enricher()
+    return enricher.get_stats()
+
+
+@app.post("/enrich/search")
+async def enrich_with_search(
+    university_name: str = Query(..., description="Nome da universidade"),
+    website_url: str = Query(default=None, description="URL do site (opcional, buscará se não fornecido)"),
+    force: bool = Query(default=False, description="Ignorar cache"),
+):
+    """
+    Enriquece dados de universidade, buscando o website oficial se não fornecido.
+
+    Fluxo:
+    1. Se website_url não fornecido, busca via DuckDuckGo
+    2. Visita o site encontrado
+    3. Extrai logo, redes sociais, contatos
+
+    Útil quando você tem apenas o nome da universidade mas não o website.
+
+    Exemplo:
+    ```
+    POST /enrich/search?university_name=IPMAIA
+    ```
+    """
+    enricher = get_enricher()
+
+    try:
+        result = await enricher.enrich_with_search(
+            university_name=university_name,
+            website_url=website_url,
+            force=force,
+        )
+
+        return {
+            "success": result.error is None,
+            "university_name": university_name,
+            "website_searched": website_url is None,
+            "data": result.model_dump(),
+            "stats": enricher.get_stats(),
+        }
+
+    except Exception as e:
+        logger.error(f"Enrich with search error for {university_name}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/enrich/batch/search")
+async def enrich_batch_with_search(
+    universities: List[Dict[str, Any]],
+    delay_seconds: float = Query(default=2.0, description="Delay entre requisições (rate limiting)"),
+):
+    """
+    Enriquece lote de universidades, buscando websites quando necessário.
+
+    Para cada universidade:
+    - Se tem 'website': usa diretamente
+    - Se não tem: busca via DuckDuckGo primeiro
+
+    Rate limiting mais conservador para evitar bloqueios de busca.
+
+    Body (JSON):
+    ```json
+    [
+        {"id": "uni-1", "name": "IPMAIA"},
+        {"id": "uni-2", "name": "Universidade do Porto", "website": "https://up.pt"}
+    ]
+    ```
+    """
+    import asyncio
+    enricher = get_enricher()
+    results = []
+
+    for uni in universities:
+        try:
+            name = uni.get('name', '')
+            website = uni.get('website')
+
+            result = await enricher.enrich_with_search(
+                university_name=name,
+                website_url=website,
+                force=False,
+            )
+
+            results.append({
+                **uni,
+                'enrichment': result.model_dump(),
+                'enrichment_error': result.error,
+            })
+
+        except Exception as e:
+            results.append({
+                **uni,
+                'enrichment': None,
+                'enrichment_error': str(e),
+            })
+
+        # Rate limiting
+        await asyncio.sleep(delay_seconds)
+
+    return {
+        "success": True,
+        "results": results,
+        "total": len(results),
+        "enriched": len([r for r in results if r.get('enrichment_error') is None]),
+        "failed": len([r for r in results if r.get('enrichment_error') is not None]),
+        "stats": enricher.get_stats(),
     }

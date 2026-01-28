@@ -83,6 +83,11 @@ export async function GET(request: NextRequest) {
         'email',
         'phone',
         'type',
+        'instagramUrl',
+        'linkedinUrl',
+        'facebookUrl',
+        'twitterUrl',
+        'youtubeUrl',
         'coursesCount',
       ];
 
@@ -106,6 +111,11 @@ export async function GET(request: NextRequest) {
           uni.email || '',
           uni.phone || '',
           uni.type || '',
+          uni.instagramUrl || '',
+          uni.linkedinUrl || '',
+          uni.facebookUrl || '',
+          uni.twitterUrl || '',
+          uni.youtubeUrl || '',
           coursesCount,
         ];
         csvRows.push(row.join(','));
@@ -141,6 +151,14 @@ export async function GET(request: NextRequest) {
         email: uni.email,
         phone: uni.phone,
         type: uni.type,
+        // Redes sociais
+        instagramUrl: uni.instagramUrl,
+        linkedinUrl: uni.linkedinUrl,
+        facebookUrl: uni.facebookUrl,
+        twitterUrl: uni.twitterUrl,
+        youtubeUrl: uni.youtubeUrl,
+        // Enriquecimento
+        enrichedAt: uni.enrichedAt,
         coursesCount: withCourses
           ? (uni as typeof uni & { _count: { courses: number } })._count?.courses
           : undefined,

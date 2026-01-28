@@ -519,12 +519,23 @@ model University {
   // Mídia
   logoUrl     String?
 
+  // Redes Sociais
+  instagramUrl String?
+  linkedinUrl  String?
+  facebookUrl  String?
+  twitterUrl   String?
+  youtubeUrl   String?
+
   // Contato
   email       String?
   phone       String?
 
   // Tipo de instituição
   type        String?              // "publica", "privada", "politecnico"
+
+  // Enriquecimento (dados extras via AI)
+  enrichedAt  DateTime?            // Quando foi enriquecido pela última vez
+  enrichError String?              // Erro se falhou enriquecimento
 
   courses     Course[]
 

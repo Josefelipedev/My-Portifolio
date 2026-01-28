@@ -34,6 +34,7 @@ interface UniversityData {
   description?: string;
   website?: string;
   source_url: string;
+  individual_page_url?: string;
   city?: string;
   region?: string;
   address?: string;
@@ -41,6 +42,12 @@ interface UniversityData {
   email?: string;
   phone?: string;
   type?: string;
+  // Redes sociais
+  instagram_url?: string;
+  linkedin_url?: string;
+  facebook_url?: string;
+  twitter_url?: string;
+  youtube_url?: string;
 }
 
 interface CourseData {
@@ -193,6 +200,12 @@ async function importInBackground(
                 email: uni.email,
                 phone: uni.phone,
                 type: uni.type,
+                // Redes sociais
+                instagramUrl: uni.instagram_url,
+                linkedinUrl: uni.linkedin_url,
+                facebookUrl: uni.facebook_url,
+                twitterUrl: uni.twitter_url,
+                youtubeUrl: uni.youtube_url,
               },
             });
             universitiesUpdated++;
@@ -213,6 +226,12 @@ async function importInBackground(
                 email: uni.email,
                 phone: uni.phone,
                 type: uni.type,
+                // Redes sociais
+                instagramUrl: uni.instagram_url,
+                linkedinUrl: uni.linkedin_url,
+                facebookUrl: uni.facebook_url,
+                twitterUrl: uni.twitter_url,
+                youtubeUrl: uni.youtube_url,
               },
             });
             universitiesCreated++;

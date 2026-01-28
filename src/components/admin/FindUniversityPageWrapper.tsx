@@ -63,6 +63,14 @@ interface University {
   city: string | null;
   type: string | null;
   website: string | null;
+  // Redes sociais
+  instagramUrl?: string | null;
+  linkedinUrl?: string | null;
+  facebookUrl?: string | null;
+  twitterUrl?: string | null;
+  youtubeUrl?: string | null;
+  // Enriquecimento
+  enrichedAt?: string | null;
   _count?: { courses: number };
 }
 
