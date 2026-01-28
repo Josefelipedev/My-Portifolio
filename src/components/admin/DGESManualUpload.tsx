@@ -59,7 +59,8 @@ interface DGESManualUploadProps {
   showToast: (message: string, type: 'success' | 'error') => void;
 }
 
-const SCRAPER_URL = process.env.NEXT_PUBLIC_SCRAPER_URL || 'http://localhost:8000';
+// Use Next.js API route as proxy to avoid CORS issues
+const EXTRACT_API_URL = '/api/admin/finduniversity/manual-extract';
 
 export default function DGESManualUpload({ onSuccess, showToast }: DGESManualUploadProps) {
   const [contentType, setContentType] = useState<'text' | 'html' | 'url'>('html');
@@ -106,7 +107,7 @@ export default function DGESManualUpload({ onSuccess, showToast }: DGESManualUpl
     setResult(null);
 
     try {
-      const response = await fetch(`${SCRAPER_URL}/dges/manual/extract`, {
+      const response = await fetch(EXTRACT_API_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
