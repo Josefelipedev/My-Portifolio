@@ -624,3 +624,21 @@ model FindUniversitySyncLog {
   @@index([startedAt])
   @@index([syncType])
 }
+
+// ==========================================
+// Scraper Configuration
+// ==========================================
+
+model ScraperConfig {
+  id          String   @id @default("main")
+
+  // DGES Configuration
+  dgesBaseUrl     String   @default("https://www.dges.gov.pt")
+  dgesEnabled     Boolean  @default(true)
+
+  // EduPortugal Configuration
+  eduportugalBaseUrl  String   @default("https://eduportugal.eu")
+  eduportugalEnabled  Boolean  @default(true)
+
+  updatedAt   DateTime @updatedAt
+}

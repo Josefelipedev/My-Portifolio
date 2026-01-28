@@ -96,6 +96,17 @@ interface UnlinkedCourse {
   university: { id: string; name: string } | null;
 }
 
+interface ScraperConfig {
+  dges: {
+    baseUrl: string;
+    enabled: boolean;
+  };
+  eduportugal: {
+    baseUrl: string;
+    enabled: boolean;
+  };
+}
+
 interface RefreshStats {
   totalCourses: number;
   totalWithUrls: number;
@@ -198,6 +209,17 @@ export default function FindUniversityPageWrapper({
   // Import Source State
   const [importSource, setImportSource] = useState<'dges' | 'eduportugal'>('dges');
 
+  // Scraper Config State
+  const [scraperConfig, setScraperConfig] = useState<ScraperConfig | null>(null);
+  const [scraperConfigLoading, setScraperConfigLoading] = useState(false);
+  const [editingConfig, setEditingConfig] = useState(false);
+  const [configForm, setConfigForm] = useState({
+    dgesBaseUrl: '',
+    dgesEnabled: true,
+    eduportugalBaseUrl: '',
+    eduportugalEnabled: true,
+  });
+
   // AI Features State
   const [aiSearchQuery, setAiSearchQuery] = useState('');
   const [aiSearchResults, setAiSearchResults] = useState<AISearchResult | null>(null);
@@ -291,6 +313,66 @@ export default function FindUniversityPageWrapper({
       setLoadingData(false);
     }
   };
+
+  // Scraper Config functions
+  const loadScraperConfig = async () => {
+    setScraperConfigLoading(true);
+    try {
+      const response = await fetch('/api/admin/finduniversity/scraper-config');
+      const data = await response.json();
+      if (data.config) {
+        setScraperConfig(data.config);
+        setConfigForm({
+          dgesBaseUrl: data.config.dges.baseUrl,
+          dgesEnabled: data.config.dges.enabled,
+          eduportugalBaseUrl: data.config.eduportugal.baseUrl,
+          eduportugalEnabled: data.config.eduportugal.enabled,
+        });
+      }
+    } catch (err) {
+      console.error('Failed to load scraper config:', err);
+    } finally {
+      setScraperConfigLoading(false);
+    }
+  };
+
+  const saveScraperConfig = async () => {
+    setScraperConfigLoading(true);
+    try {
+      const response = await fetchWithCSRF('/api/admin/finduniversity/scraper-config', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          dges: {
+            baseUrl: configForm.dgesBaseUrl,
+            enabled: configForm.dgesEnabled,
+          },
+          eduportugal: {
+            baseUrl: configForm.eduportugalBaseUrl,
+            enabled: configForm.eduportugalEnabled,
+          },
+        }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        setScraperConfig(data.config);
+        setEditingConfig(false);
+        showSuccess('Configuracao salva com sucesso!');
+      } else {
+        showError(data.error || 'Falha ao salvar configuracao');
+      }
+    } catch (err) {
+      console.error('Failed to save scraper config:', err);
+      showError('Erro ao salvar configuracao');
+    } finally {
+      setScraperConfigLoading(false);
+    }
+  };
+
+  // Load scraper config on mount
+  useEffect(() => {
+    loadScraperConfig();
+  }, []);
 
   // Files functions
   const loadFiles = async () => {
@@ -1069,6 +1151,119 @@ export default function FindUniversityPageWrapper({
                     {exportLoading === 'courses-csv' ? '...' : 'Courses CSV'}
                   </button>
                 </div>
+              </div>
+
+              {/* Scraper Config */}
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-semibold text-zinc-600 dark:text-zinc-400">Configuracao do Scraper</h3>
+                  {!editingConfig && (
+                    <button
+                      onClick={() => setEditingConfig(true)}
+                      className="text-xs text-blue-500 hover:text-blue-600"
+                    >
+                      Editar
+                    </button>
+                  )}
+                </div>
+
+                {scraperConfigLoading && !scraperConfig ? (
+                  <div className="text-sm text-zinc-500">Carregando...</div>
+                ) : editingConfig ? (
+                  <div className="space-y-4 bg-zinc-50 dark:bg-zinc-900 rounded-lg p-4">
+                    {/* DGES Config */}
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <input
+                          type="checkbox"
+                          id="dgesEnabled"
+                          checked={configForm.dgesEnabled}
+                          onChange={(e) => setConfigForm({ ...configForm, dgesEnabled: e.target.checked })}
+                          className="rounded"
+                        />
+                        <label htmlFor="dgesEnabled" className="text-sm font-medium">DGES (Oficial)</label>
+                      </div>
+                      <input
+                        type="url"
+                        value={configForm.dgesBaseUrl}
+                        onChange={(e) => setConfigForm({ ...configForm, dgesBaseUrl: e.target.value })}
+                        placeholder="https://www.dges.gov.pt"
+                        className="w-full px-3 py-2 text-sm border rounded-lg dark:bg-zinc-800 dark:border-zinc-700"
+                      />
+                    </div>
+
+                    {/* EduPortugal Config */}
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <input
+                          type="checkbox"
+                          id="eduportugalEnabled"
+                          checked={configForm.eduportugalEnabled}
+                          onChange={(e) => setConfigForm({ ...configForm, eduportugalEnabled: e.target.checked })}
+                          className="rounded"
+                        />
+                        <label htmlFor="eduportugalEnabled" className="text-sm font-medium">EduPortugal</label>
+                      </div>
+                      <input
+                        type="url"
+                        value={configForm.eduportugalBaseUrl}
+                        onChange={(e) => setConfigForm({ ...configForm, eduportugalBaseUrl: e.target.value })}
+                        placeholder="https://eduportugal.eu"
+                        className="w-full px-3 py-2 text-sm border rounded-lg dark:bg-zinc-800 dark:border-zinc-700"
+                      />
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex gap-2">
+                      <button
+                        onClick={saveScraperConfig}
+                        disabled={scraperConfigLoading}
+                        className="px-4 py-2 bg-blue-500 text-white text-sm rounded-lg hover:bg-blue-600 disabled:opacity-50"
+                      >
+                        {scraperConfigLoading ? 'Salvando...' : 'Salvar'}
+                      </button>
+                      <button
+                        onClick={() => {
+                          setEditingConfig(false);
+                          if (scraperConfig) {
+                            setConfigForm({
+                              dgesBaseUrl: scraperConfig.dges.baseUrl,
+                              dgesEnabled: scraperConfig.dges.enabled,
+                              eduportugalBaseUrl: scraperConfig.eduportugal.baseUrl,
+                              eduportugalEnabled: scraperConfig.eduportugal.enabled,
+                            });
+                          }
+                        }}
+                        className="px-4 py-2 bg-zinc-200 dark:bg-zinc-700 text-sm rounded-lg hover:bg-zinc-300 dark:hover:bg-zinc-600"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                ) : scraperConfig ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="bg-zinc-50 dark:bg-zinc-900 rounded-lg p-3">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className={`w-2 h-2 rounded-full ${scraperConfig.dges.enabled ? 'bg-green-500' : 'bg-red-500'}`} />
+                        <p className="text-sm font-medium">DGES (Oficial)</p>
+                      </div>
+                      <p className="text-xs text-zinc-500 truncate" title={scraperConfig.dges.baseUrl}>
+                        {scraperConfig.dges.baseUrl}
+                      </p>
+                    </div>
+                    <div className="bg-zinc-50 dark:bg-zinc-900 rounded-lg p-3">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className={`w-2 h-2 rounded-full ${scraperConfig.eduportugal.enabled ? 'bg-green-500' : 'bg-red-500'}`} />
+                        <p className="text-sm font-medium">EduPortugal</p>
+                      </div>
+                      <p className="text-xs text-zinc-500 truncate" title={scraperConfig.eduportugal.baseUrl}>
+                        {scraperConfig.eduportugal.baseUrl}
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-sm text-zinc-500">Configuracao nao disponivel</div>
+                )}
               </div>
 
               {/* Running Job Indicator */}

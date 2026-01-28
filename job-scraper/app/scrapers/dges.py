@@ -31,7 +31,7 @@ TOGETHER_API_KEY = os.getenv("TOGETHER_API_KEY", "")
 TOGETHER_API_URL = "https://api.together.xyz/v1/chat/completions"
 AI_MODEL = "meta-llama/Llama-3.3-70B-Instruct-Turbo"
 
-# URL base configurável via variável de ambiente
+# URL base configurável via variável de ambiente (fallback)
 DGES_BASE_URL = os.getenv("DGES_BASE_URL", "https://www.dges.gov.pt")
 
 
