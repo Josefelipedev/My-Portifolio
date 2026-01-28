@@ -169,6 +169,13 @@ export default function FindUniversityPageWrapper({
   const [batchRefreshLoading, setBatchRefreshLoading] = useState(false);
   const [refreshSource, setRefreshSource] = useState<'auto' | 'sourceUrl' | 'officialUrl' | 'researchUrl' | 'custom'>('auto');
   const [customRefreshUrl, setCustomRefreshUrl] = useState('');
+  const [batchRefreshResults, setBatchRefreshResults] = useState<{
+    refreshed: number;
+    failed: number;
+    results: Array<{ courseId: string; name: string; fieldsUpdated?: number; confidence?: number; urlUsed?: string }>;
+    errors: Array<{ courseId: string; name: string; error: string; urlUsed?: string }>;
+    sourceUsed?: string;
+  } | null>(null);
 
   // Research URL State
   const [editingResearchUrl, setEditingResearchUrl] = useState<string | null>(null);
@@ -560,34 +567,71 @@ export default function FindUniversityPageWrapper({
   const handleBatchRefresh = async (count: number) => {
     if (!confirm(`Refresh ${count} courses using AI? This will use AI credits.`)) return;
     setBatchRefreshLoading(true);
+    setBatchRefreshResults(null);
     try {
       // Get courses needing refresh
       const response = await fetch(`/api/admin/finduniversity/refresh?limit=${count}`);
       const data = await response.json();
-      const courseIds = (data.courses || []).map((c: { id: string }) => c.id).slice(0, count);
 
-      if (courseIds.length === 0) {
-        alert('No courses need refresh');
+      if (!response.ok) {
+        setBatchRefreshResults({
+          refreshed: 0,
+          failed: 1,
+          results: [],
+          errors: [{ courseId: '', name: 'API Error', error: data.error || 'Failed to fetch courses' }],
+        });
         return;
       }
 
+      const courseIds = (data.courses || []).map((c: { id: string }) => c.id).slice(0, count);
+
+      if (courseIds.length === 0) {
+        setBatchRefreshResults({
+          refreshed: 0,
+          failed: 0,
+          results: [],
+          errors: [{ courseId: '', name: 'Info', error: 'No courses need refresh - all courses have complete data or no URLs' }],
+        });
+        return;
+      }
+
+      // Include source in the request
       const refreshResponse = await fetchWithCSRF('/api/admin/finduniversity/refresh', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ courseIds, useAI: true }),
+        body: JSON.stringify({
+          courseIds,
+          useAI: true,
+          source: refreshSource,
+        }),
       });
 
+      const result = await refreshResponse.json();
+
       if (refreshResponse.ok) {
-        const result = await refreshResponse.json();
-        alert(`Refreshed ${result.refreshed} courses, ${result.failed} failed`);
+        setBatchRefreshResults({
+          refreshed: result.refreshed || 0,
+          failed: result.failed || 0,
+          results: result.results || [],
+          errors: result.errors || [],
+        });
         loadRefreshStats();
       } else {
-        const error = await refreshResponse.json();
-        alert(error.error || 'Batch refresh failed');
+        setBatchRefreshResults({
+          refreshed: 0,
+          failed: 1,
+          results: [],
+          errors: [{ courseId: '', name: 'API Error', error: result.error || 'Batch refresh failed' }],
+        });
       }
     } catch (err) {
       console.error('Batch refresh error:', err);
-      alert('Batch refresh failed');
+      setBatchRefreshResults({
+        refreshed: 0,
+        failed: 1,
+        results: [],
+        errors: [{ courseId: '', name: 'Network Error', error: err instanceof Error ? err.message : 'Batch refresh failed' }],
+      });
     } finally {
       setBatchRefreshLoading(false);
     }
@@ -1156,7 +1200,80 @@ export default function FindUniversityPageWrapper({
                       >
                         {batchRefreshLoading ? '...' : 'Atualizar 10 Cursos'}
                       </button>
+                      <button
+                        onClick={() => setBatchRefreshResults(null)}
+                        disabled={!batchRefreshResults}
+                        className="px-3 py-1.5 bg-zinc-200 dark:bg-zinc-700 text-sm rounded hover:bg-zinc-300 disabled:opacity-50"
+                      >
+                        Limpar
+                      </button>
                     </div>
+
+                    {/* Batch Refresh Results */}
+                    {batchRefreshResults && (
+                      <div className="mt-4 p-3 bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700">
+                        <div className="flex items-center justify-between mb-2">
+                          <div>
+                            <h4 className="text-sm font-semibold">Resultados do Refresh</h4>
+                            {batchRefreshResults.sourceUsed && (
+                              <p className="text-xs text-zinc-500">Fonte: {batchRefreshResults.sourceUsed}</p>
+                            )}
+                          </div>
+                          <div className="flex gap-2">
+                            <span className="px-2 py-0.5 text-xs bg-green-100 text-green-700 rounded">
+                              {batchRefreshResults.refreshed} OK
+                            </span>
+                            {batchRefreshResults.failed > 0 && (
+                              <span className="px-2 py-0.5 text-xs bg-red-100 text-red-700 rounded">
+                                {batchRefreshResults.failed} Erros
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Success Results */}
+                        {batchRefreshResults.results.length > 0 && (
+                          <div className="mb-3">
+                            <p className="text-xs text-zinc-500 mb-1">Atualizados:</p>
+                            <div className="max-h-40 overflow-y-auto space-y-1">
+                              {batchRefreshResults.results.map((r) => (
+                                <div key={r.courseId} className="text-xs p-2 bg-green-50 dark:bg-green-900/20 rounded">
+                                  <div className="flex justify-between">
+                                    <span className="font-medium">{r.name}</span>
+                                    <span className="text-green-700">
+                                      {r.fieldsUpdated} campos • {Math.round((r.confidence || 0) * 100)}%
+                                    </span>
+                                  </div>
+                                  {r.urlUsed && (
+                                    <p className="text-zinc-400 truncate mt-0.5">{r.urlUsed}</p>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Error Results */}
+                        {batchRefreshResults.errors.length > 0 && (
+                          <div>
+                            <p className="text-xs text-zinc-500 mb-1">Erros:</p>
+                            <div className="max-h-40 overflow-y-auto space-y-1">
+                              {batchRefreshResults.errors.map((e, idx) => (
+                                <div key={e.courseId || idx} className="text-xs p-2 bg-red-50 dark:bg-red-900/20 rounded">
+                                  <div className="flex justify-between">
+                                    <span className="font-medium text-red-700">{e.name}</span>
+                                  </div>
+                                  <p className="text-red-600 mt-0.5">{e.error}</p>
+                                  {e.urlUsed && (
+                                    <p className="text-zinc-400 truncate mt-0.5">{e.urlUsed}</p>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </>
                 ) : (
                   <p className="text-sm text-zinc-500">Carregando...</p>
