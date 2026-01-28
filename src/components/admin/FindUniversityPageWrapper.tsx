@@ -5,7 +5,7 @@ import AdminLayout from './AdminLayout';
 import { fetchWithCSRF } from '@/lib/csrf-client';
 import { useToast } from '@/components/ui/Toast';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
-import ImportWizard from './ImportWizard';
+import DataManagementModal from './DataManagementModal';
 import DGESManualUpload from './DGESManualUpload';
 import UniversityEnrichment from './UniversityEnrichment';
 
@@ -181,7 +181,7 @@ export default function FindUniversityPageWrapper({
   const [recentSyncs, setRecentSyncs] = useState<SyncLog[]>(initialRecentSyncs);
   const [exportLoading, setExportLoading] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'universities' | 'courses' | 'files' | 'research' | 'ai' | 'manual' | 'enrich'>('overview');
-  const [showImportWizard, setShowImportWizard] = useState(false);
+  const [showDataModal, setShowDataModal] = useState(false);
   const [universities, setUniversities] = useState<University[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
   const [loadingData, setLoadingData] = useState(false);
@@ -1263,206 +1263,18 @@ export default function FindUniversityPageWrapper({
                 </div>
               )}
 
-              {/* Export */}
+              {/* Data Management Button */}
               <div>
-                <h3 className="text-sm font-semibold mb-3 text-zinc-600 dark:text-zinc-400">Export Data</h3>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    onClick={() => handleExport('universities', 'json')}
-                    disabled={exportLoading !== null}
-                    className="px-3 py-1.5 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 disabled:opacity-50"
-                  >
-                    {exportLoading === 'universities-json' ? '...' : 'Universities JSON'}
-                  </button>
-                  <button
-                    onClick={() => handleExport('universities', 'csv')}
-                    disabled={exportLoading !== null}
-                    className="px-3 py-1.5 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 disabled:opacity-50"
-                  >
-                    {exportLoading === 'universities-csv' ? '...' : 'Universities CSV'}
-                  </button>
-                  <button
-                    onClick={() => handleExport('courses', 'json')}
-                    disabled={exportLoading !== null}
-                    className="px-3 py-1.5 bg-green-500 text-white text-sm rounded hover:bg-green-600 disabled:opacity-50"
-                  >
-                    {exportLoading === 'courses-json' ? '...' : 'Courses JSON'}
-                  </button>
-                  <button
-                    onClick={() => handleExport('courses', 'csv')}
-                    disabled={exportLoading !== null}
-                    className="px-3 py-1.5 bg-green-500 text-white text-sm rounded hover:bg-green-600 disabled:opacity-50"
-                  >
-                    {exportLoading === 'courses-csv' ? '...' : 'Courses CSV'}
-                  </button>
-                </div>
-              </div>
-
-              {/* Scraper Config */}
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-semibold text-zinc-600 dark:text-zinc-400">Configuracao do Scraper</h3>
-                  {!editingConfig && (
-                    <button
-                      onClick={() => setEditingConfig(true)}
-                      className="text-xs text-blue-500 hover:text-blue-600"
-                    >
-                      Editar
-                    </button>
-                  )}
-                </div>
-
-                {scraperConfigLoading && !scraperConfig ? (
-                  <div className="text-sm text-zinc-500">Carregando...</div>
-                ) : editingConfig ? (
-                  <div className="space-y-4 bg-zinc-50 dark:bg-zinc-900 rounded-lg p-4">
-                    {/* DGES Config */}
-                    <div>
-                      <div className="flex items-center gap-2 mb-2">
-                        <input
-                          type="checkbox"
-                          id="dgesEnabled"
-                          checked={configForm.dgesEnabled}
-                          onChange={(e) => setConfigForm({ ...configForm, dgesEnabled: e.target.checked })}
-                          className="rounded"
-                        />
-                        <label htmlFor="dgesEnabled" className="text-sm font-medium">DGES (Oficial)</label>
-                      </div>
-                      <input
-                        type="url"
-                        value={configForm.dgesBaseUrl}
-                        onChange={(e) => setConfigForm({ ...configForm, dgesBaseUrl: e.target.value })}
-                        placeholder="https://www.dges.gov.pt"
-                        className="w-full px-3 py-2 text-sm border rounded-lg dark:bg-zinc-800 dark:border-zinc-700"
-                      />
-                    </div>
-
-                    {/* EduPortugal Config */}
-                    <div>
-                      <div className="flex items-center gap-2 mb-2">
-                        <input
-                          type="checkbox"
-                          id="eduportugalEnabled"
-                          checked={configForm.eduportugalEnabled}
-                          onChange={(e) => setConfigForm({ ...configForm, eduportugalEnabled: e.target.checked })}
-                          className="rounded"
-                        />
-                        <label htmlFor="eduportugalEnabled" className="text-sm font-medium">EduPortugal</label>
-                      </div>
-                      <input
-                        type="url"
-                        value={configForm.eduportugalBaseUrl}
-                        onChange={(e) => setConfigForm({ ...configForm, eduportugalBaseUrl: e.target.value })}
-                        placeholder="https://eduportugal.eu"
-                        className="w-full px-3 py-2 text-sm border rounded-lg dark:bg-zinc-800 dark:border-zinc-700"
-                      />
-                    </div>
-
-                    {/* Actions */}
-                    <div className="flex gap-2">
-                      <button
-                        onClick={saveScraperConfig}
-                        disabled={scraperConfigLoading}
-                        className="px-4 py-2 bg-blue-500 text-white text-sm rounded-lg hover:bg-blue-600 disabled:opacity-50"
-                      >
-                        {scraperConfigLoading ? 'Salvando...' : 'Salvar'}
-                      </button>
-                      <button
-                        onClick={() => {
-                          setEditingConfig(false);
-                          if (scraperConfig) {
-                            setConfigForm({
-                              dgesBaseUrl: scraperConfig.dges.baseUrl,
-                              dgesEnabled: scraperConfig.dges.enabled,
-                              eduportugalBaseUrl: scraperConfig.eduportugal.baseUrl,
-                              eduportugalEnabled: scraperConfig.eduportugal.enabled,
-                            });
-                          }
-                        }}
-                        className="px-4 py-2 bg-zinc-200 dark:bg-zinc-700 text-sm rounded-lg hover:bg-zinc-300 dark:hover:bg-zinc-600"
-                      >
-                        Cancelar
-                      </button>
-                    </div>
-                  </div>
-                ) : scraperConfig ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="bg-zinc-50 dark:bg-zinc-900 rounded-lg p-3">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className={`w-2 h-2 rounded-full ${scraperConfig.dges.enabled ? 'bg-green-500' : 'bg-red-500'}`} />
-                        <p className="text-sm font-medium">DGES (Oficial)</p>
-                      </div>
-                      <p className="text-xs text-zinc-500 truncate" title={scraperConfig.dges.baseUrl}>
-                        {scraperConfig.dges.baseUrl}
-                      </p>
-                    </div>
-                    <div className="bg-zinc-50 dark:bg-zinc-900 rounded-lg p-3">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className={`w-2 h-2 rounded-full ${scraperConfig.eduportugal.enabled ? 'bg-green-500' : 'bg-red-500'}`} />
-                        <p className="text-sm font-medium">EduPortugal</p>
-                      </div>
-                      <p className="text-xs text-zinc-500 truncate" title={scraperConfig.eduportugal.baseUrl}>
-                        {scraperConfig.eduportugal.baseUrl}
-                      </p>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-sm text-zinc-500">Configuracao nao disponivel</div>
-                )}
-              </div>
-
-              {/* URL Update Section */}
-              <div>
-                <h3 className="text-sm font-semibold mb-3 text-zinc-600 dark:text-zinc-400">Atualizar via URL</h3>
-                <p className="text-xs text-zinc-500 mb-3">
-                  Passe a URL de uma universidade ou curso para extrair e atualizar os dados automaticamente.
-                </p>
-                <div className="bg-zinc-50 dark:bg-zinc-900 rounded-lg p-4 space-y-3">
-                  <div className="flex gap-2">
-                    <select
-                      value={urlUpdateType}
-                      onChange={(e) => setUrlUpdateType(e.target.value as 'university' | 'course')}
-                      className="px-3 py-2 text-sm border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-800"
-                    >
-                      <option value="university">Universidade</option>
-                      <option value="course">Curso</option>
-                    </select>
-                    <input
-                      type="url"
-                      value={urlUpdateInput}
-                      onChange={(e) => setUrlUpdateInput(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && handleUrlUpdate()}
-                      placeholder="https://universidade.pt ou https://universidade.pt/curso/..."
-                      className="flex-1 px-3 py-2 text-sm border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-800"
-                    />
-                    <button
-                      onClick={handleUrlUpdate}
-                      disabled={urlUpdateLoading || !urlUpdateInput.trim()}
-                      className="px-4 py-2 bg-green-500 text-white text-sm rounded-lg hover:bg-green-600 disabled:opacity-50"
-                    >
-                      {urlUpdateLoading ? 'Processando...' : 'Atualizar'}
-                    </button>
-                  </div>
-
-                  {urlUpdateResult && (
-                    <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
-                      <div className="flex items-center justify-between mb-2">
-                        <p className="text-sm font-medium text-green-700 dark:text-green-400">
-                          {urlUpdateResult.type === 'university' ? 'Universidade' : 'Curso'}: {urlUpdateResult.name}
-                        </p>
-                        <span className="px-2 py-0.5 text-xs bg-green-100 text-green-700 rounded">
-                          {urlUpdateResult.fieldsUpdated} campos atualizados
-                        </span>
-                      </div>
-                      <details className="text-xs">
-                        <summary className="cursor-pointer text-zinc-500 hover:text-zinc-700">Ver dados</summary>
-                        <pre className="mt-2 p-2 bg-white dark:bg-zinc-800 rounded overflow-auto max-h-40 text-[10px]">
-                          {JSON.stringify(urlUpdateResult.data, null, 2)}
-                        </pre>
-                      </details>
-                    </div>
-                  )}
-                </div>
+                <button
+                  onClick={() => setShowDataModal(true)}
+                  className="px-4 py-2 bg-blue-500 text-white text-sm rounded-lg hover:bg-blue-600 flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  Gerir Dados (Importar, Exportar, Config)
+                </button>
               </div>
 
               {/* Running Job Indicator */}
@@ -1570,7 +1382,7 @@ export default function FindUniversityPageWrapper({
 
                   <div className="flex gap-2">
                     <button
-                      onClick={() => setShowImportWizard(true)}
+                      onClick={() => setShowDataModal(true)}
                       disabled={isImporting}
                       className="px-3 py-1.5 bg-purple-500 text-white text-sm rounded hover:bg-purple-600 disabled:opacity-50"
                     >
@@ -2475,13 +2287,29 @@ export default function FindUniversityPageWrapper({
         </div>
       )}
 
-      {/* Import Wizard */}
-      <ImportWizard
-        isOpen={showImportWizard}
-        onClose={() => setShowImportWizard(false)}
-        onComplete={() => {
-          checkImportStatus();
+      {/* Data Management Modal */}
+      <DataManagementModal
+        isOpen={showDataModal}
+        onClose={() => setShowDataModal(false)}
+        onImportStarted={(syncId, source, syncType) => {
+          setIsImporting(true);
+          setImportProgress({
+            id: syncId,
+            syncType: `${source}:${syncType}`,
+            status: 'running',
+            startedAt: new Date().toISOString(),
+            completedAt: null,
+            universitiesFound: 0,
+            universitiesCreated: 0,
+            universitiesUpdated: 0,
+            coursesFound: 0,
+            coursesCreated: 0,
+            coursesUpdated: 0,
+            errors: null,
+          });
         }}
+        scraperConfig={scraperConfig}
+        onConfigSaved={(config) => setScraperConfig(config)}
       />
     </AdminLayout>
   );
