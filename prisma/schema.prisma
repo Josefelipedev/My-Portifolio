@@ -505,6 +505,10 @@ model University {
   // URLs
   website     String?              // Site oficial da universidade
   sourceUrl   String               // URL no eduportugal
+  researchUrl String?              // URL customizada para pesquisa de informacoes
+
+  // Documentos e links importantes (JSON array)
+  documents   String?  @db.Text    // JSON: [{name, url, type}]
 
   // Localização
   city        String?              // Cidade (ex: "Lisboa", "Porto")
@@ -570,6 +574,10 @@ model Course {
   sourceUrl     String    // URL no eduportugal
   officialUrl   String?   // URL oficial do curso na universidade
   applicationUrl String?  // URL para candidatura
+  researchUrl   String?   // URL customizada para pesquisa de informacoes
+
+  // Documentos e links importantes (JSON array)
+  documents     String?   @db.Text  // JSON: [{name, url, type}]
 
   // Requisitos
   requirements  String?   @db.Text  // JSON com requisitos de entrada

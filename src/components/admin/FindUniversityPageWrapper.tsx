@@ -70,6 +70,7 @@ interface Course {
   city: string | null;
   sourceUrl?: string;
   officialUrl?: string;
+  researchUrl?: string | null;
   universityId?: string;
   university: { id?: string; name: string } | null;
 }
@@ -166,6 +167,13 @@ export default function FindUniversityPageWrapper({
   const [refreshingCourseId, setRefreshingCourseId] = useState<string | null>(null);
   const [refreshStats, setRefreshStats] = useState<RefreshStats | null>(null);
   const [batchRefreshLoading, setBatchRefreshLoading] = useState(false);
+  const [refreshSource, setRefreshSource] = useState<'auto' | 'sourceUrl' | 'officialUrl' | 'researchUrl' | 'custom'>('auto');
+  const [customRefreshUrl, setCustomRefreshUrl] = useState('');
+
+  // Research URL State
+  const [editingResearchUrl, setEditingResearchUrl] = useState<string | null>(null);
+  const [researchUrlInput, setResearchUrlInput] = useState('');
+  const [savingResearchUrl, setSavingResearchUrl] = useState(false);
 
   // AI Features State
   const [aiSearchQuery, setAiSearchQuery] = useState('');
@@ -378,13 +386,31 @@ export default function FindUniversityPageWrapper({
     }
   }, [activeTab, refreshStats, loadRefreshStats]);
 
-  const refreshCourse = async (courseId: string) => {
+  const refreshCourse = async (courseId: string, overrideUrl?: string) => {
     setRefreshingCourseId(courseId);
     try {
+      const requestBody: {
+        courseId: string;
+        useAI: boolean;
+        source: typeof refreshSource;
+        customUrl?: string;
+      } = {
+        courseId,
+        useAI: true,
+        source: overrideUrl ? 'custom' : refreshSource,
+      };
+
+      // Use override URL or custom URL from state
+      if (overrideUrl) {
+        requestBody.customUrl = overrideUrl;
+      } else if (refreshSource === 'custom' && customRefreshUrl) {
+        requestBody.customUrl = customRefreshUrl;
+      }
+
       const response = await fetchWithCSRF('/api/admin/finduniversity/refresh', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ courseId, useAI: true }),
+        body: JSON.stringify(requestBody),
       });
 
       if (response.ok) {
@@ -401,6 +427,48 @@ export default function FindUniversityPageWrapper({
       alert('Failed to refresh course');
     } finally {
       setRefreshingCourseId(null);
+    }
+  };
+
+  // Research URL functions
+  const openResearchUrlEditor = (course: Course) => {
+    setEditingResearchUrl(course.id);
+    setResearchUrlInput(course.researchUrl || '');
+  };
+
+  const closeResearchUrlEditor = () => {
+    setEditingResearchUrl(null);
+    setResearchUrlInput('');
+  };
+
+  const saveResearchUrl = async (courseId: string) => {
+    setSavingResearchUrl(true);
+    try {
+      const response = await fetchWithCSRF('/api/admin/finduniversity/research-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'course',
+          id: courseId,
+          researchUrl: researchUrlInput.trim() || null,
+        }),
+      });
+
+      if (response.ok) {
+        // Update the course in the list
+        setCourses(courses.map(c =>
+          c.id === courseId ? { ...c, researchUrl: researchUrlInput.trim() || null } : c
+        ));
+        closeResearchUrlEditor();
+      } else {
+        const error = await response.json();
+        alert(error.error || 'Failed to save research URL');
+      }
+    } catch (err) {
+      console.error('Failed to save research URL:', err);
+      alert('Failed to save research URL');
+    } finally {
+      setSavingResearchUrl(false);
     }
   };
 
@@ -990,46 +1058,92 @@ export default function FindUniversityPageWrapper({
               ) : (
                 <div className="space-y-2">
                   {courses.map((course) => (
-                    <div key={course.id} className="flex items-center justify-between p-3 bg-zinc-50 dark:bg-zinc-900 rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <input
-                          type="checkbox"
-                          checked={aiCompareIds.includes(course.id)}
-                          onChange={() => toggleCourseForCompare(course.id)}
-                          className="w-4 h-4 rounded border-zinc-300"
-                          title="Selecionar para comparacao"
-                        />
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <p className="font-medium">{course.name}</p>
-                            {!course.university && (
-                              <span className="px-1.5 py-0.5 text-[10px] bg-amber-100 text-amber-700 rounded">No Uni</span>
-                            )}
+                    <div key={course.id} className="p-3 bg-zinc-50 dark:bg-zinc-900 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="checkbox"
+                            checked={aiCompareIds.includes(course.id)}
+                            onChange={() => toggleCourseForCompare(course.id)}
+                            className="w-4 h-4 rounded border-zinc-300"
+                            title="Selecionar para comparacao"
+                          />
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <p className="font-medium">{course.name}</p>
+                              {!course.university && (
+                                <span className="px-1.5 py-0.5 text-[10px] bg-amber-100 text-amber-700 rounded">No Uni</span>
+                              )}
+                              {course.researchUrl && (
+                                <span className="px-1.5 py-0.5 text-[10px] bg-blue-100 text-blue-700 rounded">Research URL</span>
+                              )}
+                            </div>
+                            <p className="text-xs text-zinc-500">
+                              {course.university?.name || 'No university'} - {COURSE_LEVEL_LABELS[course.level] || course.level}
+                              {course.city && ` - ${course.city}`}
+                            </p>
                           </div>
-                          <p className="text-xs text-zinc-500">
-                            {course.university?.name || 'No university'} - {COURSE_LEVEL_LABELS[course.level] || course.level}
-                            {course.city && ` - ${course.city}`}
-                          </p>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => openResearchUrlEditor(course)}
+                            className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
+                            title="Edit research URL"
+                          >
+                            URL
+                          </button>
+                          {(course.sourceUrl || course.officialUrl || course.researchUrl) && (
+                            <button
+                              onClick={() => refreshCourse(course.id, course.researchUrl || undefined)}
+                              disabled={refreshingCourseId === course.id}
+                              className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200 disabled:opacity-50"
+                              title="Refresh from source URL"
+                            >
+                              {refreshingCourseId === course.id ? '...' : 'Refresh'}
+                            </button>
+                          )}
+                          <button
+                            onClick={() => deleteCourse(course.id, course.name)}
+                            className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200"
+                          >
+                            Delete
+                          </button>
                         </div>
                       </div>
-                      <div className="flex gap-2">
-                        {(course.sourceUrl || course.officialUrl) && (
-                          <button
-                            onClick={() => refreshCourse(course.id)}
-                            disabled={refreshingCourseId === course.id}
-                            className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200 disabled:opacity-50"
-                            title="Refresh from source URL"
-                          >
-                            {refreshingCourseId === course.id ? '...' : 'Refresh'}
-                          </button>
-                        )}
-                        <button
-                          onClick={() => deleteCourse(course.id, course.name)}
-                          className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200"
-                        >
-                          Delete
-                        </button>
-                      </div>
+
+                      {/* Research URL Editor */}
+                      {editingResearchUrl === course.id && (
+                        <div className="mt-3 pt-3 border-t border-zinc-200 dark:border-zinc-700">
+                          <label className="text-xs text-zinc-500 block mb-1">URL de Pesquisa (site da universidade, PDF, etc.)</label>
+                          <div className="flex gap-2">
+                            <input
+                              type="url"
+                              value={researchUrlInput}
+                              onChange={(e) => setResearchUrlInput(e.target.value)}
+                              placeholder="https://universidade.pt/curso/..."
+                              className="flex-1 px-3 py-1.5 border border-zinc-300 dark:border-zinc-600 rounded bg-white dark:bg-zinc-800 text-sm"
+                            />
+                            <button
+                              onClick={() => saveResearchUrl(course.id)}
+                              disabled={savingResearchUrl}
+                              className="px-3 py-1.5 bg-blue-500 text-white text-xs rounded hover:bg-blue-600 disabled:opacity-50"
+                            >
+                              {savingResearchUrl ? '...' : 'Salvar'}
+                            </button>
+                            <button
+                              onClick={closeResearchUrlEditor}
+                              className="px-3 py-1.5 bg-zinc-200 dark:bg-zinc-700 text-xs rounded hover:bg-zinc-300"
+                            >
+                              Cancelar
+                            </button>
+                          </div>
+                          {course.researchUrl && (
+                            <p className="text-xs text-zinc-500 mt-1">
+                              Atual: <a href={course.researchUrl} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">{course.researchUrl}</a>
+                            </p>
+                          )}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -1257,6 +1371,39 @@ export default function FindUniversityPageWrapper({
                 <h3 className="font-semibold mb-3 flex items-center gap-2">
                   <span className="text-lg">🔄</span> Atualizar Dados dos Cursos
                 </h3>
+
+                {/* Source Selector */}
+                <div className="mb-4 p-3 bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700">
+                  <label className="text-xs text-zinc-500 block mb-2">Fonte de Dados</label>
+                  <div className="grid grid-cols-2 gap-2 mb-3">
+                    <select
+                      value={refreshSource}
+                      onChange={(e) => setRefreshSource(e.target.value as typeof refreshSource)}
+                      className="px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded bg-white dark:bg-zinc-900 text-sm"
+                    >
+                      <option value="auto">Auto (researchUrl, officialUrl ou sourceUrl)</option>
+                      <option value="researchUrl">URL de Pesquisa (researchUrl)</option>
+                      <option value="sourceUrl">EduPortugal (sourceUrl)</option>
+                      <option value="officialUrl">Site Oficial (officialUrl)</option>
+                      <option value="custom">URL Customizada</option>
+                    </select>
+                  </div>
+                  {refreshSource === 'custom' && (
+                    <div>
+                      <input
+                        type="url"
+                        value={customRefreshUrl}
+                        onChange={(e) => setCustomRefreshUrl(e.target.value)}
+                        placeholder="https://exemplo.pt/curso/..."
+                        className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded bg-white dark:bg-zinc-900 text-sm"
+                      />
+                      <p className="text-xs text-zinc-500 mt-1">
+                        Cole a URL do site da universidade ou outra fonte
+                      </p>
+                    </div>
+                  )}
+                </div>
+
                 {refreshStats ? (
                   <>
                     <div className="text-sm space-y-1 mb-3">
