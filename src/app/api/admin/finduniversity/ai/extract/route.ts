@@ -12,6 +12,12 @@ interface ExtractRequest {
   saveToDatabase?: boolean;
 }
 
+interface DocumentLink {
+  name: string;
+  url: string;
+  type: string;
+}
+
 interface CourseExtraction {
   credits: number | null;
   duration: string | null;
@@ -21,6 +27,8 @@ interface CourseExtraction {
   startDate: string | null;
   requirements: string | null;
   language: string | null;
+  applicationUrl: string | null;
+  documents: DocumentLink[] | null;
   confidence: number;
 }
 
@@ -140,6 +148,10 @@ export async function POST(request: NextRequest) {
         if (courseData.requirements !== null)
           updateData.requirements = courseData.requirements;
         if (courseData.language !== null) updateData.language = courseData.language;
+        if (courseData.applicationUrl !== null)
+          updateData.applicationUrl = courseData.applicationUrl;
+        if (courseData.documents !== null)
+          updateData.documents = JSON.stringify(courseData.documents);
 
         if (Object.keys(updateData).length > 0) {
           await prisma.course.update({

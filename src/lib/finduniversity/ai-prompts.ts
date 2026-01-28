@@ -281,11 +281,13 @@ Extraia as seguintes informações (se disponíveis):
 - credits: Número de créditos ECTS
 - duration: Duração do curso (ex: "2 anos", "4 semestres")
 - durationMonths: Duração em meses (número)
-- price: Valor das propinas
-- applicationDeadline: Prazo de candidatura
+- price: Valor das propinas (inclua o valor e período, ex: "1500€/ano")
+- applicationDeadline: Prazo de candidatura (datas ou período)
 - startDate: Data de início
 - requirements: Requisitos de entrada
 - language: Idioma(s) do curso
+- applicationUrl: URL para candidatura online (se encontrado)
+- documents: Lista de documentos importantes encontrados (PDFs, regulamentos, etc)
 
 Responda APENAS com JSON válido:
 {
@@ -297,6 +299,10 @@ Responda APENAS com JSON válido:
   "startDate": "string" | null,
   "requirements": "string" | null,
   "language": "string" | null,
+  "applicationUrl": "string" | null,
+  "documents": [
+    {"name": "Nome do documento", "url": "URL completa", "type": "pdf|form|info"}
+  ] | null,
   "confidence": 0.0-1.0
 }
 
@@ -315,6 +321,7 @@ Extraia as seguintes informações (se disponíveis):
 - email: Email de contato
 - phone: Telefone de contato
 - type: Tipo (publica, privada, politecnico)
+- documents: Lista de documentos importantes encontrados (PDFs, regulamentos, calendários, etc)
 
 Responda APENAS com JSON válido:
 {
@@ -323,6 +330,9 @@ Responda APENAS com JSON válido:
   "email": "string" | null,
   "phone": "string" | null,
   "type": "publica" | "privada" | "politecnico" | null,
+  "documents": [
+    {"name": "Nome do documento", "url": "URL completa", "type": "pdf|calendar|info"}
+  ] | null,
   "confidence": 0.0-1.0
 }
 

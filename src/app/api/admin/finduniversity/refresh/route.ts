@@ -5,14 +5,25 @@ import { validateCSRFToken } from '@/lib/csrf';
 import { callAIWithTracking } from '@/lib/claude';
 import { getDataExtractionPrompt } from '@/lib/finduniversity/ai-prompts';
 
+type SourceType = 'auto' | 'sourceUrl' | 'officialUrl' | 'researchUrl' | 'custom';
+
 interface RefreshRequest {
   courseId: string;
   useAI?: boolean;
+  source?: SourceType;
+  customUrl?: string;
 }
 
 interface BatchRefreshRequest {
   courseIds: string[];
   useAI?: boolean;
+  source?: SourceType;
+}
+
+interface DocumentLink {
+  name: string;
+  url: string;
+  type: string;
 }
 
 interface CourseExtraction {
@@ -24,6 +35,8 @@ interface CourseExtraction {
   startDate: string | null;
   requirements: string | null;
   language: string | null;
+  applicationUrl: string | null;
+  documents: DocumentLink[] | null;
   confidence: number;
 }
 
@@ -118,6 +131,8 @@ async function fetchAndExtractCourseData(
     if (extracted.startDate !== null) updateData.startDate = extracted.startDate;
     if (extracted.requirements !== null) updateData.requirements = extracted.requirements;
     if (extracted.language !== null) updateData.language = extracted.language;
+    if (extracted.applicationUrl !== null) updateData.applicationUrl = extracted.applicationUrl;
+    if (extracted.documents !== null) updateData.documents = JSON.stringify(extracted.documents);
 
     const fieldsUpdated = Object.keys(updateData).length;
 
@@ -233,22 +248,30 @@ export async function POST(request: NextRequest) {
     }
 
     // Single course refresh
-    const { courseId, useAI = true } = body as RefreshRequest;
+    const { courseId, useAI = true, source = 'auto', customUrl } = body as RefreshRequest;
 
     if (!courseId) {
       return NextResponse.json({ error: 'Course ID is required' }, { status: 400 });
     }
 
+    // Validate custom URL if provided
+    if (source === 'custom') {
+      if (!customUrl) {
+        return NextResponse.json({ error: 'Custom URL is required when source is "custom"' }, { status: 400 });
+      }
+      try {
+        new URL(customUrl);
+      } catch {
+        return NextResponse.json({ error: 'Invalid custom URL format' }, { status: 400 });
+      }
+    }
+
     // Fetch course with URLs
     const course = await prisma.course.findUnique({
       where: { id: courseId },
-      select: {
-        id: true,
-        name: true,
-        sourceUrl: true,
-        officialUrl: true,
+      include: {
         university: {
-          select: { id: true, name: true },
+          select: { id: true, name: true, website: true },
         },
       },
     });
@@ -257,10 +280,41 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Course not found' }, { status: 404 });
     }
 
-    const url = course.officialUrl || course.sourceUrl;
+    // Determine which URL to use based on source parameter
+    let url: string | null = null;
+    // Access researchUrl safely (may not exist if schema not updated)
+    const researchUrl = (course as { researchUrl?: string | null }).researchUrl;
+
+    switch (source) {
+      case 'custom':
+        url = customUrl || null;
+        break;
+      case 'sourceUrl':
+        url = course.sourceUrl;
+        break;
+      case 'officialUrl':
+        url = course.officialUrl;
+        break;
+      case 'researchUrl':
+        url = researchUrl || null;
+        break;
+      case 'auto':
+      default:
+        // Auto: prefer researchUrl, then officialUrl, fallback to sourceUrl
+        url = researchUrl || course.officialUrl || course.sourceUrl;
+        break;
+    }
 
     if (!url) {
-      return NextResponse.json({ error: 'Course has no source URL' }, { status: 400 });
+      return NextResponse.json({
+        error: `No URL available for source "${source}"`,
+        availableUrls: {
+          sourceUrl: course.sourceUrl || null,
+          officialUrl: course.officialUrl || null,
+          researchUrl: researchUrl || null,
+          universityWebsite: course.university?.website || null,
+        }
+      }, { status: 400 });
     }
 
     const result = await fetchAndExtractCourseData(course.id, url, useAI);
@@ -330,7 +384,7 @@ export async function GET(request: NextRequest) {
     // Courses with URLs but missing important fields
     const coursesNeedingRefresh = await prisma.course.findMany({
       where: {
-        OR: [{ sourceUrl: { not: null } }, { officialUrl: { not: null } }],
+        OR: [{ sourceUrl: { not: '' } }, { officialUrl: { not: '' } }],
         AND: [
           {
             OR: [
@@ -366,7 +420,7 @@ export async function GET(request: NextRequest) {
     // Count total courses needing refresh
     const totalNeedingRefresh = await prisma.course.count({
       where: {
-        OR: [{ sourceUrl: { not: null } }, { officialUrl: { not: null } }],
+        OR: [{ sourceUrl: { not: '' } }, { officialUrl: { not: '' } }],
         AND: [
           {
             OR: [
@@ -384,7 +438,7 @@ export async function GET(request: NextRequest) {
     // Count courses with URLs
     const totalWithUrls = await prisma.course.count({
       where: {
-        OR: [{ sourceUrl: { not: null } }, { officialUrl: { not: null } }],
+        OR: [{ sourceUrl: { not: '' } }, { officialUrl: { not: '' } }],
       },
     });
 

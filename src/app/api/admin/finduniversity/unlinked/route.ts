@@ -17,12 +17,18 @@ export async function GET() {
     // Find courses where university relationship might have issues
     // Since universityId is required in schema, we look for courses
     // where the university might not exist anymore or has issues
+    // Using raw query to find orphaned courses (university doesn't exist)
+    const orphanedCourseIds = await prisma.$queryRaw<Array<{ id: string }>>`
+      SELECT c."id"
+      FROM "Course" c
+      LEFT JOIN "University" u ON c."universityId" = u."id"
+      WHERE u."id" IS NULL
+      LIMIT 100
+    `;
+
     const coursesWithIssues = await prisma.course.findMany({
       where: {
-        OR: [
-          // Courses where university relation fails
-          { university: { is: null } },
-        ],
+        id: { in: orphanedCourseIds.map(c => c.id) },
       },
       select: {
         id: true,
