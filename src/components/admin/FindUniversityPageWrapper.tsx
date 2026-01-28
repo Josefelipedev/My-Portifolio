@@ -6,6 +6,8 @@ import { fetchWithCSRF } from '@/lib/csrf-client';
 import { useToast } from '@/components/ui/Toast';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 import ImportWizard from './ImportWizard';
+import DGESManualUpload from './DGESManualUpload';
+import UniversityEnrichment from './UniversityEnrichment';
 
 // AI Features Types
 interface AISearchResult {
@@ -163,13 +165,22 @@ export default function FindUniversityPageWrapper({
   const { showSuccess, showError, showWarning } = useToast();
   const { confirm } = useConfirm();
 
+  // Helper function for child components
+  const showToast = useCallback((message: string, type: 'success' | 'error') => {
+    if (type === 'success') {
+      showSuccess(message);
+    } else {
+      showError(message);
+    }
+  }, [showSuccess, showError]);
+
   const [universitiesCount, setUniversitiesCount] = useState(initialUniversitiesCount);
   const [coursesCount, setCoursesCount] = useState(initialCoursesCount);
   const [isImporting, setIsImporting] = useState(!!initialRunningSync);
   const [importProgress, setImportProgress] = useState<SyncLog | null>(initialRunningSync);
   const [recentSyncs, setRecentSyncs] = useState<SyncLog[]>(initialRecentSyncs);
   const [exportLoading, setExportLoading] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'overview' | 'universities' | 'courses' | 'files' | 'research' | 'ai'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'universities' | 'courses' | 'files' | 'research' | 'ai' | 'manual' | 'enrich'>('overview');
   const [showImportWizard, setShowImportWizard] = useState(false);
   const [universities, setUniversities] = useState<University[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
@@ -1089,7 +1100,7 @@ export default function FindUniversityPageWrapper({
       <div className="bg-white dark:bg-zinc-800 rounded-xl border border-zinc-200 dark:border-zinc-700 mb-6">
         <div className="border-b border-zinc-200 dark:border-zinc-700">
           <nav className="flex gap-4 px-4 overflow-x-auto">
-            {(['overview', 'universities', 'courses', 'files', 'research', 'ai'] as const).map((tab) => (
+            {(['overview', 'universities', 'courses', 'files', 'research', 'ai', 'manual', 'enrich'] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -1099,7 +1110,11 @@ export default function FindUniversityPageWrapper({
                     : 'border-transparent text-zinc-500 hover:text-zinc-700'
                 }`}
               >
-                {tab === 'ai' ? 'AI Tools' : tab === 'research' ? 'Research URLs' : tab.charAt(0).toUpperCase() + tab.slice(1)}
+                {tab === 'ai' ? 'AI Tools' :
+                 tab === 'research' ? 'Research URLs' :
+                 tab === 'manual' ? 'Upload Manual' :
+                 tab === 'enrich' ? 'Enriquecer' :
+                 tab.charAt(0).toUpperCase() + tab.slice(1)}
               </button>
             ))}
           </nav>
@@ -2074,6 +2089,26 @@ export default function FindUniversityPageWrapper({
                 )}
               </div>
             </div>
+          )}
+
+          {/* Manual Upload Tab */}
+          {activeTab === 'manual' && (
+            <DGESManualUpload
+              onSuccess={() => {
+                loadUniversities();
+                loadCourses();
+              }}
+              showToast={showToast}
+            />
+          )}
+
+          {/* Enrichment Tab */}
+          {activeTab === 'enrich' && (
+            <UniversityEnrichment
+              universities={universities}
+              onEnrichComplete={() => loadUniversities()}
+              showToast={showToast}
+            />
           )}
         </div>
       </div>
