@@ -29,7 +29,7 @@ from models import UniversityListing, CourseListing, CourseLevel
 
 logger = logging.getLogger(__name__)
 
-# Configuração da IA
+# Configuração da Together AI (mesma API key do projeto principal)
 TOGETHER_API_KEY = os.getenv("TOGETHER_API_KEY", "")
 TOGETHER_API_URL = "https://api.together.xyz/v1/chat/completions"
 AI_MODEL = "meta-llama/Llama-3.3-70B-Instruct-Turbo"
