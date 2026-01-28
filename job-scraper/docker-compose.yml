@@ -13,9 +13,6 @@ services:
       - LOG_LEVEL=INFO
       # Connect to existing Redis server
       - REDIS_URL=redis://host.docker.internal:6379/1
-      # Scraper source URLs (configurable)
-      - DGES_BASE_URL=${DGES_BASE_URL:-https://www.dges.gov.pt}
-      - EDUPORTUGAL_BASE_URL=${EDUPORTUGAL_BASE_URL:-https://eduportugal.eu}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
