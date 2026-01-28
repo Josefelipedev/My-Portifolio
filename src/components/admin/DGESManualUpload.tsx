@@ -166,7 +166,7 @@ export default function DGESManualUpload({ onSuccess, showToast }: DGESManualUpl
 
     // Check if scraper is online
     if (scraperOnline === false) {
-      showToast('Scraper Python nao esta disponivel. Execute: cd job-scraper && docker-compose up -d', 'error');
+      showToast('Scraper Python nao esta disponivel. Execute: cd job-scraper && docker compose up -d', 'error');
       return;
     }
 
@@ -314,7 +314,7 @@ export default function DGESManualUpload({ onSuccess, showToast }: DGESManualUpl
         </div>
         {scraperOnline === false && (
           <p className="text-xs text-red-600 dark:text-red-400 mt-2">
-            Execute: <code className="bg-red-100 dark:bg-red-900/50 px-1 rounded">cd job-scraper && docker-compose up -d</code>
+            Execute: <code className="bg-red-100 dark:bg-red-900/50 px-1 rounded">cd job-scraper && docker compose up -d</code>
           </p>
         )}
       </div>
