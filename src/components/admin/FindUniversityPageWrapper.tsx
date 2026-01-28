@@ -176,16 +176,6 @@ export default function FindUniversityPageWrapper({
   // Refresh State
   const [refreshingCourseId, setRefreshingCourseId] = useState<string | null>(null);
   const [refreshStats, setRefreshStats] = useState<RefreshStats | null>(null);
-  const [batchRefreshLoading, setBatchRefreshLoading] = useState(false);
-  const [refreshSource, setRefreshSource] = useState<'auto' | 'sourceUrl' | 'officialUrl' | 'researchUrl' | 'custom'>('auto');
-  const [customRefreshUrl, setCustomRefreshUrl] = useState('');
-  const [batchRefreshResults, setBatchRefreshResults] = useState<{
-    refreshed: number;
-    failed: number;
-    results: Array<{ courseId: string; name: string; fieldsUpdated?: number; confidence?: number; urlUsed?: string }>;
-    errors: Array<{ courseId: string; name: string; error: string; urlUsed?: string }>;
-    sourceUsed?: string;
-  } | null>(null);
 
   // Research URL State
   const [editingResearchUrl, setEditingResearchUrl] = useState<string | null>(null);
@@ -207,17 +197,6 @@ export default function FindUniversityPageWrapper({
 
   // Import Source State
   const [importSource, setImportSource] = useState<'dges' | 'eduportugal'>('dges');
-
-  // Scraper Config State
-  const [scraperConfig, setScraperConfig] = useState<{
-    sources: {
-      dges: { name: string; base_url: string; description: string };
-      eduportugal: { name: string; base_url: string; description: string };
-    };
-  } | null>(null);
-  const [showUrlConfig, setShowUrlConfig] = useState(false);
-  const [customDgesUrl, setCustomDgesUrl] = useState('');
-  const [customEduportugalUrl, setCustomEduportugalUrl] = useState('');
 
   // AI Features State
   const [aiSearchQuery, setAiSearchQuery] = useState('');
@@ -266,11 +245,6 @@ export default function FindUniversityPageWrapper({
     const interval = setInterval(checkImportStatus, 5000);
     return () => clearInterval(interval);
   }, [isImporting, checkImportStatus]);
-
-  // Load scraper config on mount
-  useEffect(() => {
-    loadScraperConfig();
-  }, []);
 
   // Load data when tab changes
   useEffect(() => {
@@ -329,25 +303,6 @@ export default function FindUniversityPageWrapper({
       console.error('Failed to load files:', err);
     } finally {
       setFilesLoading(false);
-    }
-  };
-
-  const loadScraperConfig = async () => {
-    try {
-      const response = await fetch('/api/admin/finduniversity/config');
-      if (response.ok) {
-        const config = await response.json();
-        setScraperConfig(config);
-        // Initialize custom URL inputs with current values
-        if (config.sources?.dges?.base_url) {
-          setCustomDgesUrl(config.sources.dges.base_url);
-        }
-        if (config.sources?.eduportugal?.base_url) {
-          setCustomEduportugalUrl(config.sources.eduportugal.base_url);
-        }
-      }
-    } catch (err) {
-      console.error('Failed to load scraper config:', err);
     }
   };
 
@@ -561,19 +516,16 @@ export default function FindUniversityPageWrapper({
       const requestBody: {
         courseId: string;
         useAI: boolean;
-        source: typeof refreshSource;
+        source: string;
         customUrl?: string;
       } = {
         courseId,
         useAI: true,
-        source: overrideUrl ? 'custom' : refreshSource,
+        source: overrideUrl ? 'custom' : 'auto',
       };
 
-      // Use override URL or custom URL from state
       if (overrideUrl) {
         requestBody.customUrl = overrideUrl;
-      } else if (refreshSource === 'custom' && customRefreshUrl) {
-        requestBody.customUrl = customRefreshUrl;
       }
 
       const response = await fetchWithCSRF('/api/admin/finduniversity/refresh', {
@@ -585,7 +537,6 @@ export default function FindUniversityPageWrapper({
       if (response.ok) {
         const data = await response.json();
         showSuccess(`Updated ${data.fieldsUpdated} fields (confidence: ${Math.round((data.confidence || 0) * 100)}%)`);
-        // Refresh the courses list
         loadCourses();
       } else {
         const error = await response.json();
@@ -710,85 +661,6 @@ export default function FindUniversityPageWrapper({
       showError('Failed to stop job');
     } finally {
       setStoppingJob(false);
-    }
-  };
-
-  const handleBatchRefresh = async (count: number) => {
-    const confirmed = await confirm({
-      title: 'Batch Refresh',
-      message: `Refresh ${count} courses using AI? This will use AI credits.`,
-      type: 'warning',
-      confirmText: 'Refresh',
-    });
-    if (!confirmed) return;
-    setBatchRefreshLoading(true);
-    setBatchRefreshResults(null);
-    try {
-      // Get courses needing refresh
-      const response = await fetch(`/api/admin/finduniversity/refresh?limit=${count}`);
-      const data = await response.json();
-
-      if (!response.ok) {
-        setBatchRefreshResults({
-          refreshed: 0,
-          failed: 1,
-          results: [],
-          errors: [{ courseId: '', name: 'API Error', error: data.error || 'Failed to fetch courses' }],
-        });
-        return;
-      }
-
-      const courseIds = (data.courses || []).map((c: { id: string }) => c.id).slice(0, count);
-
-      if (courseIds.length === 0) {
-        setBatchRefreshResults({
-          refreshed: 0,
-          failed: 0,
-          results: [],
-          errors: [{ courseId: '', name: 'Info', error: 'No courses need refresh - all courses have complete data or no URLs' }],
-        });
-        return;
-      }
-
-      // Include source in the request
-      const refreshResponse = await fetchWithCSRF('/api/admin/finduniversity/refresh', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          courseIds,
-          useAI: true,
-          source: refreshSource,
-        }),
-      });
-
-      const result = await refreshResponse.json();
-
-      if (refreshResponse.ok) {
-        setBatchRefreshResults({
-          refreshed: result.refreshed || 0,
-          failed: result.failed || 0,
-          results: result.results || [],
-          errors: result.errors || [],
-        });
-        loadRefreshStats();
-      } else {
-        setBatchRefreshResults({
-          refreshed: 0,
-          failed: 1,
-          results: [],
-          errors: [{ courseId: '', name: 'API Error', error: result.error || 'Batch refresh failed' }],
-        });
-      }
-    } catch (err) {
-      console.error('Batch refresh error:', err);
-      setBatchRefreshResults({
-        refreshed: 0,
-        failed: 1,
-        results: [],
-        errors: [{ courseId: '', name: 'Network Error', error: err instanceof Error ? err.message : 'Batch refresh failed' }],
-      });
-    } finally {
-      setBatchRefreshLoading(false);
     }
   };
 
@@ -1199,89 +1071,6 @@ export default function FindUniversityPageWrapper({
                 </div>
               </div>
 
-              {/* Scraper Configuration */}
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-semibold text-zinc-600 dark:text-zinc-400">Configuracao do Scraper</h3>
-                  <button
-                    onClick={() => setShowUrlConfig(!showUrlConfig)}
-                    className="text-xs text-blue-500 hover:text-blue-600"
-                  >
-                    {showUrlConfig ? 'Ocultar Detalhes' : 'Ver Detalhes'}
-                  </button>
-                </div>
-
-                {scraperConfig ? (
-                  <div className="space-y-3">
-                    {/* DGES URL */}
-                    <div className="p-3 bg-zinc-50 dark:bg-zinc-900 rounded-lg">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-medium">DGES</p>
-                          <p className="text-xs text-zinc-500">{scraperConfig.sources.dges.description}</p>
-                        </div>
-                        <span className="px-2 py-0.5 text-xs bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 rounded">
-                          Ativo
-                        </span>
-                      </div>
-                      {showUrlConfig && (
-                        <div className="mt-2 pt-2 border-t border-zinc-200 dark:border-zinc-700">
-                          <label className="text-xs text-zinc-500 block mb-1">URL Base</label>
-                          <input
-                            type="text"
-                            value={customDgesUrl}
-                            onChange={(e) => setCustomDgesUrl(e.target.value)}
-                            className="w-full px-2 py-1 text-xs bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-600 rounded"
-                            placeholder="https://www.dges.gov.pt"
-                          />
-                          <p className="text-xs text-zinc-400 mt-1">
-                            Atual: {scraperConfig.sources.dges.base_url}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* EduPortugal URL */}
-                    <div className="p-3 bg-zinc-50 dark:bg-zinc-900 rounded-lg">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-medium">EduPortugal</p>
-                          <p className="text-xs text-zinc-500">{scraperConfig.sources.eduportugal.description}</p>
-                        </div>
-                        <span className="px-2 py-0.5 text-xs bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 rounded">
-                          Ativo
-                        </span>
-                      </div>
-                      {showUrlConfig && (
-                        <div className="mt-2 pt-2 border-t border-zinc-200 dark:border-zinc-700">
-                          <label className="text-xs text-zinc-500 block mb-1">URL Base</label>
-                          <input
-                            type="text"
-                            value={customEduportugalUrl}
-                            onChange={(e) => setCustomEduportugalUrl(e.target.value)}
-                            className="w-full px-2 py-1 text-xs bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-600 rounded"
-                            placeholder="https://eduportugal.eu"
-                          />
-                          <p className="text-xs text-zinc-400 mt-1">
-                            Atual: {scraperConfig.sources.eduportugal.base_url}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-
-                    {showUrlConfig && (
-                      <p className="text-xs text-zinc-500 italic">
-                        Para alterar as URLs permanentemente, atualize as variaveis de ambiente DGES_BASE_URL e EDUPORTUGAL_BASE_URL no servidor.
-                      </p>
-                    )}
-                  </div>
-                ) : (
-                  <div className="p-3 bg-zinc-50 dark:bg-zinc-900 rounded-lg text-center">
-                    <p className="text-sm text-zinc-500">Carregando configuracao...</p>
-                  </div>
-                )}
-              </div>
-
               {/* Running Job Indicator */}
               {isImporting && importProgress && universitiesCount > 0 && (
                 <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
@@ -1438,151 +1227,6 @@ export default function FindUniversityPageWrapper({
                   </div>
                 </div>
               )}
-
-              {/* Batch Refresh */}
-              <div className="p-4 bg-zinc-50 dark:bg-zinc-900 rounded-lg">
-                <h3 className="text-sm font-semibold mb-3 text-zinc-600 dark:text-zinc-400 flex items-center gap-2">
-                  <span>🔄</span> Atualizar Dados dos Cursos
-                </h3>
-
-                {/* Source Selector */}
-                <div className="mb-4 p-3 bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700">
-                  <label className="text-xs text-zinc-500 block mb-2">Fonte de Dados</label>
-                  <div className="grid grid-cols-2 gap-2 mb-3">
-                    <select
-                      value={refreshSource}
-                      onChange={(e) => setRefreshSource(e.target.value as typeof refreshSource)}
-                      className="px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded bg-white dark:bg-zinc-900 text-sm"
-                    >
-                      <option value="auto">Auto (researchUrl, officialUrl ou sourceUrl)</option>
-                      <option value="researchUrl">URL de Pesquisa (researchUrl)</option>
-                      <option value="sourceUrl">EduPortugal (sourceUrl)</option>
-                      <option value="officialUrl">Site Oficial (officialUrl)</option>
-                      <option value="custom">URL Customizada</option>
-                    </select>
-                  </div>
-                  {refreshSource === 'custom' && (
-                    <div>
-                      <input
-                        type="url"
-                        value={customRefreshUrl}
-                        onChange={(e) => setCustomRefreshUrl(e.target.value)}
-                        placeholder="https://exemplo.pt/curso/..."
-                        className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded bg-white dark:bg-zinc-900 text-sm"
-                      />
-                      <p className="text-xs text-zinc-500 mt-1">
-                        Cole a URL do site da universidade ou outra fonte
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                {refreshStats ? (
-                  <>
-                    <div className="text-sm space-y-1 mb-3">
-                      <p>Cursos com dados incompletos: <strong>{refreshStats.totalNeedingRefresh}</strong></p>
-                      <p>Cursos com URL de origem: <strong>{refreshStats.totalWithUrls}</strong></p>
-                      <div className="text-xs text-zinc-500 mt-2">
-                        Campos faltando:
-                        <span className="ml-2">credits: {refreshStats.missingFields.credits}</span>
-                        <span className="ml-2">price: {refreshStats.missingFields.price}</span>
-                        <span className="ml-2">duration: {refreshStats.missingFields.duration}</span>
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => handleBatchRefresh(5)}
-                        disabled={batchRefreshLoading || refreshStats.totalNeedingRefresh === 0}
-                        className="px-3 py-1.5 bg-green-500 text-white text-sm rounded hover:bg-green-600 disabled:opacity-50"
-                      >
-                        {batchRefreshLoading ? '...' : 'Atualizar 5 Cursos'}
-                      </button>
-                      <button
-                        onClick={() => handleBatchRefresh(10)}
-                        disabled={batchRefreshLoading || refreshStats.totalNeedingRefresh === 0}
-                        className="px-3 py-1.5 bg-green-500 text-white text-sm rounded hover:bg-green-600 disabled:opacity-50"
-                      >
-                        {batchRefreshLoading ? '...' : 'Atualizar 10 Cursos'}
-                      </button>
-                      <button
-                        onClick={() => setBatchRefreshResults(null)}
-                        disabled={!batchRefreshResults}
-                        className="px-3 py-1.5 bg-zinc-200 dark:bg-zinc-700 text-sm rounded hover:bg-zinc-300 disabled:opacity-50"
-                      >
-                        Limpar
-                      </button>
-                    </div>
-
-                    {/* Batch Refresh Results */}
-                    {batchRefreshResults && (
-                      <div className="mt-4 p-3 bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700">
-                        <div className="flex items-center justify-between mb-2">
-                          <div>
-                            <h4 className="text-sm font-semibold">Resultados do Refresh</h4>
-                            {batchRefreshResults.sourceUsed && (
-                              <p className="text-xs text-zinc-500">Fonte: {batchRefreshResults.sourceUsed}</p>
-                            )}
-                          </div>
-                          <div className="flex gap-2">
-                            <span className="px-2 py-0.5 text-xs bg-green-100 text-green-700 rounded">
-                              {batchRefreshResults.refreshed} OK
-                            </span>
-                            {batchRefreshResults.failed > 0 && (
-                              <span className="px-2 py-0.5 text-xs bg-red-100 text-red-700 rounded">
-                                {batchRefreshResults.failed} Erros
-                              </span>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Success Results */}
-                        {batchRefreshResults.results.length > 0 && (
-                          <div className="mb-3">
-                            <p className="text-xs text-zinc-500 mb-1">Atualizados:</p>
-                            <div className="max-h-40 overflow-y-auto space-y-1">
-                              {batchRefreshResults.results.map((r) => (
-                                <div key={r.courseId} className="text-xs p-2 bg-green-50 dark:bg-green-900/20 rounded">
-                                  <div className="flex justify-between">
-                                    <span className="font-medium">{r.name}</span>
-                                    <span className="text-green-700">
-                                      {r.fieldsUpdated} campos • {Math.round((r.confidence || 0) * 100)}%
-                                    </span>
-                                  </div>
-                                  {r.urlUsed && (
-                                    <p className="text-zinc-400 truncate mt-0.5">{r.urlUsed}</p>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Error Results */}
-                        {batchRefreshResults.errors.length > 0 && (
-                          <div>
-                            <p className="text-xs text-zinc-500 mb-1">Erros:</p>
-                            <div className="max-h-40 overflow-y-auto space-y-1">
-                              {batchRefreshResults.errors.map((e, idx) => (
-                                <div key={e.courseId || idx} className="text-xs p-2 bg-red-50 dark:bg-red-900/20 rounded">
-                                  <div className="flex justify-between">
-                                    <span className="font-medium text-red-700">{e.name}</span>
-                                  </div>
-                                  <p className="text-red-600 mt-0.5">{e.error}</p>
-                                  {e.urlUsed && (
-                                    <p className="text-zinc-400 truncate mt-0.5">{e.urlUsed}</p>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <p className="text-sm text-zinc-500">Carregando...</p>
-                )}
-              </div>
             </div>
           )}
 
