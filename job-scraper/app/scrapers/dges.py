@@ -202,6 +202,193 @@ class DGESScraper:
         return 'outro'
 
     # ==========================================
+    # AI Extraction
+    # ==========================================
+
+    async def _call_ai(self, prompt: str, max_tokens: int = 4000) -> Optional[str]:
+        """
+        Chama a API Together AI para extrair dados.
+
+        Args:
+            prompt: O prompt para a IA
+            max_tokens: Máximo de tokens na resposta
+
+        Returns:
+            Resposta da IA ou None se falhar
+        """
+        if not TOGETHER_API_KEY:
+            logger.warning("TOGETHER_API_KEY não configurada - usando extração tradicional")
+            return None
+
+        try:
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                response = await client.post(
+                    TOGETHER_API_URL,
+                    headers={
+                        "Authorization": f"Bearer {TOGETHER_API_KEY}",
+                        "Content-Type": "application/json",
+                    },
+                    json={
+                        "model": AI_MODEL,
+                        "messages": [{"role": "user", "content": prompt}],
+                        "max_tokens": max_tokens,
+                        "temperature": 0.1,
+                    },
+                )
+
+                if response.status_code == 200:
+                    data = response.json()
+                    return data["choices"][0]["message"]["content"]
+                else:
+                    logger.error(f"AI API error: {response.status_code} - {response.text}")
+                    return None
+
+        except Exception as e:
+            logger.error(f"AI call failed: {e}")
+            return None
+
+    def _get_dges_extraction_prompt(self, html_content: str, region_name: str) -> str:
+        """Gera prompt para extrair universidades e cursos do HTML do DGES."""
+        soup = BeautifulSoup(html_content, "lxml")
+
+        # Remove scripts e styles
+        for tag in soup.select("script, style, nav, footer, header"):
+            tag.decompose()
+
+        text_content = soup.get_text(separator="\n", strip=True)
+        # Limita o tamanho
+        text_content = text_content[:20000]
+
+        return f"""Você é um especialista em extrair dados de páginas do site DGES (Direção-Geral do Ensino Superior de Portugal).
+
+Analise o conteúdo abaixo de uma página de listagem de instituições e cursos da região "{region_name}" em Portugal.
+
+CONTEÚDO DA PÁGINA:
+{text_content}
+
+INSTRUÇÕES:
+1. Extraia TODAS as instituições de ensino superior encontradas
+2. Para cada instituição, extraia também os cursos listados
+
+O formato do site DGES geralmente é:
+- Código da instituição (4 dígitos)
+- Nome da instituição
+- Cursos com códigos e níveis [Lic], [Mest], [Dout], etc.
+
+Responda APENAS com um JSON válido no formato:
+{{
+  "institutions": [
+    {{
+      "code": "0100",
+      "name": "Nome da Instituição",
+      "type": "publica_universitario" ou "publica_politecnico" ou "privada_universitario" ou "privada_politecnico",
+      "courses": [
+        {{
+          "code": "9999",
+          "name": "Nome do Curso",
+          "level": "licenciatura" ou "mestrado" ou "doutorado" ou "mestrado-integrado" ou "curso-tecnico"
+        }}
+      ]
+    }}
+  ]
+}}
+
+IMPORTANTE:
+- Extraia TODAS as instituições e cursos, mesmo que apareçam apenas como links
+- O código da instituição geralmente aparece antes do nome
+- Os níveis são indicados entre colchetes: [Lic], [Mest], [Dout], [MI], [CTeSP]
+- Converta os níveis para o formato padronizado
+- Se não encontrar dados, retorne {{"institutions": []}}"""
+
+    async def _parse_with_ai(self, html: str, region_name: str) -> Dict[str, Any]:
+        """
+        Usa IA para extrair dados quando o parsing tradicional falha.
+
+        Returns:
+            Dicionário com universities e courses
+        """
+        universities: List[UniversityListing] = []
+        courses: List[CourseListing] = []
+
+        prompt = self._get_dges_extraction_prompt(html, region_name)
+        ai_response = await self._call_ai(prompt)
+
+        if not ai_response:
+            logger.warning("AI extraction failed - no response")
+            return {"universities": universities, "courses": courses}
+
+        try:
+            # Extrai JSON da resposta (pode vir com texto extra)
+            json_match = re.search(r'\{[\s\S]*\}', ai_response)
+            if not json_match:
+                logger.warning("AI response doesn't contain valid JSON")
+                return {"universities": universities, "courses": courses}
+
+            data = json.loads(json_match.group())
+            institutions = data.get("institutions", [])
+
+            logger.info(f"AI extracted {len(institutions)} institutions from {region_name}")
+
+            for inst in institutions:
+                inst_code = inst.get("code", "")
+                inst_name = inst.get("name", "")
+                inst_type = inst.get("type", "outro")
+
+                if not inst_name:
+                    continue
+
+                inst_slug = self._slugify(inst_name)
+
+                # Cria universidade
+                universities.append(UniversityListing(
+                    id=self.generate_id(f"{inst_code}-{inst_slug}"),
+                    name=inst_name,
+                    slug=inst_slug,
+                    short_name=None,
+                    description=None,
+                    city=region_name,
+                    logo_url=None,
+                    source_url=f"{self.base_url}/guias/indest.asp",
+                    type=inst_type,
+                ))
+
+                # Processa cursos da instituição
+                for course in inst.get("courses", []):
+                    course_code = course.get("code", "")
+                    course_name = course.get("name", "")
+                    course_level = course.get("level", "outro")
+
+                    if not course_name:
+                        continue
+
+                    course_slug = self._slugify(course_name)
+
+                    courses.append(CourseListing(
+                        id=self.generate_id(f"{course_code}-{course_slug}"),
+                        name=course_name,
+                        slug=course_slug,
+                        description=None,
+                        level=course_level,
+                        duration=None,
+                        city=region_name,
+                        modality="presencial",
+                        start_date=None,
+                        price=None,
+                        source_url=f"{self.base_url}/guias/detcursopi.asp?codc={course_code}&code={inst_code}",
+                        university_name=inst_name,
+                        university_slug=inst_slug,
+                    ))
+
+            logger.info(f"AI extraction complete: {len(universities)} universities, {len(courses)} courses")
+
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse AI JSON response: {e}")
+        except Exception as e:
+            logger.error(f"AI extraction error: {e}")
+
+        return {"universities": universities, "courses": courses}
+
+    # ==========================================
     # Scraping de Instituições e Cursos
     # ==========================================
 
@@ -501,6 +688,13 @@ class DGESScraper:
                 university_name=current_inst_name,
                 university_slug=self._slugify(current_inst_name) if current_inst_name else None,
             ))
+
+        # Se não encontrou universidades, tenta extração por IA
+        if not universities and html:
+            logger.info(f"Tentando extração por IA para {region_name}...")
+            ai_result = await self._parse_with_ai(html, region_name)
+            if ai_result.get("universities"):
+                return ai_result
 
         return {
             "universities": universities,
