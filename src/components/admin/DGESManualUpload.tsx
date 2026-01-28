@@ -77,7 +77,7 @@ function normalizeExtractionResult(data: Record<string, unknown>): ExtractionRes
 
   // If already has universities/courses structure, use it
   if (rawComparison?.universities && rawComparison?.courses) {
-    return data as ExtractionResult;
+    return data as unknown as ExtractionResult;
   }
 
   // Otherwise, convert flat format to nested format
