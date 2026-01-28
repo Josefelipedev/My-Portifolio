@@ -396,7 +396,7 @@ export default function FindUniversityPageWrapper({
   }, []);
 
   useEffect(() => {
-    if (activeTab === 'ai' && !refreshStats) {
+    if ((activeTab === 'overview' || activeTab === 'ai') && !refreshStats) {
       loadRefreshStats();
     }
   }, [activeTab, refreshStats, loadRefreshStats]);
@@ -1090,6 +1090,78 @@ export default function FindUniversityPageWrapper({
                   </div>
                 </div>
               )}
+
+              {/* Batch Refresh */}
+              <div className="p-4 bg-zinc-50 dark:bg-zinc-900 rounded-lg">
+                <h3 className="text-sm font-semibold mb-3 text-zinc-600 dark:text-zinc-400 flex items-center gap-2">
+                  <span>🔄</span> Atualizar Dados dos Cursos
+                </h3>
+
+                {/* Source Selector */}
+                <div className="mb-4 p-3 bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700">
+                  <label className="text-xs text-zinc-500 block mb-2">Fonte de Dados</label>
+                  <div className="grid grid-cols-2 gap-2 mb-3">
+                    <select
+                      value={refreshSource}
+                      onChange={(e) => setRefreshSource(e.target.value as typeof refreshSource)}
+                      className="px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded bg-white dark:bg-zinc-900 text-sm"
+                    >
+                      <option value="auto">Auto (researchUrl, officialUrl ou sourceUrl)</option>
+                      <option value="researchUrl">URL de Pesquisa (researchUrl)</option>
+                      <option value="sourceUrl">EduPortugal (sourceUrl)</option>
+                      <option value="officialUrl">Site Oficial (officialUrl)</option>
+                      <option value="custom">URL Customizada</option>
+                    </select>
+                  </div>
+                  {refreshSource === 'custom' && (
+                    <div>
+                      <input
+                        type="url"
+                        value={customRefreshUrl}
+                        onChange={(e) => setCustomRefreshUrl(e.target.value)}
+                        placeholder="https://exemplo.pt/curso/..."
+                        className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded bg-white dark:bg-zinc-900 text-sm"
+                      />
+                      <p className="text-xs text-zinc-500 mt-1">
+                        Cole a URL do site da universidade ou outra fonte
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {refreshStats ? (
+                  <>
+                    <div className="text-sm space-y-1 mb-3">
+                      <p>Cursos com dados incompletos: <strong>{refreshStats.totalNeedingRefresh}</strong></p>
+                      <p>Cursos com URL de origem: <strong>{refreshStats.totalWithUrls}</strong></p>
+                      <div className="text-xs text-zinc-500 mt-2">
+                        Campos faltando:
+                        <span className="ml-2">credits: {refreshStats.missingFields.credits}</span>
+                        <span className="ml-2">price: {refreshStats.missingFields.price}</span>
+                        <span className="ml-2">duration: {refreshStats.missingFields.duration}</span>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleBatchRefresh(5)}
+                        disabled={batchRefreshLoading || refreshStats.totalNeedingRefresh === 0}
+                        className="px-3 py-1.5 bg-green-500 text-white text-sm rounded hover:bg-green-600 disabled:opacity-50"
+                      >
+                        {batchRefreshLoading ? '...' : 'Atualizar 5 Cursos'}
+                      </button>
+                      <button
+                        onClick={() => handleBatchRefresh(10)}
+                        disabled={batchRefreshLoading || refreshStats.totalNeedingRefresh === 0}
+                        className="px-3 py-1.5 bg-green-500 text-white text-sm rounded hover:bg-green-600 disabled:opacity-50"
+                      >
+                        {batchRefreshLoading ? '...' : 'Atualizar 10 Cursos'}
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-sm text-zinc-500">Carregando...</p>
+                )}
+              </div>
             </div>
           )}
 
@@ -1589,78 +1661,6 @@ export default function FindUniversityPageWrapper({
                     </div>
                   )}
                 </div>
-              </div>
-
-              {/* Batch Refresh */}
-              <div className="p-4 bg-zinc-50 dark:bg-zinc-900 rounded-lg">
-                <h3 className="font-semibold mb-3 flex items-center gap-2">
-                  <span className="text-lg">🔄</span> Atualizar Dados dos Cursos
-                </h3>
-
-                {/* Source Selector */}
-                <div className="mb-4 p-3 bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700">
-                  <label className="text-xs text-zinc-500 block mb-2">Fonte de Dados</label>
-                  <div className="grid grid-cols-2 gap-2 mb-3">
-                    <select
-                      value={refreshSource}
-                      onChange={(e) => setRefreshSource(e.target.value as typeof refreshSource)}
-                      className="px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded bg-white dark:bg-zinc-900 text-sm"
-                    >
-                      <option value="auto">Auto (researchUrl, officialUrl ou sourceUrl)</option>
-                      <option value="researchUrl">URL de Pesquisa (researchUrl)</option>
-                      <option value="sourceUrl">EduPortugal (sourceUrl)</option>
-                      <option value="officialUrl">Site Oficial (officialUrl)</option>
-                      <option value="custom">URL Customizada</option>
-                    </select>
-                  </div>
-                  {refreshSource === 'custom' && (
-                    <div>
-                      <input
-                        type="url"
-                        value={customRefreshUrl}
-                        onChange={(e) => setCustomRefreshUrl(e.target.value)}
-                        placeholder="https://exemplo.pt/curso/..."
-                        className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded bg-white dark:bg-zinc-900 text-sm"
-                      />
-                      <p className="text-xs text-zinc-500 mt-1">
-                        Cole a URL do site da universidade ou outra fonte
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                {refreshStats ? (
-                  <>
-                    <div className="text-sm space-y-1 mb-3">
-                      <p>Cursos com dados incompletos: <strong>{refreshStats.totalNeedingRefresh}</strong></p>
-                      <p>Cursos com URL de origem: <strong>{refreshStats.totalWithUrls}</strong></p>
-                      <div className="text-xs text-zinc-500 mt-2">
-                        Campos faltando:
-                        <span className="ml-2">credits: {refreshStats.missingFields.credits}</span>
-                        <span className="ml-2">price: {refreshStats.missingFields.price}</span>
-                        <span className="ml-2">duration: {refreshStats.missingFields.duration}</span>
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => handleBatchRefresh(5)}
-                        disabled={batchRefreshLoading || refreshStats.totalNeedingRefresh === 0}
-                        className="px-3 py-1.5 bg-green-500 text-white text-sm rounded hover:bg-green-600 disabled:opacity-50"
-                      >
-                        {batchRefreshLoading ? '...' : 'Atualizar 5 Cursos'}
-                      </button>
-                      <button
-                        onClick={() => handleBatchRefresh(10)}
-                        disabled={batchRefreshLoading || refreshStats.totalNeedingRefresh === 0}
-                        className="px-3 py-1.5 bg-green-500 text-white text-sm rounded hover:bg-green-600 disabled:opacity-50"
-                      >
-                        {batchRefreshLoading ? '...' : 'Atualizar 10 Cursos'}
-                      </button>
-                    </div>
-                  </>
-                ) : (
-                  <p className="text-sm text-zinc-500">Carregando...</p>
-                )}
               </div>
 
               {/* Recommendations */}
