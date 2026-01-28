@@ -195,6 +195,9 @@ export default function FindUniversityPageWrapper({
   // Job Control State
   const [stoppingJob, setStoppingJob] = useState(false);
 
+  // Import Source State
+  const [importSource, setImportSource] = useState<'dges' | 'eduportugal'>('dges');
+
   // AI Features State
   const [aiSearchQuery, setAiSearchQuery] = useState('');
   const [aiSearchResults, setAiSearchResults] = useState<AISearchResult | null>(null);
@@ -638,7 +641,8 @@ export default function FindUniversityPageWrapper({
   };
 
   const startImport = async (syncType: string) => {
-    if (!confirm(`This will import ${syncType === 'full' ? 'universities and courses' : syncType} from source. Continue?`)) {
+    const sourceName = importSource === 'dges' ? 'DGES (Oficial)' : 'EduPortugal';
+    if (!confirm(`Importar ${syncType === 'full' ? 'universidades e cursos' : syncType} do ${sourceName}?`)) {
       return;
     }
 
@@ -648,7 +652,7 @@ export default function FindUniversityPageWrapper({
       const response = await fetchWithCSRF('/api/admin/finduniversity/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ syncType }),
+        body: JSON.stringify({ syncType, source: importSource }),
       });
 
       const data = await response.json();
@@ -1088,20 +1092,54 @@ export default function FindUniversityPageWrapper({
                     </div>
                   )}
 
+                  {/* Source Selector */}
+                  <div className="mb-3 p-3 bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700">
+                    <label className="text-xs text-zinc-500 block mb-2">Fonte de Dados</label>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setImportSource('dges')}
+                        className={`flex-1 px-3 py-2 text-sm rounded border ${
+                          importSource === 'dges'
+                            ? 'bg-blue-500 text-white border-blue-500'
+                            : 'bg-white dark:bg-zinc-900 border-zinc-300 dark:border-zinc-600 hover:bg-zinc-50'
+                        }`}
+                      >
+                        <div className="font-medium">DGES</div>
+                        <div className="text-xs opacity-80">Fonte Oficial</div>
+                      </button>
+                      <button
+                        onClick={() => setImportSource('eduportugal')}
+                        className={`flex-1 px-3 py-2 text-sm rounded border ${
+                          importSource === 'eduportugal'
+                            ? 'bg-blue-500 text-white border-blue-500'
+                            : 'bg-white dark:bg-zinc-900 border-zinc-300 dark:border-zinc-600 hover:bg-zinc-50'
+                        }`}
+                      >
+                        <div className="font-medium">EduPortugal</div>
+                        <div className="text-xs opacity-80">Agregador</div>
+                      </button>
+                    </div>
+                    <p className="text-xs text-zinc-500 mt-2">
+                      {importSource === 'dges'
+                        ? 'DGES: Direção-Geral do Ensino Superior - dados oficiais do governo'
+                        : 'EduPortugal: Agregador privado de cursos'}
+                    </p>
+                  </div>
+
                   <div className="flex gap-2">
                     <button
                       onClick={() => startImport('universities')}
                       disabled={isImporting}
                       className="px-3 py-1.5 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 disabled:opacity-50"
                     >
-                      Import Universities
+                      Importar Universidades
                     </button>
                     <button
                       onClick={() => startImport('full')}
                       disabled={isImporting}
                       className="px-3 py-1.5 bg-green-500 text-white text-sm rounded hover:bg-green-600 disabled:opacity-50"
                     >
-                      Import All
+                      Importar Tudo
                     </button>
                   </div>
                 </div>
