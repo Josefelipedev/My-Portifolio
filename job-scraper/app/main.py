@@ -673,6 +673,29 @@ async def get_saved_file(filename: str):
     )
 
 
+@app.delete("/eduportugal/files/{filename}")
+async def delete_saved_file(filename: str):
+    """Delete a specific saved JSON file."""
+    import os
+
+    # Security check - prevent path traversal
+    if ".." in filename or "/" in filename:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+
+    filepath = f"/app/data/{filename}"
+
+    if not os.path.exists(filepath):
+        raise HTTPException(status_code=404, detail="File not found")
+
+    try:
+        os.remove(filepath)
+        logger.info(f"Deleted file: {filename}")
+        return {"success": True, "deleted": filename}
+    except Exception as e:
+        logger.error(f"Failed to delete file {filename}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to delete file: {str(e)}")
+
+
 # ============================================================================
 # DGES - Fonte Oficial do Ensino Superior em Portugal
 # ============================================================================
