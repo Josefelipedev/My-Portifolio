@@ -239,6 +239,28 @@ export default function FindUniversityPageWrapper({
     eduportugalEnabled: true,
   });
 
+  // University Search & Bulk Delete State
+  const [universitySearch, setUniversitySearch] = useState('');
+  const [deletingAllUniversities, setDeletingAllUniversities] = useState(false);
+  const [universityPage, setUniversityPage] = useState(1);
+  const [universityTotal, setUniversityTotal] = useState(0);
+
+  // Course Search State
+  const [courseSearch, setCourseSearch] = useState('');
+  const [coursePage, setCoursePage] = useState(1);
+  const [courseTotal, setCourseTotal] = useState(0);
+
+  // URL Update State
+  const [urlUpdateInput, setUrlUpdateInput] = useState('');
+  const [urlUpdateType, setUrlUpdateType] = useState<'university' | 'course'>('university');
+  const [urlUpdateLoading, setUrlUpdateLoading] = useState(false);
+  const [urlUpdateResult, setUrlUpdateResult] = useState<{
+    type: string;
+    name: string;
+    fieldsUpdated: number;
+    data: Record<string, unknown>;
+  } | null>(null);
+
   // AI Features State
   const [aiSearchQuery, setAiSearchQuery] = useState('');
   const [aiSearchResults, setAiSearchResults] = useState<AISearchResult | null>(null);
@@ -307,12 +329,21 @@ export default function FindUniversityPageWrapper({
     }
   }, [showUnlinkedOnly]);
 
-  const loadUniversities = async () => {
+  const loadUniversities = async (search?: string, page?: number) => {
     setLoadingData(true);
     try {
-      const response = await fetch('/api/universities?withCourses=true&pageSize=100');
+      const params = new URLSearchParams({
+        withCourses: 'true',
+        pageSize: '50',
+        page: String(page || universityPage),
+      });
+      if (search || universitySearch) {
+        params.set('q', search || universitySearch);
+      }
+      const response = await fetch(`/api/universities?${params}`);
       const data = await response.json();
       setUniversities(data.universities || []);
+      setUniversityTotal(data.pagination?.total || 0);
     } catch (err) {
       console.error('Failed to load universities:', err);
     } finally {
@@ -320,16 +351,107 @@ export default function FindUniversityPageWrapper({
     }
   };
 
-  const loadCourses = async () => {
+  const loadCourses = async (search?: string, page?: number) => {
     setLoadingData(true);
     try {
-      const response = await fetch('/api/courses/search?pageSize=100');
+      const params = new URLSearchParams({
+        pageSize: '50',
+        page: String(page || coursePage),
+      });
+      if (search || courseSearch) {
+        params.set('q', search || courseSearch);
+      }
+      const response = await fetch(`/api/courses/search?${params}`);
       const data = await response.json();
       setCourses(data.courses || []);
+      setCourseTotal(data.pagination?.total || 0);
     } catch (err) {
       console.error('Failed to load courses:', err);
     } finally {
       setLoadingData(false);
+    }
+  };
+
+  // Delete all universities
+  const deleteAllUniversities = async () => {
+    const confirmed = await confirm({
+      title: 'Apagar TODAS as Universidades',
+      message: `Tem certeza que deseja apagar TODAS as ${universitiesCount} universidades e todos os cursos associados? Esta acao NAO pode ser desfeita!`,
+      type: 'danger',
+      confirmText: 'Sim, Apagar Tudo',
+    });
+    if (!confirmed) return;
+
+    // Double confirmation for safety
+    const doubleConfirm = await confirm({
+      title: 'Confirmacao Final',
+      message: 'Esta e a ultima confirmacao. Todos os dados serao perdidos permanentemente.',
+      type: 'danger',
+      confirmText: 'Confirmar Exclusao',
+    });
+    if (!doubleConfirm) return;
+
+    setDeletingAllUniversities(true);
+    try {
+      const response = await fetchWithCSRF('/api/universities/bulk', { method: 'DELETE' });
+      const data = await response.json();
+
+      if (data.success) {
+        setUniversities([]);
+        setUniversitiesCount(0);
+        setCoursesCount(0);
+        setCourses([]);
+        showSuccess(`${data.deleted} universidades apagadas com sucesso`);
+      } else {
+        showError(data.error || 'Falha ao apagar universidades');
+      }
+    } catch (err) {
+      console.error('Failed to delete all universities:', err);
+      showError('Erro ao apagar universidades');
+    } finally {
+      setDeletingAllUniversities(false);
+    }
+  };
+
+  // URL-based update
+  const handleUrlUpdate = async () => {
+    if (!urlUpdateInput.trim()) {
+      showError('Por favor, insira uma URL valida');
+      return;
+    }
+
+    setUrlUpdateLoading(true);
+    setUrlUpdateResult(null);
+
+    try {
+      const response = await fetchWithCSRF('/api/admin/finduniversity/url-update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          url: urlUpdateInput.trim(),
+          type: urlUpdateType,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        setUrlUpdateResult(data.result);
+        showSuccess(`Atualizado: ${data.result.name} (${data.result.fieldsUpdated} campos)`);
+        // Reload data
+        if (urlUpdateType === 'university') {
+          loadUniversities();
+        } else {
+          loadCourses();
+        }
+      } else {
+        showError(data.error || 'Falha ao atualizar dados');
+      }
+    } catch (err) {
+      console.error('URL update error:', err);
+      showError('Erro ao atualizar dados pela URL');
+    } finally {
+      setUrlUpdateLoading(false);
     }
   };
 
@@ -1289,6 +1411,60 @@ export default function FindUniversityPageWrapper({
                 )}
               </div>
 
+              {/* URL Update Section */}
+              <div>
+                <h3 className="text-sm font-semibold mb-3 text-zinc-600 dark:text-zinc-400">Atualizar via URL</h3>
+                <p className="text-xs text-zinc-500 mb-3">
+                  Passe a URL de uma universidade ou curso para extrair e atualizar os dados automaticamente.
+                </p>
+                <div className="bg-zinc-50 dark:bg-zinc-900 rounded-lg p-4 space-y-3">
+                  <div className="flex gap-2">
+                    <select
+                      value={urlUpdateType}
+                      onChange={(e) => setUrlUpdateType(e.target.value as 'university' | 'course')}
+                      className="px-3 py-2 text-sm border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-800"
+                    >
+                      <option value="university">Universidade</option>
+                      <option value="course">Curso</option>
+                    </select>
+                    <input
+                      type="url"
+                      value={urlUpdateInput}
+                      onChange={(e) => setUrlUpdateInput(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleUrlUpdate()}
+                      placeholder="https://universidade.pt ou https://universidade.pt/curso/..."
+                      className="flex-1 px-3 py-2 text-sm border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-800"
+                    />
+                    <button
+                      onClick={handleUrlUpdate}
+                      disabled={urlUpdateLoading || !urlUpdateInput.trim()}
+                      className="px-4 py-2 bg-green-500 text-white text-sm rounded-lg hover:bg-green-600 disabled:opacity-50"
+                    >
+                      {urlUpdateLoading ? 'Processando...' : 'Atualizar'}
+                    </button>
+                  </div>
+
+                  {urlUpdateResult && (
+                    <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-sm font-medium text-green-700 dark:text-green-400">
+                          {urlUpdateResult.type === 'university' ? 'Universidade' : 'Curso'}: {urlUpdateResult.name}
+                        </p>
+                        <span className="px-2 py-0.5 text-xs bg-green-100 text-green-700 rounded">
+                          {urlUpdateResult.fieldsUpdated} campos atualizados
+                        </span>
+                      </div>
+                      <details className="text-xs">
+                        <summary className="cursor-pointer text-zinc-500 hover:text-zinc-700">Ver dados</summary>
+                        <pre className="mt-2 p-2 bg-white dark:bg-zinc-800 rounded overflow-auto max-h-40 text-[10px]">
+                          {JSON.stringify(urlUpdateResult.data, null, 2)}
+                        </pre>
+                      </details>
+                    </div>
+                  )}
+                </div>
+              </div>
+
               {/* Running Job Indicator */}
               {isImporting && importProgress && universitiesCount > 0 && (
                 <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
@@ -1451,22 +1627,84 @@ export default function FindUniversityPageWrapper({
           {/* Universities Tab */}
           {activeTab === 'universities' && (
             <div>
+              {/* Search and Actions Bar */}
+              <div className="flex flex-col sm:flex-row gap-3 mb-4 pb-4 border-b border-zinc-200 dark:border-zinc-700">
+                <div className="flex-1 flex gap-2">
+                  <input
+                    type="text"
+                    value={universitySearch}
+                    onChange={(e) => setUniversitySearch(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && loadUniversities(universitySearch, 1)}
+                    placeholder="Pesquisar universidades..."
+                    className="flex-1 px-3 py-2 text-sm border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-800"
+                  />
+                  <button
+                    onClick={() => loadUniversities(universitySearch, 1)}
+                    disabled={loadingData}
+                    className="px-4 py-2 bg-blue-500 text-white text-sm rounded-lg hover:bg-blue-600 disabled:opacity-50"
+                  >
+                    Pesquisar
+                  </button>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => loadUniversities()}
+                    disabled={loadingData}
+                    className="px-3 py-2 text-sm bg-zinc-200 dark:bg-zinc-700 rounded-lg hover:bg-zinc-300 disabled:opacity-50"
+                  >
+                    Atualizar
+                  </button>
+                  {universitiesCount > 0 && (
+                    <button
+                      onClick={deleteAllUniversities}
+                      disabled={deletingAllUniversities}
+                      className="px-3 py-2 text-sm bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50"
+                    >
+                      {deletingAllUniversities ? 'Apagando...' : 'Apagar Todas'}
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Stats */}
+              <div className="flex items-center justify-between mb-4 text-sm text-zinc-500">
+                <span>Total: {universityTotal || universitiesCount} universidades</span>
+                {universities.length > 0 && (
+                  <span>Mostrando {universities.length} resultados</span>
+                )}
+              </div>
+
               {loadingData ? (
-                <div className="text-center py-8 text-zinc-500">Loading...</div>
+                <div className="text-center py-8 text-zinc-500">Carregando...</div>
               ) : universities.length === 0 ? (
-                <div className="text-center py-8 text-zinc-500">No universities yet</div>
+                <div className="text-center py-8 text-zinc-500">
+                  {universitySearch ? 'Nenhuma universidade encontrada' : 'Nenhuma universidade ainda'}
+                </div>
               ) : (
                 <div className="space-y-2">
                   {universities.map((uni) => (
                     <div key={uni.id} className="flex items-center justify-between p-3 bg-zinc-50 dark:bg-zinc-900 rounded-lg">
-                      <div>
-                        <p className="font-medium">{uni.name}</p>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate">{uni.name}</p>
                         <p className="text-xs text-zinc-500">
-                          {uni.city || 'No city'} {uni.type && `- ${uni.type}`}
-                          {uni._count && ` - ${uni._count.courses} courses`}
+                          {uni.city || 'Sem cidade'} {uni.type && `- ${uni.type}`}
+                          {uni._count && ` - ${uni._count.courses} cursos`}
                         </p>
+                        {(uni.instagramUrl || uni.linkedinUrl || uni.facebookUrl) && (
+                          <div className="flex gap-2 mt-1">
+                            {uni.instagramUrl && (
+                              <a href={uni.instagramUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-pink-500 hover:underline">IG</a>
+                            )}
+                            {uni.linkedinUrl && (
+                              <a href={uni.linkedinUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline">LI</a>
+                            )}
+                            {uni.facebookUrl && (
+                              <a href={uni.facebookUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-500 hover:underline">FB</a>
+                            )}
+                          </div>
+                        )}
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 ml-2">
                         {uni.website && (
                           <a
                             href={uni.website}
@@ -1481,11 +1719,42 @@ export default function FindUniversityPageWrapper({
                           onClick={() => deleteUniversity(uni.id, uni.name)}
                           className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200"
                         >
-                          Delete
+                          Apagar
                         </button>
                       </div>
                     </div>
                   ))}
+                </div>
+              )}
+
+              {/* Pagination */}
+              {universityTotal > 50 && (
+                <div className="flex items-center justify-center gap-2 mt-4 pt-4 border-t border-zinc-200 dark:border-zinc-700">
+                  <button
+                    onClick={() => {
+                      const newPage = Math.max(1, universityPage - 1);
+                      setUniversityPage(newPage);
+                      loadUniversities(universitySearch, newPage);
+                    }}
+                    disabled={universityPage === 1 || loadingData}
+                    className="px-3 py-1 text-sm bg-zinc-200 dark:bg-zinc-700 rounded disabled:opacity-50"
+                  >
+                    Anterior
+                  </button>
+                  <span className="text-sm text-zinc-500">
+                    Pagina {universityPage} de {Math.ceil(universityTotal / 50)}
+                  </span>
+                  <button
+                    onClick={() => {
+                      const newPage = universityPage + 1;
+                      setUniversityPage(newPage);
+                      loadUniversities(universitySearch, newPage);
+                    }}
+                    disabled={universityPage >= Math.ceil(universityTotal / 50) || loadingData}
+                    className="px-3 py-1 text-sm bg-zinc-200 dark:bg-zinc-700 rounded disabled:opacity-50"
+                  >
+                    Proxima
+                  </button>
                 </div>
               )}
             </div>
@@ -1494,22 +1763,54 @@ export default function FindUniversityPageWrapper({
           {/* Courses Tab */}
           {activeTab === 'courses' && (
             <div>
-              {/* Filter Controls */}
-              <div className="flex items-center gap-4 mb-4 pb-4 border-b border-zinc-200 dark:border-zinc-700">
-                <label className="flex items-center gap-2 text-sm">
+              {/* Search and Filter Controls */}
+              <div className="flex flex-col gap-3 mb-4 pb-4 border-b border-zinc-200 dark:border-zinc-700">
+                {/* Search Bar */}
+                <div className="flex gap-2">
                   <input
-                    type="checkbox"
-                    checked={showUnlinkedOnly}
-                    onChange={(e) => setShowUnlinkedOnly(e.target.checked)}
-                    className="w-4 h-4 rounded border-zinc-300"
+                    type="text"
+                    value={courseSearch}
+                    onChange={(e) => setCourseSearch(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && loadCourses(courseSearch, 1)}
+                    placeholder="Pesquisar cursos..."
+                    className="flex-1 px-3 py-2 text-sm border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-800"
                   />
-                  Show Unlinked Only
-                </label>
-                {showUnlinkedOnly && unlinkedCourses.length > 0 && (
-                  <span className="text-xs text-amber-600 dark:text-amber-400">
-                    {unlinkedCourses.length} courses without university
+                  <button
+                    onClick={() => loadCourses(courseSearch, 1)}
+                    disabled={loadingData}
+                    className="px-4 py-2 bg-blue-500 text-white text-sm rounded-lg hover:bg-blue-600 disabled:opacity-50"
+                  >
+                    Pesquisar
+                  </button>
+                  <button
+                    onClick={() => loadCourses()}
+                    disabled={loadingData}
+                    className="px-3 py-2 text-sm bg-zinc-200 dark:bg-zinc-700 rounded-lg hover:bg-zinc-300 disabled:opacity-50"
+                  >
+                    Atualizar
+                  </button>
+                </div>
+
+                {/* Filter Options */}
+                <div className="flex items-center gap-4">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={showUnlinkedOnly}
+                      onChange={(e) => setShowUnlinkedOnly(e.target.checked)}
+                      className="w-4 h-4 rounded border-zinc-300"
+                    />
+                    Mostrar Apenas Sem Universidade
+                  </label>
+                  {showUnlinkedOnly && unlinkedCourses.length > 0 && (
+                    <span className="text-xs text-amber-600 dark:text-amber-400">
+                      {unlinkedCourses.length} cursos sem universidade
+                    </span>
+                  )}
+                  <span className="text-sm text-zinc-500 ml-auto">
+                    Total: {courseTotal || coursesCount} cursos
                   </span>
-                )}
+                </div>
               </div>
 
               {loadingData ? (
