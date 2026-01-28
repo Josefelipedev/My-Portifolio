@@ -5,6 +5,27 @@ import { logger } from '@/lib/logger';
 
 const SCRAPER_URL = process.env.PYTHON_SCRAPER_URL || 'http://localhost:8000';
 
+// Helper to get scraper config from database
+async function getScraperConfig() {
+  let config = await prisma.scraperConfig.findUnique({
+    where: { id: 'main' },
+  });
+
+  if (!config) {
+    config = await prisma.scraperConfig.create({
+      data: {
+        id: 'main',
+        dgesBaseUrl: 'https://www.dges.gov.pt',
+        dgesEnabled: true,
+        eduportugalBaseUrl: 'https://eduportugal.eu',
+        eduportugalEnabled: true,
+      },
+    });
+  }
+
+  return config;
+}
+
 interface UniversityData {
   id: string;
   name: string;
@@ -70,6 +91,17 @@ export async function POST(request: NextRequest) {
     const body = await request.json().catch(() => ({}));
     const { syncType = 'full', source = 'dges', maxPages, regions } = body;
 
+    // Get scraper config from database
+    const scraperConfig = await getScraperConfig();
+
+    // Check if source is enabled
+    if (source === 'dges' && !scraperConfig.dgesEnabled) {
+      return NextResponse.json({ error: 'DGES source is disabled' }, { status: 400 });
+    }
+    if (source === 'eduportugal' && !scraperConfig.eduportugalEnabled) {
+      return NextResponse.json({ error: 'EduPortugal source is disabled' }, { status: 400 });
+    }
+
     // Create sync log entry
     const syncLog = await prisma.findUniversitySyncLog.create({
       data: {
@@ -80,8 +112,11 @@ export async function POST(request: NextRequest) {
 
     logger.info('finduniversity', `Starting import from ${source}: ${syncType}`, { syncId: syncLog.id });
 
+    // Get base URL for the source
+    const baseUrl = source === 'dges' ? scraperConfig.dgesBaseUrl : scraperConfig.eduportugalBaseUrl;
+
     // Start async import process (don't await)
-    importInBackground(syncLog.id, syncType, source, maxPages, regions);
+    importInBackground(syncLog.id, syncType, source, maxPages, regions, baseUrl);
 
     return NextResponse.json({
       success: true,
@@ -104,7 +139,8 @@ async function importInBackground(
   syncType: string,
   source: string,
   maxPages?: number,
-  regions?: string
+  regions?: string,
+  baseUrl?: string
 ) {
   try {
     let universitiesData: UniversityData[] = [];
@@ -126,6 +162,7 @@ async function importInBackground(
       url.searchParams.set('sync_id', syncId);
       if (maxPages) url.searchParams.set('max_pages', String(maxPages));
       if (isDGES && regions) url.searchParams.set('regions', regions);
+      if (baseUrl) url.searchParams.set('base_url', baseUrl);
 
       const response = await fetch(url.toString(), {
         signal: AbortSignal.timeout(600000), // 10 min timeout
@@ -208,6 +245,7 @@ async function importInBackground(
       url.searchParams.set('sync_id', syncId);
       if (maxPages) url.searchParams.set('max_pages', String(maxPages));
       if (isDGES && regions) url.searchParams.set('regions', regions);
+      if (baseUrl) url.searchParams.set('base_url', baseUrl);
 
       const response = await fetch(url.toString(), {
         signal: AbortSignal.timeout(1800000), // 30 min timeout for courses

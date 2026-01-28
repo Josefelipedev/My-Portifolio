@@ -407,6 +407,7 @@ async def scrape_universities(
     max_pages: int = Query(default=None, description="Limite de paginas"),
     sync_id: str = Query(default=None, description="ID do sync para tracking"),
     save_to_file: bool = Query(default=True, description="Salvar resultado em arquivo JSON"),
+    base_url: str = Query(default=None, description="URL base customizada (ex: https://eduportugal.eu)"),
 ):
     """
     Scrape universities from EduPortugal.
@@ -418,6 +419,12 @@ async def scrape_universities(
     import os
 
     stats["requests_total"] += 1
+
+    # Apply custom base URL if provided
+    original_base_url = eduportugal_scraper.base_url
+    if base_url:
+        eduportugal_scraper.base_url = base_url.rstrip("/")
+        logger.info(f"Using custom base URL: {eduportugal_scraper.base_url}")
 
     async def progress_callback(progress: dict):
         if sync_id and sync_id in eduportugal_syncs:
@@ -456,6 +463,11 @@ async def scrape_universities(
         logger.error(f"EduPortugal universities error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+    finally:
+        # Restore original base URL
+        if base_url:
+            eduportugal_scraper.base_url = original_base_url
+
 
 @app.get("/eduportugal/courses")
 async def scrape_courses(
@@ -463,6 +475,7 @@ async def scrape_courses(
     max_pages: int = Query(default=None, description="Limite de paginas por nivel"),
     sync_id: str = Query(default=None, description="ID do sync para tracking"),
     save_to_file: bool = Query(default=True, description="Salvar resultado em arquivo JSON"),
+    base_url: str = Query(default=None, description="URL base customizada (ex: https://eduportugal.eu)"),
 ):
     """
     Scrape courses from EduPortugal.
@@ -473,6 +486,7 @@ async def scrape_courses(
     - max_pages: Limite de paginas por nivel (util para testes)
     - sync_id: ID para tracking de progresso
     - save_to_file: Salvar automaticamente em /app/data/courses_TIMESTAMP.json
+    - base_url: URL base customizada para o scraper
 
     Retorna lista de cursos com informacoes detalhadas.
     """
@@ -480,6 +494,12 @@ async def scrape_courses(
     import os
 
     stats["requests_total"] += 1
+
+    # Apply custom base URL if provided
+    original_base_url = eduportugal_scraper.base_url
+    if base_url:
+        eduportugal_scraper.base_url = base_url.rstrip("/")
+        logger.info(f"Using custom base URL: {eduportugal_scraper.base_url}")
 
     levels_list = levels.split(",") if levels else None
 
@@ -527,6 +547,11 @@ async def scrape_courses(
         stats["requests_failed"] += 1
         logger.error(f"EduPortugal courses error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+    finally:
+        # Restore original base URL
+        if base_url:
+            eduportugal_scraper.base_url = original_base_url
 
 
 @app.get("/eduportugal/course/details")
@@ -720,6 +745,7 @@ async def scrape_dges_universities(
     regions: str = Query(default=None, description="Códigos de região separados por vírgula (ex: 11,13)"),
     sync_id: str = Query(default=None, description="ID do sync para tracking"),
     save_to_file: bool = Query(default=True, description="Salvar resultado em arquivo JSON"),
+    base_url: str = Query(default=None, description="URL base customizada (ex: https://www.dges.gov.pt)"),
 ):
     """
     Scrape universities from DGES (official government source).
@@ -737,6 +763,12 @@ async def scrape_dges_universities(
     import os
 
     stats["requests_total"] += 1
+
+    # Apply custom base URL if provided
+    original_base_url = dges_scraper.base_url
+    if base_url:
+        dges_scraper.base_url = base_url.rstrip("/")
+        logger.info(f"Using custom DGES base URL: {dges_scraper.base_url}")
 
     regions_list = regions.split(",") if regions else None
 
@@ -778,6 +810,11 @@ async def scrape_dges_universities(
         logger.error(f"DGES universities error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+    finally:
+        # Restore original base URL
+        if base_url:
+            dges_scraper.base_url = original_base_url
+
 
 @app.get("/dges/courses")
 async def scrape_dges_courses(
@@ -786,6 +823,7 @@ async def scrape_dges_courses(
     max_per_institution: int = Query(default=None, description="Limite de cursos por instituição"),
     sync_id: str = Query(default=None, description="ID do sync para tracking"),
     save_to_file: bool = Query(default=True, description="Salvar resultado em arquivo JSON"),
+    base_url: str = Query(default=None, description="URL base customizada (ex: https://www.dges.gov.pt)"),
 ):
     """
     Scrape courses from DGES (official government source).
@@ -800,6 +838,12 @@ async def scrape_dges_courses(
     import os
 
     stats["requests_total"] += 1
+
+    # Apply custom base URL if provided
+    original_base_url = dges_scraper.base_url
+    if base_url:
+        dges_scraper.base_url = base_url.rstrip("/")
+        logger.info(f"Using custom DGES base URL: {dges_scraper.base_url}")
 
     regions_list = regions.split(",") if regions else None
     levels_list = levels.split(",") if levels else None
@@ -850,6 +894,11 @@ async def scrape_dges_courses(
         stats["requests_failed"] += 1
         logger.error(f"DGES courses error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+    finally:
+        # Restore original base URL
+        if base_url:
+            dges_scraper.base_url = original_base_url
 
 
 @app.get("/dges/all")
