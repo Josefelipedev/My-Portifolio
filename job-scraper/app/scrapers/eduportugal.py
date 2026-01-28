@@ -7,22 +7,32 @@ Suporta todas as categorias de cursos: graduação, mestrado, doutorado, MBA, et
 Estrutura do site:
 - Instituições: /instituicoes-de-ensino/ (paginado)
 - Cursos por nível: /cursos-estudo/{level}/ (paginado)
+
+Nota: Usa extração por IA para ser resiliente a mudanças no HTML do site.
 """
 
 import asyncio
 import hashlib
+import json
 import logging
+import os
 import re
 from datetime import datetime
 from typing import List, Optional, Callable, Dict, Any
 from urllib.parse import urljoin
 
+import httpx
 from playwright.async_api import async_playwright, Browser
 from bs4 import BeautifulSoup
 
 from models import UniversityListing, CourseListing, CourseLevel
 
 logger = logging.getLogger(__name__)
+
+# Configuração da IA
+TOGETHER_API_KEY = os.getenv("TOGETHER_API_KEY", "")
+TOGETHER_API_URL = "https://api.together.xyz/v1/chat/completions"
+AI_MODEL = "meta-llama/Llama-3.3-70B-Instruct-Turbo"
 
 
 class EduPortugalScraper:
@@ -79,6 +89,297 @@ class EduPortugalScraper:
     def generate_id(self, unique_part: str) -> str:
         """Gera ID único a partir de uma string."""
         return f"{self.name}-{hashlib.md5(unique_part.encode()).hexdigest()[:12]}"
+
+    def _save_debug_html(self, html: str, filename: str):
+        """Salva HTML para debug quando não encontrar resultados."""
+        debug_dir = "/app/data/debug"
+        os.makedirs(debug_dir, exist_ok=True)
+        filepath = os.path.join(debug_dir, filename)
+        with open(filepath, "w", encoding="utf-8") as f:
+            f.write(html)
+        logger.info(f"Debug HTML saved to {filepath}")
+
+    async def _call_ai(self, prompt: str, max_tokens: int = 4000) -> Optional[str]:
+        """
+        Chama a API Together AI para extrair dados.
+
+        Args:
+            prompt: O prompt para a IA
+            max_tokens: Máximo de tokens na resposta
+
+        Returns:
+            Resposta da IA ou None se falhar
+        """
+        if not TOGETHER_API_KEY:
+            logger.warning("TOGETHER_API_KEY não configurada - usando extração tradicional")
+            return None
+
+        try:
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                response = await client.post(
+                    TOGETHER_API_URL,
+                    headers={
+                        "Authorization": f"Bearer {TOGETHER_API_KEY}",
+                        "Content-Type": "application/json",
+                    },
+                    json={
+                        "model": AI_MODEL,
+                        "messages": [{"role": "user", "content": prompt}],
+                        "max_tokens": max_tokens,
+                        "temperature": 0.1,
+                    },
+                )
+
+                if response.status_code == 200:
+                    data = response.json()
+                    return data["choices"][0]["message"]["content"]
+                else:
+                    logger.error(f"AI API error: {response.status_code} - {response.text}")
+                    return None
+
+        except Exception as e:
+            logger.error(f"AI call failed: {e}")
+            return None
+
+    def _get_universities_extraction_prompt(self, html_content: str) -> str:
+        """Gera prompt para extrair universidades do HTML."""
+        # Limpa o HTML e pega só o texto relevante
+        soup = BeautifulSoup(html_content, "lxml")
+
+        # Remove scripts e styles
+        for tag in soup.select("script, style, nav, footer, header"):
+            tag.decompose()
+
+        text_content = soup.get_text(separator="\n", strip=True)
+        # Limita o tamanho
+        text_content = text_content[:15000]
+
+        return f"""Você é um especialista em extrair dados de páginas web de universidades portuguesas.
+
+Analise o conteúdo abaixo de uma página de listagem de instituições de ensino em Portugal e extraia TODAS as universidades/instituições encontradas.
+
+CONTEÚDO DA PÁGINA:
+{text_content}
+
+Para cada instituição encontrada, extraia:
+- name: Nome completo da instituição
+- slug: Identificador único baseado no nome (ex: "universidade-do-porto")
+- city: Cidade (se mencionada)
+- description: Breve descrição (se disponível)
+
+Responda APENAS com um JSON válido no formato:
+{{
+  "institutions": [
+    {{
+      "name": "Nome da Instituição",
+      "slug": "nome-da-instituicao",
+      "city": "Cidade" ou null,
+      "description": "Descrição" ou null,
+      "source_url": "URL se encontrada" ou null
+    }}
+  ]
+}}
+
+IMPORTANTE:
+- Extraia TODAS as instituições mencionadas, mesmo que apareçam apenas como links
+- Não invente dados - se não encontrar, coloque null
+- Gere o slug a partir do nome (lowercase, hífens no lugar de espaços)
+- Retorne um array vazio se não encontrar nenhuma instituição"""
+
+    def _get_courses_extraction_prompt(self, html_content: str, level: str) -> str:
+        """Gera prompt para extrair cursos do HTML."""
+        soup = BeautifulSoup(html_content, "lxml")
+
+        # Remove scripts e styles
+        for tag in soup.select("script, style, nav, footer, header"):
+            tag.decompose()
+
+        text_content = soup.get_text(separator="\n", strip=True)
+        text_content = text_content[:15000]
+
+        return f"""Você é um especialista em extrair dados de páginas web de cursos universitários portugueses.
+
+Analise o conteúdo abaixo de uma página de listagem de cursos de {level} em Portugal e extraia TODOS os cursos encontrados.
+
+CONTEÚDO DA PÁGINA:
+{text_content}
+
+Para cada curso encontrado, extraia:
+- name: Nome completo do curso
+- slug: Identificador único baseado no nome
+- university_name: Nome da universidade/instituição
+- city: Cidade (se mencionada)
+- duration: Duração (se mencionada)
+- description: Breve descrição (se disponível)
+
+Responda APENAS com um JSON válido no formato:
+{{
+  "courses": [
+    {{
+      "name": "Nome do Curso",
+      "slug": "nome-do-curso",
+      "university_name": "Nome da Universidade" ou null,
+      "city": "Cidade" ou null,
+      "duration": "2 anos" ou null,
+      "description": "Descrição" ou null,
+      "source_url": "URL se encontrada" ou null
+    }}
+  ]
+}}
+
+IMPORTANTE:
+- O nível destes cursos é: {level}
+- Extraia TODOS os cursos mencionados
+- Não invente dados - se não encontrar, coloque null
+- Gere o slug a partir do nome (lowercase, hífens no lugar de espaços)
+- Retorne um array vazio se não encontrar nenhum curso"""
+
+    async def _extract_universities_with_ai(self, html: str) -> List[UniversityListing]:
+        """
+        Extrai universidades usando IA.
+
+        Args:
+            html: HTML da página
+
+        Returns:
+            Lista de UniversityListing
+        """
+        prompt = self._get_universities_extraction_prompt(html)
+        response = await self._call_ai(prompt)
+
+        if not response:
+            return []
+
+        try:
+            # Encontra o JSON na resposta
+            json_match = re.search(r'\{[\s\S]*\}', response)
+            if not json_match:
+                logger.error("No JSON found in AI response for universities")
+                return []
+
+            data = json.loads(json_match.group())
+            institutions = data.get("institutions", [])
+
+            universities = []
+            for inst in institutions:
+                name = inst.get("name", "").strip()
+                if not name or len(name) < 3:
+                    continue
+
+                slug = inst.get("slug") or self._slugify(name)
+                source_url = inst.get("source_url")
+
+                if not source_url:
+                    source_url = f"{self.base_url}/instituicoes-de-ensino/{slug}/"
+
+                universities.append(UniversityListing(
+                    id=self.generate_id(slug),
+                    name=name,
+                    slug=slug,
+                    description=inst.get("description"),
+                    city=inst.get("city"),
+                    logo_url=None,
+                    source_url=source_url,
+                ))
+
+            logger.info(f"AI extracted {len(universities)} universities")
+            return universities
+
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse AI response: {e}")
+            return []
+        except Exception as e:
+            logger.error(f"Error extracting universities with AI: {e}")
+            return []
+
+    async def _extract_courses_with_ai(self, html: str, level: str) -> List[CourseListing]:
+        """
+        Extrai cursos usando IA.
+
+        Args:
+            html: HTML da página
+            level: Nível do curso
+
+        Returns:
+            Lista de CourseListing
+        """
+        prompt = self._get_courses_extraction_prompt(html, level)
+        response = await self._call_ai(prompt)
+
+        if not response:
+            return []
+
+        try:
+            json_match = re.search(r'\{[\s\S]*\}', response)
+            if not json_match:
+                logger.error("No JSON found in AI response for courses")
+                return []
+
+            data = json.loads(json_match.group())
+            courses_data = data.get("courses", [])
+
+            courses = []
+            for course_data in courses_data:
+                name = course_data.get("name", "").strip()
+                if not name or len(name) < 3:
+                    continue
+
+                slug = course_data.get("slug") or self._slugify(name)
+                source_url = course_data.get("source_url")
+
+                if not source_url:
+                    source_url = f"{self.base_url}/cursos-estudo/{slug}/"
+
+                university_name = course_data.get("university_name")
+                university_slug = self._slugify(university_name) if university_name else None
+
+                courses.append(CourseListing(
+                    id=self.generate_id(slug),
+                    name=name,
+                    slug=slug,
+                    description=course_data.get("description"),
+                    level=level,
+                    duration=course_data.get("duration"),
+                    city=course_data.get("city"),
+                    modality=None,
+                    start_date=None,
+                    source_url=source_url,
+                    university_name=university_name,
+                    university_slug=university_slug,
+                ))
+
+            logger.info(f"AI extracted {len(courses)} courses for level {level}")
+            return courses
+
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse AI response: {e}")
+            return []
+        except Exception as e:
+            logger.error(f"Error extracting courses with AI: {e}")
+            return []
+
+    def _slugify(self, text: str) -> str:
+        """Converte texto em slug."""
+        if not text:
+            return ""
+        # Lowercase e substitui espaços por hífens
+        slug = text.lower().strip()
+        # Remove acentos
+        replacements = {
+            'á': 'a', 'à': 'a', 'ã': 'a', 'â': 'a',
+            'é': 'e', 'ê': 'e',
+            'í': 'i',
+            'ó': 'o', 'ô': 'o', 'õ': 'o',
+            'ú': 'u', 'ü': 'u',
+            'ç': 'c',
+        }
+        for old, new in replacements.items():
+            slug = slug.replace(old, new)
+        # Remove caracteres especiais
+        slug = re.sub(r'[^a-z0-9\s-]', '', slug)
+        slug = re.sub(r'[\s]+', '-', slug)
+        slug = re.sub(r'-+', '-', slug)
+        return slug.strip('-')
 
     async def _get_browser(self) -> Browser:
         """Obtém ou cria instância do browser."""
@@ -171,7 +472,8 @@ class EduPortugalScraper:
     async def scrape_universities(
         self,
         max_pages: Optional[int] = None,
-        progress_callback: Optional[Callable] = None
+        progress_callback: Optional[Callable] = None,
+        use_ai: bool = True
     ) -> List[UniversityListing]:
         """
         Faz scraping de todas as universidades do EduPortugal.
@@ -179,6 +481,7 @@ class EduPortugalScraper:
         Args:
             max_pages: Limite de páginas (None = todas)
             progress_callback: Callback para atualizações de progresso
+            use_ai: Se True, usa IA como fallback quando extração tradicional falha
 
         Returns:
             Lista de UniversityListing
@@ -199,8 +502,14 @@ class EduPortugalScraper:
 
         logger.info(f"Total de páginas de universidades: {total_pages}")
 
-        # Parse da primeira página
+        # Parse da primeira página - tenta extração tradicional primeiro
         page_universities = self._parse_universities_page(html)
+
+        # Se não encontrou nada e AI está habilitado, tenta com IA
+        if not page_universities and use_ai:
+            logger.info("Extração tradicional falhou - usando IA...")
+            page_universities = await self._extract_universities_with_ai(html)
+
         universities.extend(page_universities)
 
         await self._report_progress({
@@ -208,6 +517,7 @@ class EduPortugalScraper:
             "current_page": 1,
             "total_pages": total_pages,
             "found": len(universities),
+            "extraction_method": "ai" if not self._parse_universities_page(html) and page_universities else "traditional",
         })
 
         # Páginas restantes
@@ -218,6 +528,12 @@ class EduPortugalScraper:
             try:
                 html = await self._fetch_page(url)
                 page_universities = self._parse_universities_page(html)
+
+                # Fallback para IA se necessário
+                if not page_universities and use_ai:
+                    logger.info(f"Página {page_num}: usando IA para extração...")
+                    page_universities = await self._extract_universities_with_ai(html)
+
                 universities.extend(page_universities)
 
                 await self._report_progress({
@@ -247,16 +563,67 @@ class EduPortugalScraper:
         universities: List[UniversityListing] = []
         soup = BeautifulSoup(html, "lxml")
 
-        # Seletores para cards de universidades
+        # Seletores para cards de universidades - atualizado para nova estrutura
         cards = soup.select(
             "article.type-instituicao, .institution-card, .university-item, "
             ".listing-item, article[class*='instituicao'], "
-            ".wpbf-post-style-boxed"
+            ".wpbf-post-style-boxed, "
+            # Novos seletores
+            ".elementor-post, .jet-listing-grid__item, "
+            ".e-loop-item, div[data-elementor-type='loop-item'], "
+            ".elementor-posts-container article, "
+            ".jet-smart-listing__post, .jet-posts__item"
         )
 
         # Se não encontrar cards específicos, tenta artigos genéricos
         if not cards:
-            cards = soup.select("article")
+            cards = soup.select("article, .elementor-element a[href*='/instituicao']")
+
+        # Debug: Log what was found
+        logger.info(f"Universities page: Found {len(cards)} potential cards using primary selectors")
+
+        # Se não encontrar com seletores primários, tenta extrair de links
+        if not cards:
+            # Estratégia alternativa: buscar todos os links para instituições
+            inst_links = soup.select("a[href*='/instituicoes-de-ensino/'][href$='/']")
+            inst_links = [link for link in inst_links if link.get('href', '').count('/') > 4]
+
+            logger.info(f"Alternative strategy: Found {len(inst_links)} institution links")
+
+            # Salva HTML para debug
+            self._save_debug_html(html, "universities_debug.html")
+
+            # Extrai universidades dos links diretamente
+            seen_urls = set()
+            for link in inst_links:
+                href = link.get('href', '')
+                if href in seen_urls or not href:
+                    continue
+                seen_urls.add(href)
+
+                name = link.get_text(strip=True)
+                if not name or len(name) < 3:
+                    # Tenta pegar o texto do parent
+                    parent = link.find_parent()
+                    if parent:
+                        name = parent.get_text(strip=True)
+
+                if name and len(name) > 2:
+                    slug = href.rstrip("/").split("/")[-1]
+                    if slug and slug != "instituicoes-de-ensino":
+                        universities.append(UniversityListing(
+                            id=self.generate_id(slug),
+                            name=name[:200],  # Limita tamanho
+                            slug=slug,
+                            description=None,
+                            city=None,
+                            logo_url=None,
+                            source_url=href if href.startswith("http") else urljoin(self.base_url, href),
+                        ))
+
+            if universities:
+                logger.info(f"Extracted {len(universities)} universities from links")
+                return universities
 
         for card in cards:
             try:
@@ -353,7 +720,8 @@ class EduPortugalScraper:
         self,
         levels: Optional[List[str]] = None,
         max_pages_per_level: Optional[int] = None,
-        progress_callback: Optional[Callable] = None
+        progress_callback: Optional[Callable] = None,
+        use_ai: bool = True
     ) -> List[CourseListing]:
         """
         Faz scraping de cursos de todos ou alguns níveis.
@@ -362,6 +730,7 @@ class EduPortugalScraper:
             levels: Lista de níveis para buscar (None = todos)
             max_pages_per_level: Limite de páginas por nível (None = todas)
             progress_callback: Callback para atualizações de progresso
+            use_ai: Se True, usa IA como fallback quando extração tradicional falha
 
         Returns:
             Lista de CourseListing
@@ -382,6 +751,7 @@ class EduPortugalScraper:
             courses = await self._scrape_courses_by_level(
                 level=level,
                 max_pages=max_pages_per_level,
+                use_ai=use_ai,
             )
             all_courses.extend(courses)
 
@@ -399,6 +769,7 @@ class EduPortugalScraper:
         self,
         level: str,
         max_pages: Optional[int] = None,
+        use_ai: bool = True,
     ) -> List[CourseListing]:
         """
         Faz scraping de cursos de um nível específico.
@@ -406,6 +777,7 @@ class EduPortugalScraper:
         Args:
             level: Nível do curso
             max_pages: Limite de páginas (None = todas)
+            use_ai: Se True, usa IA como fallback quando extração tradicional falha
 
         Returns:
             Lista de CourseListing
@@ -424,8 +796,14 @@ class EduPortugalScraper:
 
         logger.info(f"Total de páginas para {level}: {total_pages}")
 
-        # Parse da primeira página
+        # Parse da primeira página - tenta tradicional primeiro
         page_courses = self._parse_courses_page(html, level)
+
+        # Fallback para IA se não encontrou nada
+        if not page_courses and use_ai:
+            logger.info(f"{level} página 1: usando IA para extração...")
+            page_courses = await self._extract_courses_with_ai(html, level)
+
         courses.extend(page_courses)
 
         await self._report_progress({
@@ -444,6 +822,12 @@ class EduPortugalScraper:
             try:
                 html = await self._fetch_page(url)
                 page_courses = self._parse_courses_page(html, level)
+
+                # Fallback para IA
+                if not page_courses and use_ai:
+                    logger.info(f"{level} página {page_num}: usando IA para extração...")
+                    page_courses = await self._extract_courses_with_ai(html, level)
+
                 courses.extend(page_courses)
 
                 await self._report_progress({
@@ -474,16 +858,30 @@ class EduPortugalScraper:
         courses: List[CourseListing] = []
         soup = BeautifulSoup(html, "lxml")
 
-        # Seletores para cards de cursos
+        # Seletores para cards de cursos - atualizado para nova estrutura
         cards = soup.select(
             "article.type-curso, .course-card, .curso-item, "
             ".listing-item, article[class*='curso'], "
-            "tr.event-list-content, .wpbf-post-style-boxed"
+            "tr.event-list-content, .wpbf-post-style-boxed, "
+            # Novos seletores para Elementor/JetEngine
+            ".elementor-post, .jet-listing-grid__item, "
+            ".e-loop-item, div[data-elementor-type='loop-item'], "
+            ".elementor-posts-container article, "
+            ".jet-smart-listing__post, .jet-posts__item"
         )
 
         # Se não encontrar cards específicos, tenta artigos genéricos
         if not cards:
-            cards = soup.select("article")
+            cards = soup.select("article, .elementor-element a[href*='/curso']")
+
+        # Debug: Log what was found
+        logger.debug(f"Courses page ({level}): Found {len(cards)} potential cards")
+        if not cards:
+            # Find any links that might be courses
+            course_links = soup.select("a[href*='/curso']")
+            logger.debug(f"Found {len(course_links)} course-related links")
+            for link in course_links[:5]:
+                logger.debug(f"  Link: {link.get('href')} - {link.get_text(strip=True)[:50]}")
 
         for card in cards:
             try:
