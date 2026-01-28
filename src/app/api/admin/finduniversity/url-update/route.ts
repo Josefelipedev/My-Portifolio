@@ -108,15 +108,21 @@ export async function POST(request: NextRequest) {
 
       if (!university) {
         // Create new university if not found
-        const slug = (scrapedData.name || new URL(url).hostname)
+        const hostname = new URL(url).hostname;
+        const baseName = scrapedData.name || hostname;
+        const slug = baseName
           .toLowerCase()
           .replace(/[^a-z0-9]+/g, '-')
           .replace(/(^-|-$)/g, '');
 
+        // Generate externalId from hostname and timestamp
+        const externalId = `url-${hostname.replace(/\./g, '-')}-${Date.now()}`;
+
         university = await prisma.university.create({
           data: {
-            name: scrapedData.name || new URL(url).hostname,
-            slug,
+            externalId,
+            name: baseName,
+            slug: `${slug}-${Date.now()}`, // Ensure unique slug
             website: url,
             sourceUrl: url,
             description: scrapedData.description || null,
