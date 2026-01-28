@@ -81,3 +81,66 @@ export async function GET(
     );
   }
 }
+
+/**
+ * DELETE /api/admin/finduniversity/files/[filename]
+ *
+ * Delete a specific JSON file from the Python scraper.
+ * Proxies to: SCRAPER_URL/eduportugal/files/{filename}
+ */
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ filename: string }> }
+) {
+  try {
+    if (!(await isAuthenticated())) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { filename } = await params;
+
+    // Security check - prevent path traversal
+    if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
+      return NextResponse.json({ error: 'Invalid filename' }, { status: 400 });
+    }
+
+    // Only allow .json files
+    if (!filename.endsWith('.json')) {
+      return NextResponse.json({ error: 'Only JSON files can be deleted' }, { status: 400 });
+    }
+
+    // Delete file from Python scraper
+    const response = await fetch(
+      `${SCRAPER_URL}/eduportugal/files/${encodeURIComponent(filename)}`,
+      {
+        method: 'DELETE',
+        signal: AbortSignal.timeout(10000),
+      }
+    );
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        return NextResponse.json({ error: 'File not found' }, { status: 404 });
+      }
+      const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
+      return NextResponse.json(
+        { error: error.detail || 'Failed to delete file' },
+        { status: response.status }
+      );
+    }
+
+    const result = await response.json();
+    return NextResponse.json(result);
+  } catch (error) {
+    console.error('Error deleting file:', error);
+
+    if (error instanceof Error && error.name === 'TimeoutError') {
+      return NextResponse.json({ error: 'Scraper not available (timeout)' }, { status: 504 });
+    }
+
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Failed to delete file' },
+      { status: 500 }
+    );
+  }
+}

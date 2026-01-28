@@ -3,6 +3,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import AdminLayout from './AdminLayout';
 import { fetchWithCSRF } from '@/lib/csrf-client';
+import { useToast } from '@/components/ui/Toast';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
+import ImportWizard from './ImportWizard';
 
 // AI Features Types
 interface AISearchResult {
@@ -137,6 +140,10 @@ export default function FindUniversityPageWrapper({
   recentSyncs: initialRecentSyncs,
   error,
 }: FindUniversityPageWrapperProps) {
+  // Toast and Confirm hooks
+  const { showSuccess, showError, showWarning } = useToast();
+  const { confirm } = useConfirm();
+
   const [universitiesCount, setUniversitiesCount] = useState(initialUniversitiesCount);
   const [coursesCount, setCoursesCount] = useState(initialCoursesCount);
   const [isImporting, setIsImporting] = useState(!!initialRunningSync);
@@ -144,6 +151,7 @@ export default function FindUniversityPageWrapper({
   const [recentSyncs, setRecentSyncs] = useState<SyncLog[]>(initialRecentSyncs);
   const [exportLoading, setExportLoading] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'universities' | 'courses' | 'files' | 'research' | 'ai'>('overview');
+  const [showImportWizard, setShowImportWizard] = useState(false);
   const [universities, setUniversities] = useState<University[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
   const [loadingData, setLoadingData] = useState(false);
@@ -154,6 +162,8 @@ export default function FindUniversityPageWrapper({
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [fileContent, setFileContent] = useState<unknown>(null);
   const [fileViewLoading, setFileViewLoading] = useState(false);
+  const [selectedFilesForDelete, setSelectedFilesForDelete] = useState<Set<string>>(new Set());
+  const [deletingFile, setDeletingFile] = useState<string | null>(null);
 
   // Linking State
   const [showUnlinkedOnly, setShowUnlinkedOnly] = useState(false);
@@ -316,11 +326,11 @@ export default function FindUniversityPageWrapper({
         const data = await response.json();
         setFileContent(data);
       } else {
-        alert('Failed to load file');
+        showError('Failed to load file');
       }
     } catch (err) {
       console.error('Failed to view file:', err);
-      alert('Failed to load file');
+      showError('Failed to load file');
     } finally {
       setFileViewLoading(false);
     }
@@ -334,6 +344,104 @@ export default function FindUniversityPageWrapper({
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
+  };
+
+  const deleteFile = async (filename: string) => {
+    const confirmed = await confirm({
+      title: 'Deletar Arquivo',
+      message: `Deletar "${filename}"? Esta acao nao pode ser desfeita.`,
+      type: 'danger',
+      confirmText: 'Deletar',
+    });
+    if (!confirmed) return;
+
+    setDeletingFile(filename);
+    try {
+      const response = await fetchWithCSRF(
+        `/api/admin/finduniversity/files/${encodeURIComponent(filename)}`,
+        { method: 'DELETE' }
+      );
+
+      if (response.ok) {
+        setFiles(files.filter(f => f.filename !== filename));
+        setSelectedFilesForDelete(prev => {
+          const next = new Set(prev);
+          next.delete(filename);
+          return next;
+        });
+        showSuccess('File deleted');
+      } else {
+        const error = await response.json();
+        showError(error.error || 'Failed to delete file');
+      }
+    } catch (err) {
+      console.error('Failed to delete file:', err);
+      showError('Failed to delete file');
+    } finally {
+      setDeletingFile(null);
+    }
+  };
+
+  const toggleFileSelection = (filename: string) => {
+    setSelectedFilesForDelete(prev => {
+      const next = new Set(prev);
+      if (next.has(filename)) {
+        next.delete(filename);
+      } else {
+        next.add(filename);
+      }
+      return next;
+    });
+  };
+
+  const selectAllFiles = () => {
+    if (selectedFilesForDelete.size === files.length) {
+      setSelectedFilesForDelete(new Set());
+    } else {
+      setSelectedFilesForDelete(new Set(files.map(f => f.filename)));
+    }
+  };
+
+  const deleteSelectedFiles = async () => {
+    if (selectedFilesForDelete.size === 0) return;
+
+    const confirmed = await confirm({
+      title: 'Deletar Arquivos',
+      message: `Deletar ${selectedFilesForDelete.size} arquivo(s) selecionado(s)? Esta acao nao pode ser desfeita.`,
+      type: 'danger',
+      confirmText: 'Deletar Todos',
+    });
+    if (!confirmed) return;
+
+    let deleted = 0;
+    let failed = 0;
+
+    for (const filename of Array.from(selectedFilesForDelete)) {
+      try {
+        const response = await fetchWithCSRF(
+          `/api/admin/finduniversity/files/${encodeURIComponent(filename)}`,
+          { method: 'DELETE' }
+        );
+        if (response.ok) {
+          deleted++;
+        } else {
+          failed++;
+        }
+      } catch {
+        failed++;
+      }
+    }
+
+    // Refresh file list
+    loadFiles();
+    setSelectedFilesForDelete(new Set());
+
+    if (deleted > 0) {
+      showSuccess(`${deleted} arquivo(s) deletado(s)`);
+    }
+    if (failed > 0) {
+      showError(`${failed} arquivo(s) falharam ao deletar`);
+    }
   };
 
   // Linking functions
@@ -378,17 +486,18 @@ export default function FindUniversityPageWrapper({
         // Remove from unlinked list
         setUnlinkedCourses(unlinkedCourses.filter(c => c.id !== linkingCourse.id));
         closeLinkingModal();
+        showSuccess('Course linked successfully');
         // Refresh courses list if loaded
         if (courses.length > 0) {
           loadCourses();
         }
       } else {
         const error = await response.json();
-        alert(error.error || 'Failed to link course');
+        showError(error.error || 'Failed to link course');
       }
     } catch (err) {
       console.error('Failed to link course:', err);
-      alert('Failed to link course');
+      showError('Failed to link course');
     } finally {
       setLinkingLoading(false);
     }
@@ -440,16 +549,16 @@ export default function FindUniversityPageWrapper({
 
       if (response.ok) {
         const data = await response.json();
-        alert(`Updated ${data.fieldsUpdated} fields (confidence: ${Math.round((data.confidence || 0) * 100)}%)`);
+        showSuccess(`Updated ${data.fieldsUpdated} fields (confidence: ${Math.round((data.confidence || 0) * 100)}%)`);
         // Refresh the courses list
         loadCourses();
       } else {
         const error = await response.json();
-        alert(error.error || 'Failed to refresh course');
+        showError(error.error || 'Failed to refresh course');
       }
     } catch (err) {
       console.error('Failed to refresh course:', err);
-      alert('Failed to refresh course');
+      showError('Failed to refresh course');
     } finally {
       setRefreshingCourseId(null);
     }
@@ -485,13 +594,14 @@ export default function FindUniversityPageWrapper({
           c.id === courseId ? { ...c, researchUrl: researchUrlInput.trim() || null } : c
         ));
         closeResearchUrlEditor();
+        showSuccess('Research URL saved');
       } else {
         const error = await response.json();
-        alert(error.error || 'Failed to save research URL');
+        showError(error.error || 'Failed to save research URL');
       }
     } catch (err) {
       console.error('Failed to save research URL:', err);
-      alert('Failed to save research URL');
+      showError('Failed to save research URL');
     } finally {
       setSavingResearchUrl(false);
     }
@@ -555,20 +665,27 @@ export default function FindUniversityPageWrapper({
         setIsImporting(false);
         setImportProgress(null);
         checkImportStatus();
+        showSuccess('Job stopped');
       } else {
         const error = await response.json();
-        alert(error.error || 'Failed to stop job');
+        showError(error.error || 'Failed to stop job');
       }
     } catch (err) {
       console.error('Failed to stop job:', err);
-      alert('Failed to stop job');
+      showError('Failed to stop job');
     } finally {
       setStoppingJob(false);
     }
   };
 
   const handleBatchRefresh = async (count: number) => {
-    if (!confirm(`Refresh ${count} courses using AI? This will use AI credits.`)) return;
+    const confirmed = await confirm({
+      title: 'Batch Refresh',
+      message: `Refresh ${count} courses using AI? This will use AI credits.`,
+      type: 'warning',
+      confirmText: 'Refresh',
+    });
+    if (!confirmed) return;
     setBatchRefreshLoading(true);
     setBatchRefreshResults(null);
     try {
@@ -642,9 +759,13 @@ export default function FindUniversityPageWrapper({
 
   const startImport = async (syncType: string) => {
     const sourceName = importSource === 'dges' ? 'DGES (Oficial)' : 'EduPortugal';
-    if (!confirm(`Importar ${syncType === 'full' ? 'universidades e cursos' : syncType} do ${sourceName}?`)) {
-      return;
-    }
+    const confirmed = await confirm({
+      title: 'Iniciar Importacao',
+      message: `Importar ${syncType === 'full' ? 'universidades e cursos' : syncType} do ${sourceName}?`,
+      type: 'info',
+      confirmText: 'Importar',
+    });
+    if (!confirmed) return;
 
     setIsImporting(true);
 
@@ -674,45 +795,59 @@ export default function FindUniversityPageWrapper({
         });
       } else {
         setIsImporting(false);
-        alert('Failed to start import: ' + (data.error || 'Unknown error'));
+        showError('Failed to start import: ' + (data.error || 'Unknown error'));
       }
     } catch (err) {
       setIsImporting(false);
-      alert('Failed to start import');
+      showError('Failed to start import');
       console.error(err);
     }
   };
 
   const deleteUniversity = async (id: string, name: string) => {
-    if (!confirm(`Delete "${name}" and all its courses?`)) return;
+    const confirmed = await confirm({
+      title: 'Deletar Universidade',
+      message: `Deletar "${name}" e todos os cursos? Esta acao nao pode ser desfeita.`,
+      type: 'danger',
+      confirmText: 'Deletar',
+    });
+    if (!confirmed) return;
 
     try {
       const response = await fetchWithCSRF(`/api/universities/${id}`, { method: 'DELETE' });
       if (response.ok) {
         setUniversities(universities.filter((u) => u.id !== id));
         setUniversitiesCount((c) => c - 1);
+        showSuccess('University deleted');
       } else {
-        alert('Failed to delete university');
+        showError('Failed to delete university');
       }
     } catch (err) {
-      alert('Failed to delete university');
+      showError('Failed to delete university');
       console.error(err);
     }
   };
 
   const deleteCourse = async (id: string, name: string) => {
-    if (!confirm(`Delete course "${name}"?`)) return;
+    const confirmed = await confirm({
+      title: 'Deletar Curso',
+      message: `Deletar curso "${name}"?`,
+      type: 'danger',
+      confirmText: 'Deletar',
+    });
+    if (!confirmed) return;
 
     try {
       const response = await fetchWithCSRF(`/api/courses/${id}`, { method: 'DELETE' });
       if (response.ok) {
         setCourses(courses.filter((c) => c.id !== id));
         setCoursesCount((c) => c - 1);
+        showSuccess('Course deleted');
       } else {
-        alert('Failed to delete course');
+        showError('Failed to delete course');
       }
     } catch (err) {
-      alert('Failed to delete course');
+      showError('Failed to delete course');
       console.error(err);
     }
   };
@@ -738,7 +873,7 @@ export default function FindUniversityPageWrapper({
       window.URL.revokeObjectURL(downloadUrl);
     } catch (err) {
       console.error('Export failed:', err);
-      alert('Export failed');
+      showError('Export failed');
     } finally {
       setExportLoading(null);
     }
@@ -790,11 +925,11 @@ export default function FindUniversityPageWrapper({
         setAiSearchResults(data);
       } else {
         const error = await response.json();
-        alert(error.error || 'Search failed');
+        showError(error.error || 'Search failed');
       }
     } catch (err) {
       console.error('AI search error:', err);
-      alert('Search failed');
+      showError('Search failed');
     } finally {
       setAiSearchLoading(false);
     }
@@ -802,7 +937,7 @@ export default function FindUniversityPageWrapper({
 
   const handleAiRecommend = async () => {
     if (aiRecommendInterests.length === 0) {
-      alert('Add at least one interest');
+      showWarning('Add at least one interest');
       return;
     }
     setAiRecommendLoading(true);
@@ -826,18 +961,24 @@ export default function FindUniversityPageWrapper({
         setAiRecommendations(data.recommendations || []);
       } else {
         const error = await response.json();
-        alert(error.error || 'Recommendation failed');
+        showError(error.error || 'Recommendation failed');
       }
     } catch (err) {
       console.error('AI recommend error:', err);
-      alert('Recommendation failed');
+      showError('Recommendation failed');
     } finally {
       setAiRecommendLoading(false);
     }
   };
 
   const handleGenerateDescriptions = async (type: 'course' | 'university') => {
-    if (!confirm(`Generate descriptions for ${type}s without description?`)) return;
+    const confirmed = await confirm({
+      title: 'Gerar Descricoes',
+      message: `Gerar descricoes para ${type === 'course' ? 'cursos' : 'universidades'} sem descricao?`,
+      type: 'warning',
+      confirmText: 'Gerar',
+    });
+    if (!confirmed) return;
     setAiSummaryLoading(true);
 
     try {
@@ -849,15 +990,15 @@ export default function FindUniversityPageWrapper({
 
       if (response.ok) {
         const data = await response.json();
-        alert(`Generated ${data.generated} descriptions`);
+        showSuccess(`Generated ${data.generated} descriptions`);
         loadAiSummaryStats();
       } else {
         const error = await response.json();
-        alert(error.error || 'Generation failed');
+        showError(error.error || 'Generation failed');
       }
     } catch (err) {
       console.error('AI summary error:', err);
-      alert('Generation failed');
+      showError('Generation failed');
     } finally {
       setAiSummaryLoading(false);
     }
@@ -865,7 +1006,7 @@ export default function FindUniversityPageWrapper({
 
   const handleAiCompare = async () => {
     if (aiCompareIds.length < 2) {
-      alert('Select at least 2 courses to compare');
+      showWarning('Select at least 2 courses to compare');
       return;
     }
     setAiCompareLoading(true);
@@ -883,11 +1024,11 @@ export default function FindUniversityPageWrapper({
         setAiCompareResult(data);
       } else {
         const error = await response.json();
-        alert(error.error || 'Comparison failed');
+        showError(error.error || 'Comparison failed');
       }
     } catch (err) {
       console.error('AI compare error:', err);
-      alert('Comparison failed');
+      showError('Comparison failed');
     } finally {
       setAiCompareLoading(false);
     }
@@ -1127,6 +1268,13 @@ export default function FindUniversityPageWrapper({
                   </div>
 
                   <div className="flex gap-2">
+                    <button
+                      onClick={() => setShowImportWizard(true)}
+                      disabled={isImporting}
+                      className="px-3 py-1.5 bg-purple-500 text-white text-sm rounded hover:bg-purple-600 disabled:opacity-50"
+                    >
+                      Wizard Passo a Passo
+                    </button>
                     <button
                       onClick={() => startImport('universities')}
                       disabled={isImporting}
@@ -1516,14 +1664,37 @@ export default function FindUniversityPageWrapper({
           {activeTab === 'files' && (
             <div>
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-semibold text-zinc-600 dark:text-zinc-400">Saved JSON Files</h3>
-                <button
-                  onClick={loadFiles}
-                  disabled={filesLoading}
-                  className="px-3 py-1.5 text-xs bg-zinc-200 dark:bg-zinc-700 rounded hover:bg-zinc-300 disabled:opacity-50"
-                >
-                  {filesLoading ? 'Loading...' : 'Refresh'}
-                </button>
+                <div className="flex items-center gap-3">
+                  <h3 className="text-sm font-semibold text-zinc-600 dark:text-zinc-400">Saved JSON Files</h3>
+                  {files.length > 0 && (
+                    <label className="flex items-center gap-2 text-xs text-zinc-500 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={selectedFilesForDelete.size === files.length && files.length > 0}
+                        onChange={selectAllFiles}
+                        className="rounded"
+                      />
+                      Select All
+                    </label>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  {selectedFilesForDelete.size > 0 && (
+                    <button
+                      onClick={deleteSelectedFiles}
+                      className="px-3 py-1.5 text-xs bg-red-500 text-white rounded hover:bg-red-600"
+                    >
+                      Delete Selected ({selectedFilesForDelete.size})
+                    </button>
+                  )}
+                  <button
+                    onClick={loadFiles}
+                    disabled={filesLoading}
+                    className="px-3 py-1.5 text-xs bg-zinc-200 dark:bg-zinc-700 rounded hover:bg-zinc-300 disabled:opacity-50"
+                  >
+                    {filesLoading ? 'Loading...' : 'Refresh'}
+                  </button>
+                </div>
               </div>
 
               {filesLoading ? (
@@ -1536,11 +1707,19 @@ export default function FindUniversityPageWrapper({
                 <div className="space-y-2">
                   {files.map((file) => (
                     <div key={file.filename} className="flex items-center justify-between p-3 bg-zinc-50 dark:bg-zinc-900 rounded-lg">
-                      <div>
-                        <p className="font-medium text-sm">{file.filename}</p>
-                        <p className="text-xs text-zinc-500">
-                          {file.size_mb.toFixed(2)} MB - {formatDate(file.created_at)}
-                        </p>
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="checkbox"
+                          checked={selectedFilesForDelete.has(file.filename)}
+                          onChange={() => toggleFileSelection(file.filename)}
+                          className="rounded"
+                        />
+                        <div>
+                          <p className="font-medium text-sm">{file.filename}</p>
+                          <p className="text-xs text-zinc-500">
+                            {file.size_mb.toFixed(2)} MB - {formatDate(file.created_at)}
+                          </p>
+                        </div>
                       </div>
                       <div className="flex gap-2">
                         <button
@@ -1554,6 +1733,13 @@ export default function FindUniversityPageWrapper({
                           className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200"
                         >
                           Download
+                        </button>
+                        <button
+                          onClick={() => deleteFile(file.filename)}
+                          disabled={deletingFile === file.filename}
+                          className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200 disabled:opacity-50"
+                        >
+                          {deletingFile === file.filename ? '...' : 'Delete'}
                         </button>
                       </div>
                     </div>
@@ -1987,6 +2173,15 @@ export default function FindUniversityPageWrapper({
           </div>
         </div>
       )}
+
+      {/* Import Wizard */}
+      <ImportWizard
+        isOpen={showImportWizard}
+        onClose={() => setShowImportWizard(false)}
+        onComplete={() => {
+          checkImportStatus();
+        }}
+      />
     </AdminLayout>
   );
 }
