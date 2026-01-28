@@ -104,26 +104,54 @@ class DGESScraper:
             )
         return self._http_client
 
-    async def _fetch_page(self, url: str) -> str:
+    async def _fetch_page(self, url: str, retries: int = 3) -> str:
         """
-        Busca uma página com rate limiting.
+        Busca uma página com rate limiting e retry.
 
         Args:
             url: URL da página
+            retries: Número de tentativas em caso de erro
 
         Returns:
             HTML da página
         """
         client = await self._get_client()
+        last_error = None
 
-        # Rate limiting
-        await asyncio.sleep(self.RATE_LIMIT_DELAY)
+        for attempt in range(retries):
+            # Rate limiting
+            await asyncio.sleep(self.RATE_LIMIT_DELAY)
 
-        response = await client.get(url)
-        response.raise_for_status()
+            try:
+                response = await client.get(url)
 
-        # DGES usa encoding Windows-1252
-        return response.content.decode('windows-1252', errors='replace')
+                # Se for erro 500, tenta novamente após delay maior
+                if response.status_code == 500:
+                    logger.warning(f"DGES 500 error (attempt {attempt + 1}/{retries}): {url}")
+                    if attempt < retries - 1:
+                        await asyncio.sleep(5)  # Wait 5 seconds before retry
+                        continue
+                    else:
+                        # Return empty page instead of raising to allow other regions to continue
+                        logger.error(f"DGES permanently unavailable: {url}")
+                        return ""
+
+                response.raise_for_status()
+
+                # DGES usa encoding Windows-1252
+                return response.content.decode('windows-1252', errors='replace')
+
+            except Exception as e:
+                last_error = e
+                if attempt < retries - 1:
+                    logger.warning(f"Fetch error (attempt {attempt + 1}/{retries}): {e}")
+                    await asyncio.sleep(3)
+                    continue
+                raise
+
+        if last_error:
+            raise last_error
+        return ""
 
     def _slugify(self, text: str) -> str:
         """Converte texto em slug."""
