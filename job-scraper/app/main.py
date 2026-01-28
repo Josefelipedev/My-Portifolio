@@ -1307,6 +1307,220 @@ async def dges_manual_extract_json(body: DGESManualUploadBody):
 
 
 # ============================================================================
+# EduPortugal - Manual Upload / Extraction
+# ============================================================================
+
+
+class EduPortugalManualUploadBody(PydanticBaseModel):
+    """Body para upload manual EduPortugal com conteúdos grandes."""
+    content_type: str  # "text", "html", "url"
+    content: str  # O conteúdo a extrair
+    extraction_mode: str = "mixed"  # "universities", "courses", "mixed"
+    region: Optional[str] = None  # Hint de região
+
+
+@app.post("/eduportugal/manual/extract")
+async def eduportugal_manual_extract_json(body: EduPortugalManualUploadBody):
+    """
+    Upload manual de dados EduPortugal com JSON body (para conteúdos grandes).
+
+    Endpoint para extrair dados de universidades e cursos a partir de conteúdo
+    copiado do site EduPortugal ou outros portais de educação em Portugal.
+
+    Body:
+    ```json
+    {
+        "content_type": "html",
+        "content": "<html>...</html>",
+        "extraction_mode": "mixed",
+        "region": "Lisboa"
+    }
+    ```
+
+    Retorna:
+    - extracted: {universities: [...], courses: [...]}
+    - comparison: {new: [...], existing: [...], updated: [...]}
+    - stats: {tokens_used, model_used, extraction_time_ms}
+    """
+    from models import ManualUploadRequest, ContentType as CT, ExtractionMode as EM
+
+    stats["requests_total"] += 1
+
+    try:
+        # Converter para enums
+        try:
+            ct = CT(body.content_type)
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail=f"content_type inválido: {body.content_type}. Use: text, html, url"
+            )
+
+        try:
+            em = EM(body.extraction_mode)
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail=f"extraction_mode inválido: {body.extraction_mode}. Use: universities, courses, mixed"
+            )
+
+        # Criar request
+        request = ManualUploadRequest(
+            content_type=ct,
+            content=body.content,
+            extraction_mode=em,
+            region=body.region,
+        )
+
+        # Processar extração usando o mesmo extractor (Agno é source-agnostic)
+        extractor = get_dges_manual_extractor()
+        result = await extractor.extract(request)
+
+        # Atualizar source nos dados extraídos para "eduportugal"
+        if result.extracted:
+            for uni in result.extracted.get("universities", []):
+                if "id" in uni:
+                    uni["id"] = uni["id"].replace("dges-", "eduportugal-")
+            for course in result.extracted.get("courses", []):
+                if "id" in course:
+                    course["id"] = course["id"].replace("dges-", "eduportugal-")
+
+        stats["requests_success"] += 1
+
+        return result.model_dump()
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        stats["requests_failed"] += 1
+        logger.error(f"EduPortugal manual extract (JSON) error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# Unified Manual Extract - Supports both DGES and EduPortugal
+# ============================================================================
+
+
+class UnifiedManualUploadBody(PydanticBaseModel):
+    """Body para upload manual unificado."""
+    content_type: str  # "text", "html", "url"
+    content: str  # O conteúdo a extrair
+    extraction_mode: str = "mixed"  # "universities", "courses", "mixed"
+    source: str = "auto"  # "dges", "eduportugal", "auto"
+    region: Optional[str] = None  # Hint de região
+
+
+@app.post("/manual/extract")
+async def unified_manual_extract(body: UnifiedManualUploadBody):
+    """
+    Endpoint unificado para upload manual de dados de educação.
+
+    Suporta extração de dados de:
+    - DGES (fonte oficial do governo português)
+    - EduPortugal (portal privado de educação)
+    - Outras fontes (modo auto detecta automaticamente)
+
+    Body:
+    ```json
+    {
+        "content_type": "html",
+        "content": "<html>...</html>",
+        "extraction_mode": "mixed",
+        "source": "auto",
+        "region": "Lisboa"
+    }
+    ```
+
+    O parâmetro "source" define a fonte:
+    - "dges": Dados da Direção-Geral do Ensino Superior
+    - "eduportugal": Dados do portal EduPortugal
+    - "auto": Detecta automaticamente a fonte (padrão)
+
+    Retorna:
+    - extracted: {universities: [...], courses: [...]}
+    - comparison: {new: [...], existing: [...], updated: [...]}
+    - stats: {tokens_used, model_used, extraction_time_ms, detected_source}
+    """
+    from models import ManualUploadRequest, ContentType as CT, ExtractionMode as EM
+
+    stats["requests_total"] += 1
+
+    try:
+        # Converter para enums
+        try:
+            ct = CT(body.content_type)
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail=f"content_type inválido: {body.content_type}. Use: text, html, url"
+            )
+
+        try:
+            em = EM(body.extraction_mode)
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail=f"extraction_mode inválido: {body.extraction_mode}. Use: universities, courses, mixed"
+            )
+
+        # Validar source
+        valid_sources = ["dges", "eduportugal", "auto"]
+        if body.source not in valid_sources:
+            raise HTTPException(
+                status_code=400,
+                detail=f"source inválido: {body.source}. Use: {', '.join(valid_sources)}"
+            )
+
+        # Auto-detectar fonte se necessário
+        detected_source = body.source
+        if body.source == "auto":
+            content_lower = body.content.lower()
+            if "dges.gov.pt" in content_lower or "direcao-geral" in content_lower:
+                detected_source = "dges"
+            elif "eduportugal" in content_lower:
+                detected_source = "eduportugal"
+            else:
+                # Padrão para DGES se não conseguir detectar
+                detected_source = "dges"
+
+        # Criar request
+        request = ManualUploadRequest(
+            content_type=ct,
+            content=body.content,
+            extraction_mode=em,
+            region=body.region,
+        )
+
+        # Processar extração
+        extractor = get_dges_manual_extractor()
+        result = await extractor.extract(request)
+
+        # Atualizar source nos dados extraídos
+        if result.extracted and detected_source != "dges":
+            for uni in result.extracted.get("universities", []):
+                if "id" in uni:
+                    uni["id"] = uni["id"].replace("dges-", f"{detected_source}-")
+            for course in result.extracted.get("courses", []):
+                if "id" in course:
+                    course["id"] = course["id"].replace("dges-", f"{detected_source}-")
+
+        stats["requests_success"] += 1
+
+        result_dict = result.model_dump()
+        result_dict["stats"]["detected_source"] = detected_source
+
+        return result_dict
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        stats["requests_failed"] += 1
+        logger.error(f"Unified manual extract error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
 # University Enricher - Extração inteligente de dados extras
 # ============================================================================
 

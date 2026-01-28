@@ -6,8 +6,16 @@ const SCRAPER_URL = process.env.PYTHON_SCRAPER_URL || 'http://localhost:8000';
 /**
  * POST /api/admin/finduniversity/manual-extract
  *
- * Proxy for the Python scraper's DGES manual extract endpoint.
+ * Proxy for the Python scraper's manual extract endpoints.
+ * Supports both DGES and EduPortugal sources.
  * This allows the frontend to call the scraper without CORS issues.
+ *
+ * Body params:
+ * - content_type: "text" | "html" | "url"
+ * - content: string
+ * - extraction_mode: "universities" | "courses" | "mixed"
+ * - source: "dges" | "eduportugal" | "auto" (default: "auto")
+ * - region: string (optional)
  */
 export async function POST(request: NextRequest) {
   try {
@@ -25,8 +33,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Call the Python scraper
-    const scraperResponse = await fetch(`${SCRAPER_URL}/dges/manual/extract`, {
+    // Determine source (default to "auto" which uses unified endpoint)
+    const source = body.source || 'auto';
+    const validSources = ['dges', 'eduportugal', 'auto'];
+
+    if (!validSources.includes(source)) {
+      return NextResponse.json(
+        { error: `Invalid source: ${source}. Use: ${validSources.join(', ')}` },
+        { status: 400 }
+      );
+    }
+
+    // Use unified endpoint for flexibility
+    const scraperResponse = await fetch(`${SCRAPER_URL}/manual/extract`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -35,6 +54,7 @@ export async function POST(request: NextRequest) {
         content_type: body.content_type,
         content: body.content,
         extraction_mode: body.extraction_mode,
+        source: source,
         region: body.region || null,
       }),
     });

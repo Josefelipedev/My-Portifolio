@@ -90,6 +90,7 @@ class AgnoExtractionAgent:
         mode: str = "mixed",
         region_hint: Optional[str] = None,
         use_cache: bool = True,
+        base_url: str = "",
     ) -> AgnoExtractionResult:
         """
         Extrai dados educacionais do conteúdo.
@@ -99,6 +100,7 @@ class AgnoExtractionAgent:
             mode: "universities", "courses", ou "mixed"
             region_hint: Hint de região para contexto
             use_cache: Usar cache de extrações
+            base_url: URL base para resolver links relativos
 
         Returns:
             AgnoExtractionResult com universidades e/ou cursos
@@ -112,6 +114,12 @@ class AgnoExtractionAgent:
             logger.info("Cache hit para extração")
             return self._cache[cache_key]
 
+        # 0. Extrair links do HTML PRIMEIRO (preserva URLs)
+        extracted_links = []
+        if "<" in content and ">" in content:
+            extracted_links = self._extract_links_from_html(content, base_url)
+            logger.info(f"Extraídos {len(extracted_links)} links do HTML")
+
         # 1. Comprimir conteúdo
         compressed = self._compress_content(content)
         logger.info(f"Conteúdo comprimido: {len(content)} → {len(compressed)} chars")
@@ -121,8 +129,8 @@ class AgnoExtractionAgent:
         model = COMPLEX_MODEL if use_complex else SIMPLE_MODEL
         logger.info(f"Usando modelo: {model}")
 
-        # 3. Construir prompt
-        prompt = self._build_prompt(compressed, mode, region_hint)
+        # 3. Construir prompt (inclui links extraídos se disponíveis)
+        prompt = self._build_prompt(compressed, mode, region_hint, extracted_links)
 
         # 4. Chamar API
         try:
@@ -158,6 +166,62 @@ class AgnoExtractionAgent:
             return AgnoExtractionResult(
                 extraction_time_ms=int((time.time() - start_time) * 1000)
             )
+
+    def _extract_links_from_html(self, html: str, base_url: str = "") -> List[Dict[str, str]]:
+        """
+        Extrai links do HTML antes de enviar para AI.
+
+        Preserva nome e URL de cada link encontrado.
+        """
+        from urllib.parse import urljoin
+
+        soup = BeautifulSoup(html, "html.parser")
+
+        # Remover elementos não-conteúdo
+        for tag in soup.select("script, style, nav, footer, header, aside, noscript, iframe, svg"):
+            tag.decompose()
+
+        # Pega o conteúdo principal
+        main_el = soup.select_one("main, article, .content, #content") or soup.body
+        if not main_el:
+            main_el = soup
+
+        links = []
+        seen_urls = set()
+
+        # Domínios a ignorar
+        blocked_domains = [
+            "facebook.com", "instagram.com", "linkedin.com",
+            "twitter.com", "youtube.com", "tiktok.com",
+            "whatsapp.com", "t.me", "mailto:", "tel:",
+        ]
+
+        for a in main_el.select("a[href]"):
+            name = a.get_text(strip=True)
+            href = a.get("href", "").strip()
+
+            if not name or len(name) < 3 or not href or href.startswith("#"):
+                continue
+
+            # Resolve URL relativa
+            full_url = urljoin(base_url, href) if base_url else href
+
+            # Filtra URLs bloqueadas
+            if any(blocked in full_url.lower() for blocked in blocked_domains):
+                continue
+
+            # Deduplica
+            if full_url in seen_urls:
+                continue
+            seen_urls.add(full_url)
+
+            # Limita tamanho do nome
+            if len(name) > 200:
+                name = name[:200]
+
+            links.append({"name": name, "url": full_url})
+
+        return links
 
     def _compress_content(self, content: str) -> str:
         """
@@ -222,50 +286,84 @@ class AgnoExtractionAgent:
         content: str,
         mode: str,
         region_hint: Optional[str],
+        extracted_links: Optional[List[Dict[str, str]]] = None,
     ) -> str:
         """
-        Constrói prompt mínimo para extração.
+        Constrói prompt para extração.
 
-        O schema estruturado faz o trabalho pesado,
-        então o prompt pode ser conciso.
+        Se links foram extraídos do HTML, envia lista estruturada para AI enriquecer.
+        Caso contrário, envia o texto para extração tradicional.
         """
         # Schema JSON esperado
         if mode == "universities":
             schema_desc = """
 {
   "universities": [
-    {"code": "0000", "name": "Nome", "type": "publica_universitario|publica_politecnico|privada_universitario|privada_politecnico|outro", "region": "região", "city": "cidade", "website": "url"}
+    {"code": "0000", "name": "Nome", "url": "https://...", "type": "publica_universitario|publica_politecnico|privada_universitario|privada_politecnico|outro", "region": "região", "city": "cidade", "website": "url oficial"}
   ]
 }"""
         elif mode == "courses":
             schema_desc = """
 {
   "courses": [
-    {"code": "0000", "name": "Nome do Curso", "level": "licenciatura|mestrado|doutorado|outro", "university_code": "0000", "university_name": "Nome Uni", "duration": "3 anos"}
+    {"code": "0000", "name": "Nome do Curso", "url": "https://...", "level": "licenciatura|mestrado|doutorado|mestrado-integrado|pos-graduacao|mba|curso-tecnico|outro", "university_code": "0000", "university_name": "Nome Uni", "duration": "3 anos"}
   ]
 }"""
         else:  # mixed
             schema_desc = """
 {
   "universities": [
-    {"code": "0000", "name": "Nome", "type": "tipo", "region": "região"}
+    {"code": "0000", "name": "Nome", "url": "https://...", "type": "tipo", "region": "região", "city": "cidade"}
   ],
   "courses": [
-    {"code": "0000", "name": "Nome", "level": "nível", "university_code": "0000"}
+    {"code": "0000", "name": "Nome", "url": "https://...", "level": "nível", "university_code": "0000", "university_name": "Nome Uni"}
   ]
 }"""
 
-        prompt = f"""Extraia instituições de ensino superior e/ou cursos do seguinte conteúdo português.
+        # Se temos links extraídos, usa prompt otimizado
+        if extracted_links and len(extracted_links) > 0:
+            # Formata links para AI
+            links_text = "\n".join([f"- {link['name']} | {link['url']}" for link in extracted_links[:100]])  # Limita a 100
+
+            prompt = f"""Analisa a seguinte lista de links extraídos de uma página de educação portuguesa.
+Classifica cada item como universidade/instituição OU curso, e enriquece com informações adicionais.
+
+LINKS EXTRAÍDOS:
+{links_text}
+
+TAREFA:
+1. Identifica quais são instituições de ensino (universidades, politécnicos, escolas)
+2. Identifica quais são cursos (licenciaturas, mestrados, doutoramentos, etc.)
+3. Para cada item, extrai: código (se visível), tipo/nível, região, cidade
+4. PRESERVA A URL ORIGINAL de cada item
+
+FORMATO DE RESPOSTA (JSON válido):
+{schema_desc}
+
+REGRAS:
+- Gera código único se não visível (ex: "inst-001", "curso-001")
+- type para universidades: publica_universitario, publica_politecnico, privada_universitario, privada_politecnico, outro
+- level para cursos: licenciatura, mestrado, doutorado, mestrado-integrado, pos-graduacao, mba, curso-tecnico, outro
+- Detecta cidade/região do nome se possível (Lisboa, Porto, Coimbra, etc.)
+- IMPORTANTE: Mantém a URL original de cada link
+"""
+            if region_hint:
+                prompt += f"\nCONTEXTO: Região {region_hint}"
+
+            prompt += "\n\nJSON:"
+        else:
+            # Prompt tradicional para texto
+            prompt = f"""Extraia instituições de ensino superior e/ou cursos do seguinte conteúdo português.
 Retorne APENAS JSON válido no formato especificado. Sem explicações.
 
 FORMATO ESPERADO:
 {schema_desc}
 
 """
-        if region_hint:
-            prompt += f"CONTEXTO: Região {region_hint}\n\n"
+            if region_hint:
+                prompt += f"CONTEXTO: Região {region_hint}\n\n"
 
-        prompt += f"CONTEÚDO:\n{content}\n\nJSON:"
+            prompt += f"CONTEÚDO:\n{content}\n\nJSON:"
 
         return prompt
 
@@ -383,13 +481,16 @@ FORMATO ESPERADO:
 
         for uni in result.universities:
             slug = self._slugify(uni.name)
+            # Usa URL extraída se disponível, senão usa código
+            source_url = uni.url if uni.url else f"manual-upload-{uni.code}"
             universities.append(UniversityListing(
                 id=f"{source}-{hashlib.md5(f'{uni.code}-{slug}'.encode()).hexdigest()[:12]}",
                 name=uni.name,
                 slug=slug,
                 short_name=None,
                 website=uni.website,
-                source_url=f"manual-upload-{uni.code}",
+                source_url=source_url,
+                individual_page_url=uni.url,  # URL da página no portal
                 city=uni.city,
                 region=uni.region,
                 type=uni.type,
@@ -397,13 +498,15 @@ FORMATO ESPERADO:
 
         for course in result.courses:
             slug = self._slugify(course.name)
+            # Usa URL extraída se disponível, senão usa código
+            source_url = course.url if course.url else f"manual-upload-{course.code}"
             courses.append(CourseListing(
                 id=f"{source}-{hashlib.md5(f'{course.code}-{slug}'.encode()).hexdigest()[:12]}",
                 name=course.name,
                 slug=slug,
                 level=course.level,
                 duration=course.duration,
-                source_url=f"manual-upload-{course.code}",
+                source_url=source_url,
                 university_name=course.university_name,
             ))
 

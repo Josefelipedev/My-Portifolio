@@ -4,6 +4,8 @@ import React, { useState, useEffect } from 'react';
 import { fetchWithCSRF } from '@/lib/csrf-client';
 
 // Types
+type DataSource = 'dges' | 'eduportugal' | 'auto';
+
 interface ExtractedUniversity {
   code: string;
   name: string;
@@ -51,6 +53,7 @@ interface ExtractionResult {
     tokens_used: number;
     model_used: string;
     extraction_time_ms: number;
+    detected_source?: string;
   };
 }
 
@@ -62,7 +65,30 @@ interface DGESManualUploadProps {
 // Use Next.js API route as proxy to avoid CORS issues
 const EXTRACT_API_URL = '/api/admin/finduniversity/manual-extract';
 
+// Source configurations
+const SOURCE_CONFIG: Record<DataSource, { label: string; description: string; placeholder: string; urlExample: string }> = {
+  dges: {
+    label: 'DGES',
+    description: 'Direcao-Geral do Ensino Superior (fonte oficial)',
+    placeholder: 'Cola o HTML ou texto da pagina do DGES...',
+    urlExample: 'https://www.dges.gov.pt/...',
+  },
+  eduportugal: {
+    label: 'EduPortugal',
+    description: 'Portal privado de educacao em Portugal',
+    placeholder: 'Cola o HTML ou texto da pagina do EduPortugal...',
+    urlExample: 'https://eduportugal.eu/...',
+  },
+  auto: {
+    label: 'Auto-detectar',
+    description: 'Detecta automaticamente a fonte do conteudo',
+    placeholder: 'Cola o HTML ou texto de qualquer fonte...',
+    urlExample: 'https://...',
+  },
+};
+
 export default function DGESManualUpload({ onSuccess, showToast }: DGESManualUploadProps) {
+  const [source, setSource] = useState<DataSource>('auto');
   const [contentType, setContentType] = useState<'text' | 'html' | 'url'>('html');
   const [content, setContent] = useState('');
   const [extractionMode, setExtractionMode] = useState<'universities' | 'courses' | 'mixed'>('mixed');
@@ -116,6 +142,7 @@ export default function DGESManualUpload({ onSuccess, showToast }: DGESManualUpl
           content_type: contentType,
           content: content.trim(),
           extraction_mode: extractionMode,
+          source: source,
           region: region || null,
         }),
       });
@@ -204,10 +231,10 @@ export default function DGESManualUpload({ onSuccess, showToast }: DGESManualUpl
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-lg font-medium text-gray-900 dark:text-white">
-            Upload Manual DGES
+            Upload Manual de Dados
           </h3>
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            Cola HTML, texto ou URL para extrair dados de universidades e cursos
+            Extrai dados de universidades e cursos do DGES ou EduPortugal
           </p>
         </div>
       </div>
@@ -252,6 +279,33 @@ export default function DGESManualUpload({ onSuccess, showToast }: DGESManualUpl
 
       {/* Form */}
       <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 space-y-4">
+        {/* Source Selection */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            Fonte dos Dados
+          </label>
+          <div className="grid grid-cols-3 gap-2">
+            {(Object.entries(SOURCE_CONFIG) as [DataSource, typeof SOURCE_CONFIG['dges']][]).map(([key, config]) => (
+              <button
+                key={key}
+                onClick={() => setSource(key)}
+                className={`p-3 rounded-lg text-left transition-all border-2 ${
+                  source === key
+                    ? 'bg-blue-50 border-blue-500 dark:bg-blue-900/20 dark:border-blue-400'
+                    : 'bg-gray-50 border-transparent hover:bg-gray-100 dark:bg-gray-700 dark:hover:bg-gray-600'
+                }`}
+              >
+                <div className={`font-medium text-sm ${source === key ? 'text-blue-700 dark:text-blue-300' : 'text-gray-900 dark:text-white'}`}>
+                  {config.label}
+                </div>
+                <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 line-clamp-2">
+                  {config.description}
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* Content Type */}
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -327,7 +381,7 @@ export default function DGESManualUpload({ onSuccess, showToast }: DGESManualUpl
               type="url"
               value={content}
               onChange={(e) => setContent(e.target.value)}
-              placeholder="https://www.dges.gov.pt/..."
+              placeholder={SOURCE_CONFIG[source].urlExample}
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
             />
           ) : (
@@ -335,11 +389,7 @@ export default function DGESManualUpload({ onSuccess, showToast }: DGESManualUpl
               value={content}
               onChange={(e) => setContent(e.target.value)}
               rows={10}
-              placeholder={
-                contentType === 'html'
-                  ? 'Cola o HTML da pagina aqui...'
-                  : 'Cola o texto com informacoes de universidades/cursos...'
-              }
+              placeholder={SOURCE_CONFIG[source].placeholder}
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-mono text-sm"
             />
           )}
@@ -387,8 +437,13 @@ export default function DGESManualUpload({ onSuccess, showToast }: DGESManualUpl
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 space-y-4">
           <div className="flex items-center justify-between">
             <h4 className="font-medium text-gray-900 dark:text-white">Resultados da Extracao</h4>
-            <div className="text-sm text-gray-500 dark:text-gray-400">
-              {result.stats.tokens_used} tokens | {result.stats.extraction_time_ms}ms
+            <div className="flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
+              {result.stats.detected_source && (
+                <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded text-xs font-medium">
+                  {result.stats.detected_source.toUpperCase()}
+                </span>
+              )}
+              <span>{result.stats.tokens_used} tokens | {result.stats.extraction_time_ms}ms</span>
             </div>
           </div>
 

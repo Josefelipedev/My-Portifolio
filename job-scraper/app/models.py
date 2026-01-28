@@ -205,6 +205,7 @@ class UniversityExtractionSchema(BaseModel):
     """Schema para extração de universidade via Agno."""
     code: str = Field(description="Código da instituição (4 dígitos)")
     name: str = Field(description="Nome completo da instituição")
+    url: Optional[str] = Field(default=None, description="URL da página da instituição (extraída do HTML)")
     type: Literal[
         "publica_universitario",
         "publica_politecnico",
@@ -221,6 +222,7 @@ class CourseExtractionSchema(BaseModel):
     """Schema para extração de curso via Agno."""
     code: str = Field(description="Código do curso")
     name: str = Field(description="Nome do curso")
+    url: Optional[str] = Field(default=None, description="URL da página do curso (extraída do HTML)")
     level: Literal[
         "licenciatura",
         "mestrado",
