@@ -65,6 +65,47 @@ interface DGESManualUploadProps {
 // Use Next.js API route as proxy to avoid CORS issues
 const EXTRACT_API_URL = '/api/admin/finduniversity/manual-extract';
 
+// Helper to normalize the API response to expected format
+// Backend returns: { comparison: { new: [], existing: [], updated: [] } }
+// Frontend expects: { comparison: { universities: { new: [], ... }, courses: { new: [], ... } } }
+function normalizeExtractionResult(data: Record<string, unknown>): ExtractionResult {
+  const extracted = (data.extracted || { universities: [], courses: [] }) as ExtractionResult['extracted'];
+  const stats = (data.stats || { tokens_used: 0, model_used: '', extraction_time_ms: 0 }) as ExtractionResult['stats'];
+
+  // Check if comparison is in flat format (backend) or nested format (expected)
+  const rawComparison = data.comparison as Record<string, unknown> | undefined;
+
+  // If already has universities/courses structure, use it
+  if (rawComparison?.universities && rawComparison?.courses) {
+    return data as ExtractionResult;
+  }
+
+  // Otherwise, convert flat format to nested format
+  const flatNew = (rawComparison?.new || []) as ComparisonResult[];
+  const flatExisting = (rawComparison?.existing || []) as ComparisonResult[];
+  const flatUpdated = (rawComparison?.updated || []) as ComparisonResult[];
+
+  // Get university and course names for filtering
+  const universityNames = new Set(extracted.universities?.map(u => u.name) || []);
+  const courseNames = new Set(extracted.courses?.map(c => c.name) || []);
+
+  // Split by type based on matching names
+  const comparison: ExtractionResult['comparison'] = {
+    universities: {
+      new: flatNew.filter(item => universityNames.has(item.name)),
+      existing: flatExisting.filter(item => universityNames.has(item.name)),
+      updated: flatUpdated.filter(item => universityNames.has(item.name)),
+    },
+    courses: {
+      new: flatNew.filter(item => courseNames.has(item.name)),
+      existing: flatExisting.filter(item => courseNames.has(item.name)),
+      updated: flatUpdated.filter(item => courseNames.has(item.name)),
+    },
+  };
+
+  return { extracted, comparison, stats };
+}
+
 // Source configurations
 const SOURCE_CONFIG: Record<DataSource, { label: string; description: string; placeholder: string; urlExample: string }> = {
   dges: {
@@ -153,9 +194,10 @@ export default function DGESManualUpload({ onSuccess, showToast }: DGESManualUpl
       }
 
       const data = await response.json();
-      setResult(data);
+      const normalizedData = normalizeExtractionResult(data);
+      setResult(normalizedData);
       showToast(
-        `Extraido: ${data.extracted.universities.length} universidades, ${data.extracted.courses.length} cursos`,
+        `Extraido: ${normalizedData.extracted?.universities?.length || 0} universidades, ${normalizedData.extracted?.courses?.length || 0} cursos`,
         'success'
       );
     } catch (error) {
