@@ -3,10 +3,15 @@ import EducationAdmin from '@/components/admin/EducationAdmin';
 import prisma from '@/lib/prisma';
 
 async function getEducation() {
-  const education = await prisma.education.findMany({
-    orderBy: [{ startDate: 'desc' }, { order: 'asc' }, { createdAt: 'desc' }],
-  });
-  return education;
+  try {
+    const education = await prisma.education.findMany({
+      orderBy: [{ startDate: 'desc' }, { order: 'asc' }, { createdAt: 'desc' }],
+    });
+    return education;
+  } catch {
+    // Table might not exist yet
+    return [];
+  }
 }
 
 export default async function EducationAdminPage() {
