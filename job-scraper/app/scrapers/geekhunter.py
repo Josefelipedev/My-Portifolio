@@ -1,192 +1,142 @@
-import asyncio
-import hashlib
-import os
-from datetime import datetime
-from typing import List
-from playwright.async_api import async_playwright, Page
-from bs4 import BeautifulSoup
-import logging
+"""
+GeekHunter Scraper - Busca vagas no GeekHunter.com.br
 
-from scrapers.base import BaseScraper
+Site React SPA que requer Playwright para renderizar JavaScript.
+"""
+
+import hashlib
+import logging
+from typing import List, Optional, Set
+
+from bs4 import BeautifulSoup
+from bs4.element import Tag
+
+from scrapers.hybrid_scraper import HybridScraper
 from models import JobListing, JobSource
-from config import config
 
 logger = logging.getLogger(__name__)
 
 
-class GeekHunterScraper(BaseScraper):
+class GeekHunterScraper(HybridScraper):
+    """Scraper para GeekHunter.com.br"""
+
     name = "geekhunter"
     base_url = "https://www.geekhunter.com.br"
 
-    async def _save_debug(self, page: Page, html: str, keyword: str):
-        """Save screenshot and HTML for debugging"""
-        if not config.DEBUG_MODE:
-            return
+    # GeekHunter e SPA React, precisa de JS
+    REQUIRES_JS = True
+    WAIT_FOR_SELECTOR = '[data-testid="job-card"], .job-card, .vaga-card'
 
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        base_name = f"geekhunter_{keyword}_{timestamp}"
+    def build_search_url(self, keyword: str, country: str) -> str:
+        """Constroi URL de busca."""
+        return f"{self.base_url}/vagas?search={keyword}"
 
-        try:
-            # Save screenshot
-            screenshot_path = os.path.join(config.DEBUG_DIR, f"{base_name}.png")
-            await page.screenshot(path=screenshot_path, full_page=True)
-            logger.info(f"Debug screenshot saved: {screenshot_path}")
+    def _find_job_cards(self, soup: BeautifulSoup) -> List[Tag]:
+        """Encontra cards de vagas usando multiplos seletores."""
+        selectors = [
+            '[data-testid="job-card"]',
+            ".job-card",
+            ".vaga-card",
+            'a[href*="/vagas/"]',
+        ]
+        for selector in selectors:
+            cards = soup.select(selector)
+            if cards:
+                return cards
+        return []
 
-            # Save HTML
-            html_path = os.path.join(config.DEBUG_DIR, f"{base_name}.html")
-            with open(html_path, "w", encoding="utf-8") as f:
-                f.write(html)
-            logger.info(f"Debug HTML saved: {html_path}")
+    def _extract_url(self, card: Tag) -> Optional[str]:
+        """Extrai URL da vaga do card."""
+        link = card if card.name == "a" else card.select_one('a[href*="/vagas/"]')
+        if not link:
+            return None
 
-        except Exception as e:
-            logger.error(f"Failed to save debug files: {e}")
+        url = link.get("href", "")
+        if not url:
+            return None
 
-    async def search(self, keyword: str, country: str, limit: int) -> List[JobListing]:
-        """Search GeekHunter using Playwright for JS rendering"""
-        jobs: List[JobListing] = []
-        url = f"{self.base_url}/vagas?search={keyword}"
+        if not url.startswith("http"):
+            url = f"{self.base_url}{url}"
 
-        try:
-            async with async_playwright() as p:
-                browser = await p.chromium.launch(
-                    headless=True,
-                    args=[
-                        "--no-sandbox",
-                        "--disable-setuid-sandbox",
-                        "--disable-dev-shm-usage",
-                    ],
-                )
+        return url
 
-                context = await browser.new_context(
-                    user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-                    viewport={"width": 1920, "height": 1080},
-                    locale="pt-BR",
-                )
+    def _extract_title(self, card: Tag) -> str:
+        """Extrai titulo da vaga."""
+        title_elem = card.select_one('h2, h3, .job-title, [data-testid="job-title"]')
+        if title_elem:
+            return title_elem.get_text(strip=True)
 
-                page = await context.new_page()
+        link = card if card.name == "a" else card.select_one("a")
+        if link:
+            return link.get_text(strip=True)
 
-                # Navigate and wait for content
-                await page.goto(url, wait_until="networkidle", timeout=30000)
+        return ""
 
-                # Wait for job cards to load
-                try:
-                    await page.wait_for_selector(
-                        '[data-testid="job-card"], .job-card, .vaga-card', timeout=10000
-                    )
-                except Exception:
-                    logger.warning(
-                        "No job cards found with standard selectors, trying alternatives"
-                    )
+    def _extract_field(self, card: Tag, selectors: str, default: str = "") -> str:
+        """Extrai campo do card usando seletores."""
+        elem = card.select_one(selectors)
+        return elem.get_text(strip=True) if elem else default
 
-                # Get rendered HTML
-                html = await page.content()
+    def _extract_tags(self, card: Tag) -> List[str]:
+        """Extrai tags/skills do card."""
+        tag_elems = card.select(".tag, .skill, .tech-stack span")
+        return [t.get_text(strip=True) for t in tag_elems][:10]
 
-                # Parse HTML
-                jobs = self._parse_html(html, limit)
+    def _parse_card(self, card: Tag, seen_urls: Set[str]) -> Optional[JobListing]:
+        """Parseia um card individual e retorna JobListing ou None."""
+        url = self._extract_url(card)
+        if not url or url in seen_urls:
+            return None
 
-                # Save debug if no jobs found
-                if len(jobs) == 0:
-                    logger.warning(f"No jobs found for '{keyword}', saving debug files")
-                    await self._save_debug(page, html, keyword)
+        title = self._extract_title(card)
+        if not title or len(title) < 5:
+            return None
 
-                await browser.close()
+        seen_urls.add(url)
 
-        except Exception as e:
-            logger.error(f"GeekHunter scraping error: {e}")
-            raise
+        company = self._extract_field(
+            card, '.company, .empresa, [data-testid="company-name"]'
+        )
+        location = self._extract_field(
+            card, '.location, .local, [data-testid="location"]', "Brasil"
+        )
+        salary = self._extract_field(
+            card, '.salary, .salario, [data-testid="salary"]'
+        ) or None
 
-        return jobs
+        job_id = self.generate_id(hashlib.md5(url.encode()).hexdigest()[:12])
 
-    def _parse_html(self, html: str, limit: int) -> List[JobListing]:
-        """Parse GeekHunter HTML to extract jobs"""
-        jobs: List[JobListing] = []
-        soup = BeautifulSoup(html, "lxml")
-
-        # Try multiple selectors for job cards
-        job_cards = (
-            soup.select('[data-testid="job-card"]')
-            or soup.select(".job-card")
-            or soup.select(".vaga-card")
-            or soup.select('a[href*="/vagas/"]')
+        return JobListing(
+            id=job_id,
+            source=JobSource.GEEKHUNTER,
+            title=title,
+            company=company or "Empresa nao identificada",
+            description="",
+            url=url,
+            location=location,
+            job_type="On-site",
+            salary=salary,
+            tags=self._extract_tags(card),
+            posted_at=None,
+            country="br",
         )
 
-        seen_urls = set()
+    def _parse_html(self, html: str, limit: int) -> List[JobListing]:
+        """Parse GeekHunter HTML para extrair vagas."""
+        jobs: List[JobListing] = []
+        soup = BeautifulSoup(html, "lxml")
+        seen_urls: Set[str] = set()
 
-        for card in job_cards[: limit * 2]:  # Get extra to filter duplicates
+        job_cards = self._find_job_cards(soup)
+
+        for card in job_cards[: limit * 2]:
             try:
-                # Extract URL
-                link = card if card.name == "a" else card.select_one('a[href*="/vagas/"]')
-                if not link:
-                    continue
-
-                url = link.get("href", "")
-                if not url or url in seen_urls:
-                    continue
-
-                if not url.startswith("http"):
-                    url = f"{self.base_url}{url}"
-
-                seen_urls.add(url)
-
-                # Extract title
-                title_elem = card.select_one(
-                    'h2, h3, .job-title, [data-testid="job-title"]'
-                )
-                title = (
-                    title_elem.get_text(strip=True)
-                    if title_elem
-                    else link.get_text(strip=True)
-                )
-
-                if not title or len(title) < 5:
-                    continue
-
-                # Extract company
-                company_elem = card.select_one(
-                    '.company, .empresa, [data-testid="company-name"]'
-                )
-                company = company_elem.get_text(strip=True) if company_elem else ""
-
-                # Extract location
-                location_elem = card.select_one(
-                    '.location, .local, [data-testid="location"]'
-                )
-                location = (
-                    location_elem.get_text(strip=True) if location_elem else "Brasil"
-                )
-
-                # Extract salary
-                salary_elem = card.select_one(
-                    '.salary, .salario, [data-testid="salary"]'
-                )
-                salary = salary_elem.get_text(strip=True) if salary_elem else None
-
-                # Extract tags
-                tag_elems = card.select(".tag, .skill, .tech-stack span")
-                tags = [t.get_text(strip=True) for t in tag_elems][:10]
-
-                # Generate unique ID
-                job_id = self.generate_id(hashlib.md5(url.encode()).hexdigest()[:12])
-
-                jobs.append(
-                    JobListing(
-                        id=job_id,
-                        source=JobSource.GEEKHUNTER,
-                        title=title,
-                        company=company or "Empresa não identificada",
-                        description="",  # Would need to fetch detail page
-                        url=url,
-                        location=location,
-                        job_type="On-site",
-                        salary=salary,
-                        tags=tags,
-                        posted_at=None,
-                        country="br",
-                    )
-                )
-
+                job = self._parse_card(card, seen_urls)
+                if job:
+                    jobs.append(job)
+                    if len(jobs) >= limit:
+                        break
             except Exception as e:
-                logger.debug(f"Error parsing job card: {e}")
-                continue
+                logger.debug(f"Erro ao parsear job card: {e}")
 
-        return jobs[:limit]
+        return jobs

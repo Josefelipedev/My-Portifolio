@@ -1,6 +1,6 @@
 from scrapers.base import BaseScraper
+from scrapers.hybrid_scraper import HybridScraper
 from scrapers.geekhunter import GeekHunterScraper
 from scrapers.vagas import VagasComBrScraper
-from scrapers.eduportugal import EduPortugalScraper
 
-__all__ = ["BaseScraper", "GeekHunterScraper", "VagasComBrScraper", "EduPortugalScraper"]
+__all__ = ["BaseScraper", "HybridScraper", "GeekHunterScraper", "VagasComBrScraper"]
