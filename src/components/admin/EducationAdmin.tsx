@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Education } from '@prisma/client';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
+import { useToast } from '@/components/ui/Toast';
 import { fetchWithCSRF } from '@/lib/csrf-client';
 
 const TYPE_OPTIONS = [
@@ -12,8 +13,7 @@ const TYPE_OPTIONS = [
   { value: 'certification', label: 'Certification', color: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' },
 ];
 
-export default function EducationAdmin({ education: initialEducation }: { education: Education[] }) {
-  const [education] = useState<Education[]>(initialEducation);
+export default function EducationAdmin({ education }: { education: Education[] }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
@@ -31,6 +31,7 @@ export default function EducationAdmin({ education: initialEducation }: { educat
   const [filterType, setFilterType] = useState<string | null>(null);
   const router = useRouter();
   const { confirm } = useConfirm();
+  const { showSuccess, showError } = useToast();
 
   const filteredEducation = filterType
     ? education.filter(edu => edu.type === filterType)
@@ -52,13 +53,13 @@ export default function EducationAdmin({ education: initialEducation }: { educat
       });
       const data = await res.json();
       if (res.ok) {
-        alert(data.message);
+        showSuccess(data.message);
         router.refresh();
       } else {
-        alert(data.error || 'Failed to import');
+        showError(data.error || 'Failed to import');
       }
     } catch (err) {
-      alert('Failed to import from resume');
+      showError('Failed to import from resume');
       console.error(err);
     } finally {
       setIsImporting(false);

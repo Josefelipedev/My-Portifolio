@@ -1,6 +1,8 @@
 import { Navigation } from '@/components/ui/Navigation';
 import { HeroSection } from '@/components/sections/HeroSection';
 import { AboutSection } from '@/components/sections/AboutSection';
+
+export const dynamic = 'force-dynamic';
 import { GitHubStatsSection } from '@/components/sections/GitHubStatsSection';
 import { WakaTimeStatsSection } from '@/components/sections/WakaTimeStatsSection';
 import { SkillsSection } from '@/components/sections/SkillsSection';
