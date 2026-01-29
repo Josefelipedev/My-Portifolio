@@ -4,6 +4,7 @@ import { AboutSection } from '@/components/sections/AboutSection';
 import { GitHubStatsSection } from '@/components/sections/GitHubStatsSection';
 import { WakaTimeStatsSection } from '@/components/sections/WakaTimeStatsSection';
 import { SkillsSection } from '@/components/sections/SkillsSection';
+import { EducationSection } from '@/components/sections/EducationSection';
 import { ProjectsSection } from '@/components/sections/ProjectsSection';
 import { ExperiencesSection } from '@/components/sections/ExperiencesSection';
 import { ContactSection } from '@/components/sections/ContactSection';
@@ -19,6 +20,7 @@ export default function Home() {
         <GitHubStatsSection />
         <WakaTimeStatsSection />
         <SkillsSection />
+        <EducationSection />
         <ProjectsSection />
         <ExperiencesSection />
         <ContactSection />

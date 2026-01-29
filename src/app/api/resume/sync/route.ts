@@ -8,6 +8,7 @@ import type { ResumeAnalysis } from '@/lib/claude';
 interface SyncOptions {
   syncExperiences?: boolean;
   syncSkills?: boolean;
+  syncEducation?: boolean;
   syncJson?: boolean;
   clearExisting?: boolean;
 }
@@ -32,6 +33,7 @@ export async function POST(request: Request) {
     const {
       syncExperiences = true,
       syncSkills = true,
+      syncEducation = true,
       syncJson = true,
       clearExisting = false,
     } = options;
@@ -39,6 +41,7 @@ export async function POST(request: Request) {
     const results = {
       experiences: { created: 0, updated: 0, deleted: 0 },
       skills: { created: 0, updated: 0, deleted: 0 },
+      education: { created: 0, updated: 0, deleted: 0 },
       jsonUpdated: false,
     };
 
@@ -124,6 +127,83 @@ export async function POST(request: Request) {
       }
     }
 
+    // Sync Education to database
+    if (syncEducation && analysis.education?.length > 0) {
+      if (clearExisting) {
+        const deleted = await prisma.education.deleteMany({});
+        results.education.deleted = deleted.count;
+      }
+
+      for (const edu of analysis.education) {
+        // Try to find existing education by degree and institution
+        const existing = await prisma.education.findFirst({
+          where: {
+            title: edu.degree,
+            institution: edu.institution,
+          },
+        });
+
+        const educationData = {
+          title: edu.degree,
+          institution: edu.institution,
+          type: 'degree' as const, // Default to degree for resume imports
+          location: edu.location || null,
+          description: edu.description || null,
+          startDate: edu.startDate ? new Date(`${edu.startDate}-01`) : null,
+          endDate: edu.endDate ? new Date(`${edu.endDate}-01`) : null,
+        };
+
+        if (existing) {
+          await prisma.education.update({
+            where: { id: existing.id },
+            data: educationData,
+          });
+          results.education.updated++;
+        } else {
+          await prisma.education.create({
+            data: educationData,
+          });
+          results.education.created++;
+        }
+      }
+    }
+
+    // Sync Certifications to Education database (as certification type)
+    if (syncEducation && analysis.certifications?.length > 0) {
+      for (const cert of analysis.certifications) {
+        // Try to find existing certification
+        const existing = await prisma.education.findFirst({
+          where: {
+            title: cert.name,
+            institution: cert.issuer,
+            type: 'certification',
+          },
+        });
+
+        const certData = {
+          title: cert.name,
+          institution: cert.issuer,
+          type: 'certification' as const,
+          description: cert.description || null,
+          startDate: cert.date ? new Date(`${cert.date}-01`) : null,
+          endDate: cert.date ? new Date(`${cert.date}-01`) : null,
+        };
+
+        if (existing) {
+          await prisma.education.update({
+            where: { id: existing.id },
+            data: certData,
+          });
+          results.education.updated++;
+        } else {
+          await prisma.education.create({
+            data: certData,
+          });
+          results.education.created++;
+        }
+      }
+    }
+
     // Update resume.json file
     if (syncJson) {
       const jsonPath = path.join(process.cwd(), 'src', 'data', 'resume.json');
@@ -180,7 +260,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       results,
-      message: `Sync completed: ${results.experiences.created + results.experiences.updated} experiences, ${results.skills.created + results.skills.updated} skills processed`,
+      message: `Sync completed: ${results.experiences.created + results.experiences.updated} experiences, ${results.skills.created + results.skills.updated} skills, ${results.education.created + results.education.updated} education entries processed`,
     });
   } catch (error) {
     console.error('Error syncing resume data:', error);
