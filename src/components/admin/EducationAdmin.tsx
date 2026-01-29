@@ -16,6 +16,7 @@ export default function EducationAdmin({ education: initialEducation }: { educat
   const [education] = useState<Education[]>(initialEducation);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
   const [editingEducation, setEditingEducation] = useState<Education | null>(null);
   const [title, setTitle] = useState('');
   const [institution, setInstitution] = useState('');
@@ -34,6 +35,35 @@ export default function EducationAdmin({ education: initialEducation }: { educat
   const filteredEducation = filterType
     ? education.filter(edu => edu.type === filterType)
     : education;
+
+  const handleImportFromResume = async () => {
+    const confirmed = await confirm({
+      title: 'Import from Resume',
+      message: 'This will import education and certifications from resume.json. Existing entries will be skipped. Continue?',
+      type: 'warning',
+      confirmText: 'Import',
+    });
+    if (!confirmed) return;
+
+    setIsImporting(true);
+    try {
+      const res = await fetchWithCSRF('/api/education/import', {
+        method: 'POST',
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert(data.message);
+        router.refresh();
+      } else {
+        alert(data.error || 'Failed to import');
+      }
+    } catch (err) {
+      alert('Failed to import from resume');
+      console.error(err);
+    } finally {
+      setIsImporting(false);
+    }
+  };
 
   const formatDateForInput = (date: Date | string | null): string => {
     if (!date) return '';
@@ -179,15 +209,34 @@ export default function EducationAdmin({ education: initialEducation }: { educat
         <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-100">
           Education ({education.length})
         </h2>
-        <button
-          onClick={openAddModal}
-          className="flex items-center gap-2 px-4 py-2 bg-red-500 text-white text-sm font-medium rounded-lg hover:bg-red-600 transition-colors"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          Add Education
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleImportFromResume}
+            disabled={isImporting}
+            className="flex items-center gap-2 px-4 py-2 bg-purple-500 text-white text-sm font-medium rounded-lg hover:bg-purple-600 disabled:opacity-50 transition-colors"
+          >
+            {isImporting ? (
+              <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+            ) : (
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+              </svg>
+            )}
+            {isImporting ? 'Importing...' : 'Import from Resume'}
+          </button>
+          <button
+            onClick={openAddModal}
+            className="flex items-center gap-2 px-4 py-2 bg-red-500 text-white text-sm font-medium rounded-lg hover:bg-red-600 transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Add Education
+          </button>
+        </div>
       </div>
 
       {/* Filter tabs */}
