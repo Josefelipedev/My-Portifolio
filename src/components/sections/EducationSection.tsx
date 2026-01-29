@@ -7,9 +7,10 @@ async function getEducation() {
     const education = await prisma.education.findMany({
       orderBy: [{ startDate: 'desc' }, { order: 'asc' }, { createdAt: 'desc' }],
     });
+    console.log('[EducationSection] Found', education.length, 'education entries');
     return education;
-  } catch {
-    // Table might not exist yet
+  } catch (error) {
+    console.error('[EducationSection] Error fetching education:', error);
     return [];
   }
 }
