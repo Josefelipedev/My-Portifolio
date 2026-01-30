@@ -35,6 +35,7 @@ export default function EducationAdmin({ education }: { education: Education[] }
   const [endDate, setEndDate] = useState('');
   const [description, setDescription] = useState('');
   const [certificateUrl, setCertificateUrl] = useState('');
+  const [visible, setVisible] = useState(true);
   const [expandedEducation, setExpandedEducation] = useState<string | null>(null);
   const [filterType, setFilterType] = useState<string | null>(null);
   const router = useRouter();
@@ -90,6 +91,7 @@ export default function EducationAdmin({ education }: { education: Education[] }
         institution,
         type,
         status,
+        visible,
         fieldOfStudy: fieldOfStudy || null,
         location: location || null,
         startDate: startDate ? new Date(startDate).toISOString() : null,
@@ -130,6 +132,7 @@ export default function EducationAdmin({ education }: { education: Education[] }
     setInstitution(edu.institution);
     setType(edu.type);
     setStatus(edu.status || 'completed');
+    setVisible(edu.visible !== false);
     setFieldOfStudy(edu.fieldOfStudy || '');
     setLocation(edu.location || '');
     setStartDate(formatDateForInput(edu.startDate));
@@ -156,6 +159,7 @@ export default function EducationAdmin({ education }: { education: Education[] }
     setInstitution('');
     setType('degree');
     setStatus('completed');
+    setVisible(true);
     setFieldOfStudy('');
     setLocation('');
     setStartDate('');
@@ -175,6 +179,22 @@ export default function EducationAdmin({ education }: { education: Education[] }
     const res = await fetchWithCSRF(`/api/education/${id}`, { method: 'DELETE' });
     if (res.ok) {
       router.refresh();
+    }
+  };
+
+  const handleToggleVisibility = async (id: string, currentVisible: boolean) => {
+    try {
+      const res = await fetchWithCSRF(`/api/education/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ visible: !currentVisible }),
+      });
+      if (res.ok) {
+        router.refresh();
+        showSuccess(currentVisible ? 'Hidden from site' : 'Now visible on site');
+      }
+    } catch {
+      showError('Failed to update visibility');
     }
   };
 
@@ -346,6 +366,26 @@ export default function EducationAdmin({ education }: { education: Education[] }
 
                   {/* Actions */}
                   <div className="flex items-center gap-1 ml-2">
+                    <button
+                      onClick={() => handleToggleVisibility(edu.id, edu.visible)}
+                      className={`p-1.5 rounded transition-colors ${
+                        edu.visible !== false
+                          ? 'text-green-500 hover:bg-green-100 dark:hover:bg-green-900/30'
+                          : 'text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-700'
+                      }`}
+                      title={edu.visible !== false ? 'Visible on site - click to hide' : 'Hidden from site - click to show'}
+                    >
+                      {edu.visible !== false ? (
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                        </svg>
+                      ) : (
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                        </svg>
+                      )}
+                    </button>
                     <button
                       onClick={() => openEditModal(edu)}
                       className="p-1.5 text-zinc-400 hover:text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition-colors"
@@ -550,19 +590,42 @@ export default function EducationAdmin({ education }: { education: Education[] }
                 </div>
               </div>
 
-              {/* Certificate URL - only for courses and certifications */}
-              {(type === 'course' || type === 'certification') && (
-                <div>
-                  <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Certificate URL</label>
-                  <input
-                    type="url"
-                    placeholder="https://..."
-                    value={certificateUrl}
-                    onChange={(e) => setCertificateUrl(e.target.value)}
-                    className="w-full p-2.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg focus:ring-2 focus:ring-red-500 outline-none text-sm"
+              {/* Certificate URL */}
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Certificate URL</label>
+                <input
+                  type="url"
+                  placeholder="https://..."
+                  value={certificateUrl}
+                  onChange={(e) => setCertificateUrl(e.target.value)}
+                  className="w-full p-2.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-lg focus:ring-2 focus:ring-red-500 outline-none text-sm"
+                />
+              </div>
+
+              {/* Visibility Toggle */}
+              <div className="flex items-center gap-3 p-3 bg-zinc-50 dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-700">
+                <button
+                  type="button"
+                  onClick={() => setVisible(!visible)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    visible ? 'bg-green-500' : 'bg-zinc-300 dark:bg-zinc-600'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      visible ? 'translate-x-6' : 'translate-x-1'
+                    }`}
                   />
+                </button>
+                <div>
+                  <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                    {visible ? 'Visible on site' : 'Hidden from site'}
+                  </span>
+                  <p className="text-xs text-zinc-500">
+                    {visible ? 'This will appear in the hero section' : 'This will only be visible in admin'}
+                  </p>
                 </div>
-              )}
+              </div>
 
               <div>
                 <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Description</label>
