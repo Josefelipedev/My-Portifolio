@@ -12,14 +12,38 @@ async function getSiteConfig() {
   };
 }
 
+async function getEducation() {
+  try {
+    const education = await prisma.education.findMany({
+      where: { type: 'degree' },
+      orderBy: [{ startDate: 'desc' }],
+      take: 4,
+    });
+    return education;
+  } catch {
+    return [];
+  }
+}
+
 export async function HeroSection() {
-  const config = await getSiteConfig();
+  const [config, education] = await Promise.all([
+    getSiteConfig(),
+    getEducation(),
+  ]);
 
   return (
     <HeroClient
       githubUrl={config.githubUrl}
       linkedinUrl={config.linkedinUrl}
       email={config.email}
+      education={education.map(edu => ({
+        id: edu.id,
+        title: edu.title,
+        institution: edu.institution,
+        startDate: edu.startDate,
+        endDate: edu.endDate,
+        location: edu.location,
+      }))}
     />
   );
 }
