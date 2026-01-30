@@ -67,6 +67,7 @@ model Education {
   institution  String    // University/Platform name
   type         String    @default("degree") // "degree" | "course" | "certification"
   status       String    @default("completed") // "completed" | "in_progress" | "paused" | "next"
+  visible      Boolean   @default(true) // Show on public site
   fieldOfStudy String?   // Area of study (optional)
   location     String?   // "Faro, Portugal" or "Online"
   startDate    DateTime?
@@ -82,6 +83,7 @@ model Education {
   @@index([order])
   @@index([type])
   @@index([status])
+  @@index([visible])
 }
 
 model GitHubRepoCache {

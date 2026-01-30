@@ -15,6 +15,7 @@ async function getSiteConfig() {
 async function getEducation() {
   try {
     const education = await prisma.education.findMany({
+      where: { visible: true },
       orderBy: [{ order: 'asc' }, { startDate: 'desc' }],
     });
     return education;

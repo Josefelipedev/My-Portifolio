@@ -91,28 +91,29 @@ export default function HeroClient({ githubUrl, linkedinUrl, email, education = 
             {edu.institution}
           </p>
 
-          {/* Status badge */}
-          {edu.status !== 'completed' && (
-            <span className={`inline-flex items-center gap-1 mt-1.5 px-1.5 py-0.5 rounded-full text-[9px] font-medium ${statusConfig.color}`}>
-              <span className={`w-1 h-1 rounded-full ${statusConfig.dot}`} />
+          {/* Status and certificate row */}
+          <div className={`flex items-center gap-1.5 mt-1.5 flex-wrap ${isLeft ? 'justify-end' : ''}`}>
+            {/* Status badge - always show */}
+            <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-medium ${statusConfig.color}`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${statusConfig.dot}`} />
               {statusConfig.label}
             </span>
-          )}
 
-          {/* Certificate link */}
-          {edu.certificateUrl && edu.status === 'completed' && (
-            <a
-              href={edu.certificateUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={`inline-flex items-center gap-0.5 mt-1 text-[9px] font-medium ${typeConfig.color} hover:underline`}
-            >
-              <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-              </svg>
-              View
-            </a>
-          )}
+            {/* Certificate link */}
+            {edu.certificateUrl && (
+              <a
+                href={edu.certificateUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`inline-flex items-center gap-0.5 text-[9px] font-medium ${typeConfig.color} hover:underline`}
+              >
+                <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+                Cert
+              </a>
+            )}
+          </div>
         </div>
       </div>
     );
@@ -174,43 +175,66 @@ export default function HeroClient({ githubUrl, linkedinUrl, email, education = 
               {t.hero.description}
             </p>
 
-            {/* Mobile Education - Ultra compact horizontal scroll */}
+            {/* Mobile Education - Adaptive grid layout */}
             {education.length > 0 && (
               <div className="lg:hidden mb-6 animate-fade-in-up delay-350">
-                <div className="flex gap-2 overflow-x-auto pb-2 px-1 snap-x scrollbar-hide">
+                {/* Section label */}
+                <div className="flex items-center justify-center gap-2 mb-3">
+                  <div className="h-px w-8 bg-gradient-to-r from-transparent to-red-500/30" />
+                  <span className="text-[10px] uppercase tracking-wider text-zinc-400 dark:text-zinc-500 font-medium">
+                    Education
+                  </span>
+                  <div className="h-px w-8 bg-gradient-to-l from-transparent to-purple-500/30" />
+                </div>
+
+                {/* Adaptive grid */}
+                <div className="flex flex-wrap justify-center gap-2 px-2">
                   {education.map((edu) => {
                     const typeConfig = getTypeConfig(edu.type);
                     const statusConfig = getStatusConfig(edu.status);
                     return (
                       <div
                         key={edu.id}
-                        className="flex-shrink-0 snap-center bg-white/70 dark:bg-zinc-800/70 backdrop-blur-sm rounded-lg p-2 shadow-sm border border-zinc-200/40 dark:border-zinc-700/40 min-w-[140px] max-w-[160px]"
+                        className="bg-white/70 dark:bg-zinc-800/70 backdrop-blur-sm rounded-lg p-2.5 shadow-sm border border-zinc-200/40 dark:border-zinc-700/40 hover:shadow-md transition-shadow w-[calc(50%-4px)] sm:w-auto sm:min-w-[160px] sm:max-w-[200px]"
                       >
-                        <div className="flex items-center gap-1 mb-0.5">
-                          <span className="text-xs">{typeConfig.icon}</span>
-                          <span className="text-[10px] font-semibold text-zinc-800 dark:text-zinc-200 truncate">
-                            {edu.title}
-                          </span>
+                        {/* Header with icon and type */}
+                        <div className="flex items-start justify-between gap-1 mb-1">
+                          <div className="flex items-center gap-1 flex-1 min-w-0">
+                            <span className="text-sm flex-shrink-0">{typeConfig.icon}</span>
+                            <span className="text-xs font-semibold text-zinc-800 dark:text-zinc-200 truncate">
+                              {edu.title}
+                            </span>
+                          </div>
                         </div>
-                        <p className="text-[9px] text-zinc-500 dark:text-zinc-400 truncate">
+
+                        {/* Institution */}
+                        <p className="text-[10px] text-zinc-500 dark:text-zinc-400 truncate mb-1.5">
                           {edu.institution}
                         </p>
-                        {edu.status !== 'completed' && (
-                          <span className={`inline-flex items-center gap-0.5 mt-1 px-1 py-0.5 rounded-full text-[8px] font-medium ${statusConfig.color}`}>
-                            <span className={`w-1 h-1 rounded-full ${statusConfig.dot}`} />
+
+                        {/* Status and certificate row */}
+                        <div className="flex items-center justify-between gap-1 flex-wrap">
+                          {/* Status badge - always show */}
+                          <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-medium ${statusConfig.color}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${statusConfig.dot}`} />
                             {statusConfig.label}
                           </span>
-                        )}
-                        {edu.certificateUrl && edu.status === 'completed' && (
-                          <a
-                            href={edu.certificateUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className={`inline-flex items-center gap-0.5 mt-1 text-[8px] font-medium ${typeConfig.color}`}
-                          >
-                            🔗 Cert
-                          </a>
-                        )}
+
+                          {/* Certificate link */}
+                          {edu.certificateUrl && (
+                            <a
+                              href={edu.certificateUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className={`inline-flex items-center gap-0.5 text-[9px] font-medium ${typeConfig.color} hover:underline`}
+                            >
+                              <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                              </svg>
+                              Cert
+                            </a>
+                          )}
+                        </div>
                       </div>
                     );
                   })}
