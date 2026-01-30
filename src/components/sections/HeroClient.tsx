@@ -74,7 +74,7 @@ export default function HeroClient({ githubUrl, linkedinUrl, email, education = 
   useEffect(() => {
     if (education.length <= 1 || isPaused) return;
 
-    const interval = setInterval(nextSlide, 2000); // Change every 2 seconds
+    const interval = setInterval(nextSlide, 1000); // Change every 1 second
     return () => clearInterval(interval);
   }, [education.length, isPaused, nextSlide]);
 
@@ -214,7 +214,7 @@ export default function HeroClient({ githubUrl, linkedinUrl, email, education = 
                 <div className="relative overflow-hidden px-4">
                   {/* Cards wrapper with sliding animation */}
                   <div
-                    className="flex transition-transform duration-500 ease-in-out"
+                    className="flex transition-transform duration-300 ease-in-out"
                     style={{ transform: `translateX(-${currentSlide * 100}%)` }}
                   >
                     {education.map((edu) => {
