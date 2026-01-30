@@ -8,9 +8,12 @@ interface EducationItem {
   id: string;
   title: string;
   institution: string;
+  type: string;
+  status: string;
   startDate: Date | null;
   endDate: Date | null;
   location: string | null;
+  certificateUrl: string | null;
 }
 
 interface HeroClientProps {
@@ -20,9 +23,31 @@ interface HeroClientProps {
   education?: EducationItem[];
 }
 
-function formatDate(date: Date | null): string {
-  if (!date) return 'Present';
-  return new Date(date).toLocaleDateString('en-US', { year: 'numeric' });
+function getTypeConfig(type: string) {
+  switch (type) {
+    case 'degree':
+      return { color: 'text-red-500', bg: 'bg-red-500', icon: '🎓' };
+    case 'course':
+      return { color: 'text-blue-500', bg: 'bg-blue-500', icon: '📚' };
+    case 'certification':
+      return { color: 'text-green-500', bg: 'bg-green-500', icon: '🏆' };
+    default:
+      return { color: 'text-purple-500', bg: 'bg-purple-500', icon: '📖' };
+  }
+}
+
+function getStatusConfig(status: string) {
+  switch (status) {
+    case 'in_progress':
+      return { label: 'In Progress', color: 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400', dot: 'bg-amber-500 animate-pulse' };
+    case 'paused':
+      return { label: 'Paused', color: 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400', dot: 'bg-orange-500' };
+    case 'next':
+      return { label: 'Next', color: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400', dot: 'bg-blue-500' };
+    case 'completed':
+    default:
+      return { label: 'Completed', color: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400', dot: 'bg-green-500' };
+  }
 }
 
 export default function HeroClient({ githubUrl, linkedinUrl, email, education = [] }: HeroClientProps) {
@@ -32,6 +57,67 @@ export default function HeroClient({ githubUrl, linkedinUrl, email, education = 
     ? [t.hero.role, 'Solucionador de Problemas', 'Entusiasta de Tech', 'Artesão de Código']
     : [t.hero.role, 'Problem Solver', 'Tech Enthusiast', 'Code Artisan'];
 
+  // Split education for left/right display
+  const leftItems = education.slice(0, Math.ceil(education.length / 2));
+  const rightItems = education.slice(Math.ceil(education.length / 2));
+
+  const renderCompactCard = (edu: EducationItem, index: number, side: 'left' | 'right') => {
+    const typeConfig = getTypeConfig(edu.type);
+    const statusConfig = getStatusConfig(edu.status);
+    const isLeft = side === 'left';
+
+    return (
+      <div
+        key={edu.id}
+        className="relative group"
+        style={{ animationDelay: `${index * 100}ms` }}
+      >
+        {/* Connecting line */}
+        <div className={`absolute ${isLeft ? 'right-0 translate-x-full bg-gradient-to-r' : 'left-0 -translate-x-full bg-gradient-to-l'} top-1/2 w-4 h-px from-transparent ${isLeft ? 'to-red-500/20' : 'to-purple-500/20'}`} />
+
+        {/* Compact Card */}
+        <div className={`bg-white/70 dark:bg-zinc-800/70 backdrop-blur-sm rounded-lg p-2.5 shadow-md border border-zinc-200/40 dark:border-zinc-700/40 hover:shadow-lg transition-all duration-200 ${isLeft ? 'text-right hover:-translate-x-0.5' : 'hover:translate-x-0.5'}`}>
+          {/* Header: Icon + Title */}
+          <div className={`flex items-center gap-1.5 mb-0.5 ${isLeft ? 'justify-end' : ''}`}>
+            {!isLeft && <span className="text-xs">{typeConfig.icon}</span>}
+            <span className={`text-xs font-semibold text-zinc-800 dark:text-zinc-200 truncate max-w-[140px]`}>
+              {edu.title}
+            </span>
+            {isLeft && <span className="text-xs">{typeConfig.icon}</span>}
+          </div>
+
+          {/* Institution */}
+          <p className={`text-[10px] text-zinc-500 dark:text-zinc-400 truncate max-w-[160px] ${isLeft ? 'ml-auto' : ''}`}>
+            {edu.institution}
+          </p>
+
+          {/* Status badge */}
+          {edu.status !== 'completed' && (
+            <span className={`inline-flex items-center gap-1 mt-1.5 px-1.5 py-0.5 rounded-full text-[9px] font-medium ${statusConfig.color}`}>
+              <span className={`w-1 h-1 rounded-full ${statusConfig.dot}`} />
+              {statusConfig.label}
+            </span>
+          )}
+
+          {/* Certificate link */}
+          {edu.certificateUrl && edu.status === 'completed' && (
+            <a
+              href={edu.certificateUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={`inline-flex items-center gap-0.5 mt-1 text-[9px] font-medium ${typeConfig.color} hover:underline`}
+            >
+              <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              </svg>
+              View
+            </a>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <section
       id="hero"
@@ -39,55 +125,12 @@ export default function HeroClient({ githubUrl, linkedinUrl, email, education = 
     >
       <div className="relative z-10 w-full max-w-6xl mx-auto px-4">
         {/* Main content with education on sides */}
-        <div className="flex flex-col lg:flex-row items-center justify-center gap-8 lg:gap-4">
+        <div className="flex flex-col lg:flex-row items-center justify-center gap-6 lg:gap-3">
 
-          {/* Left Education Card - Desktop only */}
-          {education.length > 0 && (
-            <div className="hidden lg:flex flex-col items-end gap-4 w-64 animate-fade-in-up">
-              {education.slice(0, 2).map((edu, index) => (
-                <div
-                  key={edu.id}
-                  className="relative group"
-                  style={{ animationDelay: `${index * 200}ms` }}
-                >
-                  {/* Connecting line */}
-                  <div className="absolute right-0 top-1/2 w-8 h-0.5 bg-gradient-to-r from-transparent to-red-500/30 translate-x-full" />
-
-                  {/* Card */}
-                  <div className="bg-white/80 dark:bg-zinc-800/80 backdrop-blur-sm rounded-xl p-4 shadow-lg border border-zinc-200/50 dark:border-zinc-700/50 hover:shadow-xl hover:-translate-x-1 transition-all duration-300 max-w-xs text-right">
-                    <div className="flex items-center justify-end gap-2 mb-1">
-                      <span className="text-xs font-medium text-red-500">
-                        {formatDate(edu.startDate)} - {formatDate(edu.endDate)}
-                      </span>
-                      <div className="w-6 h-6 rounded-full bg-gradient-to-br from-red-500 to-purple-500 flex items-center justify-center text-white">
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14l9-5-9-5-9 5 9 5z" />
-                        </svg>
-                      </div>
-                    </div>
-                    <h4 className="font-semibold text-zinc-900 dark:text-zinc-100 text-sm">
-                      {edu.title}
-                    </h4>
-                    <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                      {edu.institution}
-                    </p>
-                    {edu.location && (
-                      <p className="text-xs text-zinc-400 dark:text-zinc-500 flex items-center justify-end gap-1 mt-1">
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                        </svg>
-                        {edu.location}
-                      </p>
-                    )}
-                    {!edu.endDate && (
-                      <span className="inline-flex items-center gap-1 mt-2 px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-xs">
-                        <span className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-pulse" />
-                        In Progress
-                      </span>
-                    )}
-                  </div>
-                </div>
-              ))}
+          {/* Left Education Cards - Desktop only */}
+          {leftItems.length > 0 && (
+            <div className="hidden lg:flex flex-col items-end gap-2 w-48 animate-fade-in-up">
+              {leftItems.map((edu, index) => renderCompactCard(edu, index, 'left'))}
             </div>
           )}
 
@@ -102,7 +145,7 @@ export default function HeroClient({ githubUrl, linkedinUrl, email, education = 
             <div className="relative">
               {/* Left decorative line - Desktop */}
               {education.length > 0 && (
-                <div className="hidden lg:block absolute right-full top-1/2 -translate-y-1/2 w-12 h-0.5 bg-gradient-to-r from-transparent via-red-500/50 to-red-500/30 mr-4" />
+                <div className="hidden lg:block absolute right-full top-1/2 -translate-y-1/2 w-8 h-px bg-gradient-to-r from-transparent to-red-500/30 mr-2" />
               )}
 
               <h1 className="text-5xl sm:text-6xl md:text-7xl font-bold mb-6 animate-fade-in-up delay-100">
@@ -111,12 +154,12 @@ export default function HeroClient({ githubUrl, linkedinUrl, email, education = 
 
               {/* Right decorative line - Desktop */}
               {education.length > 0 && (
-                <div className="hidden lg:block absolute left-full top-1/2 -translate-y-1/2 w-12 h-0.5 bg-gradient-to-l from-transparent via-purple-500/50 to-purple-500/30 ml-4" />
+                <div className="hidden lg:block absolute left-full top-1/2 -translate-y-1/2 w-8 h-px bg-gradient-to-l from-transparent to-purple-500/30 ml-2" />
               )}
             </div>
 
             {/* Title with typewriter effect */}
-            <h2 className="text-2xl sm:text-3xl md:text-4xl text-zinc-700 dark:text-zinc-300 font-medium mb-8 animate-fade-in-up delay-200 h-12">
+            <h2 className="text-2xl sm:text-3xl md:text-4xl text-zinc-700 dark:text-zinc-300 font-medium mb-6 animate-fade-in-up delay-200 h-12">
               <TypewriterText
                 texts={titles}
                 speed={80}
@@ -127,37 +170,50 @@ export default function HeroClient({ githubUrl, linkedinUrl, email, education = 
             </h2>
 
             {/* Description */}
-            <p className="text-lg text-zinc-600 dark:text-zinc-400 max-w-2xl mx-auto mb-8 animate-fade-in-up delay-300 leading-relaxed">
+            <p className="text-base text-zinc-600 dark:text-zinc-400 max-w-xl mx-auto mb-6 animate-fade-in-up delay-300 leading-relaxed">
               {t.hero.description}
             </p>
 
-            {/* Mobile Education - Compact horizontal scroll */}
+            {/* Mobile Education - Ultra compact horizontal scroll */}
             {education.length > 0 && (
-              <div className="lg:hidden mb-8 animate-fade-in-up delay-350">
-                <div className="flex gap-3 overflow-x-auto pb-2 px-1 snap-x snap-mandatory scrollbar-hide">
-                  {education.map((edu) => (
-                    <div
-                      key={edu.id}
-                      className="flex-shrink-0 snap-center bg-white/80 dark:bg-zinc-800/80 backdrop-blur-sm rounded-xl p-3 shadow-md border border-zinc-200/50 dark:border-zinc-700/50 min-w-[200px] max-w-[240px]"
-                    >
-                      <div className="flex items-center gap-2 mb-1">
-                        <div className="w-5 h-5 rounded-full bg-gradient-to-br from-red-500 to-purple-500 flex items-center justify-center text-white flex-shrink-0">
-                          <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14l9-5-9-5-9 5 9 5z" />
-                          </svg>
+              <div className="lg:hidden mb-6 animate-fade-in-up delay-350">
+                <div className="flex gap-2 overflow-x-auto pb-2 px-1 snap-x scrollbar-hide">
+                  {education.map((edu) => {
+                    const typeConfig = getTypeConfig(edu.type);
+                    const statusConfig = getStatusConfig(edu.status);
+                    return (
+                      <div
+                        key={edu.id}
+                        className="flex-shrink-0 snap-center bg-white/70 dark:bg-zinc-800/70 backdrop-blur-sm rounded-lg p-2 shadow-sm border border-zinc-200/40 dark:border-zinc-700/40 min-w-[140px] max-w-[160px]"
+                      >
+                        <div className="flex items-center gap-1 mb-0.5">
+                          <span className="text-xs">{typeConfig.icon}</span>
+                          <span className="text-[10px] font-semibold text-zinc-800 dark:text-zinc-200 truncate">
+                            {edu.title}
+                          </span>
                         </div>
-                        <span className="text-xs text-red-500 font-medium">
-                          {formatDate(edu.startDate)} - {formatDate(edu.endDate)}
-                        </span>
+                        <p className="text-[9px] text-zinc-500 dark:text-zinc-400 truncate">
+                          {edu.institution}
+                        </p>
+                        {edu.status !== 'completed' && (
+                          <span className={`inline-flex items-center gap-0.5 mt-1 px-1 py-0.5 rounded-full text-[8px] font-medium ${statusConfig.color}`}>
+                            <span className={`w-1 h-1 rounded-full ${statusConfig.dot}`} />
+                            {statusConfig.label}
+                          </span>
+                        )}
+                        {edu.certificateUrl && edu.status === 'completed' && (
+                          <a
+                            href={edu.certificateUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={`inline-flex items-center gap-0.5 mt-1 text-[8px] font-medium ${typeConfig.color}`}
+                          >
+                            🔗 Cert
+                          </a>
+                        )}
                       </div>
-                      <h4 className="font-semibold text-zinc-900 dark:text-zinc-100 text-sm line-clamp-1">
-                        {edu.title}
-                      </h4>
-                      <p className="text-xs text-zinc-500 dark:text-zinc-400 line-clamp-1">
-                        {edu.institution}
-                      </p>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -223,53 +279,10 @@ export default function HeroClient({ githubUrl, linkedinUrl, email, education = 
             </div>
           </div>
 
-          {/* Right Education Card - Desktop only */}
-          {education.length > 1 && (
-            <div className="hidden lg:flex flex-col items-start gap-4 w-64 animate-fade-in-up">
-              {education.slice(1, 3).map((edu, index) => (
-                <div
-                  key={edu.id}
-                  className="relative group"
-                  style={{ animationDelay: `${(index + 2) * 200}ms` }}
-                >
-                  {/* Connecting line */}
-                  <div className="absolute left-0 top-1/2 w-8 h-0.5 bg-gradient-to-l from-transparent to-purple-500/30 -translate-x-full" />
-
-                  {/* Card */}
-                  <div className="bg-white/80 dark:bg-zinc-800/80 backdrop-blur-sm rounded-xl p-4 shadow-lg border border-zinc-200/50 dark:border-zinc-700/50 hover:shadow-xl hover:translate-x-1 transition-all duration-300 max-w-xs">
-                    <div className="flex items-center gap-2 mb-1">
-                      <div className="w-6 h-6 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white">
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14l9-5-9-5-9 5 9 5z" />
-                        </svg>
-                      </div>
-                      <span className="text-xs font-medium text-purple-500">
-                        {formatDate(edu.startDate)} - {formatDate(edu.endDate)}
-                      </span>
-                    </div>
-                    <h4 className="font-semibold text-zinc-900 dark:text-zinc-100 text-sm">
-                      {edu.title}
-                    </h4>
-                    <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                      {edu.institution}
-                    </p>
-                    {edu.location && (
-                      <p className="text-xs text-zinc-400 dark:text-zinc-500 flex items-center gap-1 mt-1">
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                        </svg>
-                        {edu.location}
-                      </p>
-                    )}
-                    {!edu.endDate && (
-                      <span className="inline-flex items-center gap-1 mt-2 px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-xs">
-                        <span className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-pulse" />
-                        In Progress
-                      </span>
-                    )}
-                  </div>
-                </div>
-              ))}
+          {/* Right Education Cards - Desktop only */}
+          {rightItems.length > 0 && (
+            <div className="hidden lg:flex flex-col items-start gap-2 w-48 animate-fade-in-up">
+              {rightItems.map((edu, index) => renderCompactCard(edu, index + leftItems.length, 'right'))}
             </div>
           )}
         </div>

@@ -66,6 +66,7 @@ model Education {
   title        String    // Course/degree name
   institution  String    // University/Platform name
   type         String    @default("degree") // "degree" | "course" | "certification"
+  status       String    @default("completed") // "completed" | "in_progress" | "paused" | "next"
   fieldOfStudy String?   // Area of study (optional)
   location     String?   // "Faro, Portugal" or "Online"
   startDate    DateTime?
@@ -80,6 +81,7 @@ model Education {
   @@index([startDate])
   @@index([order])
   @@index([type])
+  @@index([status])
 }
 
 model GitHubRepoCache {

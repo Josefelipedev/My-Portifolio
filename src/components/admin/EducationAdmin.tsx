@@ -13,6 +13,13 @@ const TYPE_OPTIONS = [
   { value: 'certification', label: 'Certification', color: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' },
 ];
 
+const STATUS_OPTIONS = [
+  { value: 'completed', label: 'Completed', color: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400', icon: '✓' },
+  { value: 'in_progress', label: 'In Progress', color: 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400', icon: '⏳' },
+  { value: 'paused', label: 'Paused', color: 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400', icon: '⏸' },
+  { value: 'next', label: 'Next Step', color: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400', icon: '→' },
+];
+
 export default function EducationAdmin({ education }: { education: Education[] }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -21,6 +28,7 @@ export default function EducationAdmin({ education }: { education: Education[] }
   const [title, setTitle] = useState('');
   const [institution, setInstitution] = useState('');
   const [type, setType] = useState('degree');
+  const [status, setStatus] = useState('completed');
   const [fieldOfStudy, setFieldOfStudy] = useState('');
   const [location, setLocation] = useState('');
   const [startDate, setStartDate] = useState('');
@@ -81,6 +89,7 @@ export default function EducationAdmin({ education }: { education: Education[] }
         title,
         institution,
         type,
+        status,
         fieldOfStudy: fieldOfStudy || null,
         location: location || null,
         startDate: startDate ? new Date(startDate).toISOString() : null,
@@ -120,6 +129,7 @@ export default function EducationAdmin({ education }: { education: Education[] }
     setTitle(edu.title);
     setInstitution(edu.institution);
     setType(edu.type);
+    setStatus(edu.status || 'completed');
     setFieldOfStudy(edu.fieldOfStudy || '');
     setLocation(edu.location || '');
     setStartDate(formatDateForInput(edu.startDate));
@@ -145,6 +155,7 @@ export default function EducationAdmin({ education }: { education: Education[] }
     setTitle('');
     setInstitution('');
     setType('degree');
+    setStatus('completed');
     setFieldOfStudy('');
     setLocation('');
     setStartDate('');
@@ -323,10 +334,12 @@ export default function EducationAdmin({ education }: { education: Education[] }
                       {formatDisplayDate(edu.startDate)} - {formatDisplayDate(edu.endDate)}
                     </span>
 
-                    {/* In Progress Badge */}
-                    {!edu.endDate && (
-                      <span className="px-2 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-xs rounded-full shrink-0">
-                        In Progress
+                    {/* Status Badge */}
+                    {edu.status && edu.status !== 'completed' && (
+                      <span className={`px-2 py-0.5 text-xs rounded-full shrink-0 ${
+                        STATUS_OPTIONS.find(s => s.value === edu.status)?.color || 'bg-zinc-100 text-zinc-600'
+                      }`}>
+                        {STATUS_OPTIONS.find(s => s.value === edu.status)?.icon} {STATUS_OPTIONS.find(s => s.value === edu.status)?.label}
                       </span>
                     )}
                   </div>
@@ -435,6 +448,28 @@ export default function EducationAdmin({ education }: { education: Education[] }
                           : 'border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:border-zinc-300 dark:hover:border-zinc-600'
                       }`}
                     >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Status Selection */}
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">Status *</label>
+                <div className="flex flex-wrap gap-2">
+                  {STATUS_OPTIONS.map(opt => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setStatus(opt.value)}
+                      className={`px-3 py-1.5 text-sm rounded-lg border-2 transition-colors flex items-center gap-1 ${
+                        status === opt.value
+                          ? `${opt.color} border-current`
+                          : 'border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:border-zinc-300 dark:hover:border-zinc-600'
+                      }`}
+                    >
+                      <span>{opt.icon}</span>
                       {opt.label}
                     </button>
                   ))}
