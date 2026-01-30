@@ -74,7 +74,7 @@ export default function HeroClient({ githubUrl, linkedinUrl, email, education = 
   useEffect(() => {
     if (education.length <= 1 || isPaused) return;
 
-    const interval = setInterval(nextSlide, 3000); // Change every 3 seconds
+    const interval = setInterval(nextSlide, 2000); // Change every 2 seconds
     return () => clearInterval(interval);
   }, [education.length, isPaused, nextSlide]);
 
