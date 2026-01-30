@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect, useCallback } from 'react';
 import TypewriterText from '../ui/TypewriterText';
 import { GradientText } from '../ui/GradientText';
 import { useLanguage } from '@/lib/i18n';
@@ -52,6 +53,8 @@ function getStatusConfig(status: string) {
 
 export default function HeroClient({ githubUrl, linkedinUrl, email, education = [] }: HeroClientProps) {
   const { t, language } = useLanguage();
+  const [currentSlide, setCurrentSlide] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
 
   const titles = language === 'pt'
     ? [t.hero.role, 'Solucionador de Problemas', 'Entusiasta de Tech', 'Artesão de Código']
@@ -60,6 +63,20 @@ export default function HeroClient({ githubUrl, linkedinUrl, email, education = 
   // Split education for left/right display
   const leftItems = education.slice(0, Math.ceil(education.length / 2));
   const rightItems = education.slice(Math.ceil(education.length / 2));
+
+  // Auto-advance carousel
+  const nextSlide = useCallback(() => {
+    if (education.length > 0) {
+      setCurrentSlide((prev) => (prev + 1) % education.length);
+    }
+  }, [education.length]);
+
+  useEffect(() => {
+    if (education.length <= 1 || isPaused) return;
+
+    const interval = setInterval(nextSlide, 3000); // Change every 3 seconds
+    return () => clearInterval(interval);
+  }, [education.length, isPaused, nextSlide]);
 
   const renderCompactCard = (edu: EducationItem, index: number, side: 'left' | 'right') => {
     const typeConfig = getTypeConfig(edu.type);
@@ -175,9 +192,15 @@ export default function HeroClient({ githubUrl, linkedinUrl, email, education = 
               {t.hero.description}
             </p>
 
-            {/* Mobile Education - Adaptive grid layout */}
+            {/* Mobile Education - Auto Carousel */}
             {education.length > 0 && (
-              <div className="lg:hidden mb-6 animate-fade-in-up delay-350">
+              <div
+                className="lg:hidden mb-6 animate-fade-in-up delay-350"
+                onMouseEnter={() => setIsPaused(true)}
+                onMouseLeave={() => setIsPaused(false)}
+                onTouchStart={() => setIsPaused(true)}
+                onTouchEnd={() => setTimeout(() => setIsPaused(false), 2000)}
+              >
                 {/* Section label */}
                 <div className="flex items-center justify-center gap-2 mb-3">
                   <div className="h-px w-8 bg-gradient-to-r from-transparent to-red-500/30" />
@@ -187,58 +210,106 @@ export default function HeroClient({ githubUrl, linkedinUrl, email, education = 
                   <div className="h-px w-8 bg-gradient-to-l from-transparent to-purple-500/30" />
                 </div>
 
-                {/* Adaptive grid */}
-                <div className="flex flex-wrap justify-center gap-2 px-2">
-                  {education.map((edu) => {
-                    const typeConfig = getTypeConfig(edu.type);
-                    const statusConfig = getStatusConfig(edu.status);
-                    return (
-                      <div
-                        key={edu.id}
-                        className="bg-white/70 dark:bg-zinc-800/70 backdrop-blur-sm rounded-lg p-2.5 shadow-sm border border-zinc-200/40 dark:border-zinc-700/40 hover:shadow-md transition-shadow w-[calc(50%-4px)] sm:w-auto sm:min-w-[160px] sm:max-w-[200px]"
-                      >
-                        {/* Header with icon and type */}
-                        <div className="flex items-start justify-between gap-1 mb-1">
-                          <div className="flex items-center gap-1 flex-1 min-w-0">
-                            <span className="text-sm flex-shrink-0">{typeConfig.icon}</span>
-                            <span className="text-xs font-semibold text-zinc-800 dark:text-zinc-200 truncate">
-                              {edu.title}
-                            </span>
+                {/* Carousel container */}
+                <div className="relative overflow-hidden px-4">
+                  {/* Cards wrapper with sliding animation */}
+                  <div
+                    className="flex transition-transform duration-500 ease-in-out"
+                    style={{ transform: `translateX(-${currentSlide * 100}%)` }}
+                  >
+                    {education.map((edu) => {
+                      const typeConfig = getTypeConfig(edu.type);
+                      const statusConfig = getStatusConfig(edu.status);
+                      return (
+                        <div
+                          key={edu.id}
+                          className="w-full flex-shrink-0 px-1"
+                        >
+                          <div className="bg-white/80 dark:bg-zinc-800/80 backdrop-blur-sm rounded-xl p-4 shadow-lg border border-zinc-200/50 dark:border-zinc-700/50 mx-auto max-w-xs">
+                            {/* Header with icon and title */}
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="text-xl">{typeConfig.icon}</span>
+                              <div className="flex-1 min-w-0">
+                                <h3 className="text-sm font-bold text-zinc-800 dark:text-zinc-200 truncate">
+                                  {edu.title}
+                                </h3>
+                                <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate">
+                                  {edu.institution}
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* Status and certificate row */}
+                            <div className="flex items-center justify-between gap-2">
+                              {/* Status badge */}
+                              <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-medium ${statusConfig.color}`}>
+                                <span className={`w-1.5 h-1.5 rounded-full ${statusConfig.dot}`} />
+                                {statusConfig.label}
+                              </span>
+
+                              {/* Certificate link */}
+                              {edu.certificateUrl && (
+                                <a
+                                  href={edu.certificateUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-medium bg-zinc-100 dark:bg-zinc-700 ${typeConfig.color} hover:scale-105 transition-transform`}
+                                >
+                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                  </svg>
+                                  Certificate
+                                </a>
+                              )}
+                            </div>
                           </div>
                         </div>
+                      );
+                    })}
+                  </div>
 
-                        {/* Institution */}
-                        <p className="text-[10px] text-zinc-500 dark:text-zinc-400 truncate mb-1.5">
-                          {edu.institution}
-                        </p>
-
-                        {/* Status and certificate row */}
-                        <div className="flex items-center justify-between gap-1 flex-wrap">
-                          {/* Status badge - always show */}
-                          <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-medium ${statusConfig.color}`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${statusConfig.dot}`} />
-                            {statusConfig.label}
-                          </span>
-
-                          {/* Certificate link */}
-                          {edu.certificateUrl && (
-                            <a
-                              href={edu.certificateUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className={`inline-flex items-center gap-0.5 text-[9px] font-medium ${typeConfig.color} hover:underline`}
-                            >
-                              <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                              </svg>
-                              Cert
-                            </a>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
+                  {/* Navigation arrows */}
+                  {education.length > 1 && (
+                    <>
+                      <button
+                        onClick={() => setCurrentSlide((prev) => (prev - 1 + education.length) % education.length)}
+                        className="absolute left-0 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-white/80 dark:bg-zinc-800/80 shadow-md border border-zinc-200/50 dark:border-zinc-700/50 text-zinc-600 dark:text-zinc-400 hover:scale-110 transition-transform"
+                        aria-label="Previous"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={() => setCurrentSlide((prev) => (prev + 1) % education.length)}
+                        className="absolute right-0 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-white/80 dark:bg-zinc-800/80 shadow-md border border-zinc-200/50 dark:border-zinc-700/50 text-zinc-600 dark:text-zinc-400 hover:scale-110 transition-transform"
+                        aria-label="Next"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                      </button>
+                    </>
+                  )}
                 </div>
+
+                {/* Dot indicators */}
+                {education.length > 1 && (
+                  <div className="flex items-center justify-center gap-1.5 mt-3">
+                    {education.map((_, index) => (
+                      <button
+                        key={index}
+                        onClick={() => setCurrentSlide(index)}
+                        className={`w-2 h-2 rounded-full transition-all duration-300 ${
+                          index === currentSlide
+                            ? 'bg-gradient-to-r from-red-500 to-purple-500 w-4'
+                            : 'bg-zinc-300 dark:bg-zinc-600 hover:bg-zinc-400 dark:hover:bg-zinc-500'
+                        }`}
+                        aria-label={`Go to slide ${index + 1}`}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
