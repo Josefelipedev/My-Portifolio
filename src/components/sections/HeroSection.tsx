@@ -15,9 +15,7 @@ async function getSiteConfig() {
 async function getEducation() {
   try {
     const education = await prisma.education.findMany({
-      where: { type: 'degree' },
-      orderBy: [{ startDate: 'desc' }],
-      take: 4,
+      orderBy: [{ order: 'asc' }, { startDate: 'desc' }],
     });
     return education;
   } catch {
@@ -40,9 +38,12 @@ export async function HeroSection() {
         id: edu.id,
         title: edu.title,
         institution: edu.institution,
+        type: edu.type,
+        status: edu.status,
         startDate: edu.startDate,
         endDate: edu.endDate,
         location: edu.location,
+        certificateUrl: edu.certificateUrl,
       }))}
     />
   );
