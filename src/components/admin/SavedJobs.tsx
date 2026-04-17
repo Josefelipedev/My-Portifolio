@@ -2,6 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import BulkActionBar from './jobs/BulkActionBar';
+import AIGradeBadge from './jobs/AIGradeBadge';
+import AIAnalysisPanel, { type AIAnalysis } from './jobs/AIAnalysisPanel';
+import CVGeneratorButton from './jobs/CVGeneratorButton';
+import InterviewPrepModal, { type InterviewPrep } from './jobs/InterviewPrepModal';
 import { exportJobsToCSV, exportJobsToPDF, ExportableJob } from '@/lib/export';
 import { useToast } from '@/components/ui/Toast';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
@@ -38,6 +42,11 @@ interface SavedJob {
   contactPhone?: string;
   enrichedData?: string | EnrichedData;
   enrichedAt?: string;
+  aiGrade?: string;
+  aiAnalysis?: string;
+  aiAnalyzedAt?: string;
+  generatedCvAt?: string;
+  interviewPrep?: string;
   application?: {
     id: string;
     status: string;
@@ -64,8 +73,16 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [batchAnalyzing, setBatchAnalyzing] = useState(false);
+  const [batchGenerating, setBatchGenerating] = useState(false);
   // AI Enrichment state
   const [enriching, setEnriching] = useState<string | null>(null);
+  // AI Analysis state
+  const [analyzing, setAnalyzing] = useState<string | null>(null);
+  const [expandedAnalysis, setExpandedAnalysis] = useState<string | null>(null);
+  // Interview Prep state
+  const [generatingPrep, setGeneratingPrep] = useState<string | null>(null);
+  const [prepModal, setPrepModal] = useState<{ job: SavedJob; prep: InterviewPrep } | null>(null);
   // Contact editing state
   const [editingContact, setEditingContact] = useState<string | null>(null);
   const [contactEmail, setContactEmail] = useState('');
@@ -398,6 +415,89 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
     }
   };
 
+  const handleAnalyze = async (job: SavedJob) => {
+    try {
+      setAnalyzing(job.id);
+      const response = await fetch('/api/jobs/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jobId: job.id }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to analyze job');
+      }
+
+      setJobs((prev) =>
+        prev.map((j) =>
+          j.id === job.id
+            ? {
+                ...j,
+                aiGrade: data.analysis.grade,
+                aiAnalysis: JSON.stringify(data.analysis),
+                aiAnalyzedAt: new Date().toISOString(),
+              }
+            : j
+        )
+      );
+      setExpandedAnalysis(job.id);
+      showSuccess(`Análise concluída! Nota: ${data.analysis.grade}`);
+    } catch (err) {
+      showError(err instanceof Error ? err.message : 'Failed to analyze job');
+    } finally {
+      setAnalyzing(null);
+    }
+  };
+
+  const getAIAnalysis = (job: SavedJob): AIAnalysis | null => {
+    if (!job.aiAnalysis) return null;
+    try {
+      return JSON.parse(job.aiAnalysis) as AIAnalysis;
+    } catch {
+      return null;
+    }
+  };
+
+  const handleInterviewPrep = async (job: SavedJob) => {
+    // If already generated, show cached
+    if (job.interviewPrep) {
+      try {
+        const cached = JSON.parse(job.interviewPrep) as InterviewPrep;
+        setPrepModal({ job, prep: cached });
+        return;
+      } catch {
+        // Fall through to regenerate
+      }
+    }
+
+    try {
+      setGeneratingPrep(job.id);
+      const response = await fetch(`/api/jobs/saved/${job.id}/interview-prep`, {
+        method: 'POST',
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to generate interview prep');
+      }
+
+      setJobs((prev) =>
+        prev.map((j) =>
+          j.id === job.id ? { ...j, interviewPrep: JSON.stringify(data.prep) } : j
+        )
+      );
+      setPrepModal({ job: { ...job, interviewPrep: JSON.stringify(data.prep) }, prep: data.prep });
+      showSuccess('Preparação para entrevista gerada!');
+    } catch (err) {
+      showError(err instanceof Error ? err.message : 'Failed to generate interview prep');
+    } finally {
+      setGeneratingPrep(null);
+    }
+  };
+
   const getEnrichedData = (job: SavedJob): EnrichedData | null => {
     if (!job.enrichedData) return null;
     if (typeof job.enrichedData === 'string') {
@@ -463,6 +563,89 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
       showError(err instanceof Error ? err.message : 'Failed to delete jobs');
     } finally {
       setBulkDeleting(false);
+    }
+  };
+
+  const handleBatchAnalyze = async () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+
+    try {
+      setBatchAnalyzing(true);
+      const response = await fetch('/api/jobs/batch/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jobIds: ids }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) throw new Error(data.error || 'Batch analyze failed');
+
+      await fetchSavedJobs();
+      showSuccess(`Análise concluída: ${data.succeeded}/${data.processed} vagas analisadas.`);
+      if (data.failed > 0) {
+        showWarning(`${data.failed} vaga(s) falharam.`);
+      }
+    } catch (err) {
+      showError(err instanceof Error ? err.message : 'Batch analyze failed');
+    } finally {
+      setBatchAnalyzing(false);
+    }
+  };
+
+  const handleBatchGenerateCVs = async () => {
+    const ids = Array.from(selectedIds).slice(0, 10);
+    if (ids.length === 0) return;
+
+    try {
+      setBatchGenerating(true);
+      const response = await fetch('/api/jobs/batch/generate-cv', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jobIds: ids }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) throw new Error(data.error || 'Batch CV generation failed');
+
+      // Trigger PDF downloads for successful generations
+      const { buildCVHtml } = await import('@/lib/jobs/cv-html');
+      const resumeModule = await import('@/data/resume.json');
+      const resumeInfo = resumeModule.default.personalInfo;
+      const html2pdfModule = await import('html2pdf.js');
+      const html2pdf = html2pdfModule.default;
+
+      for (const item of data.cvData) {
+        if (!item.success || !item.customCV) continue;
+        const job = jobs.find((j) => j.id === item.jobId);
+        if (!job) continue;
+
+        const html = buildCVHtml(item.customCV, resumeInfo, job.title, job.company);
+        const el = document.createElement('div');
+        el.innerHTML = html;
+        document.body.appendChild(el);
+
+        await html2pdf()
+          .set({
+            margin: 0,
+            filename: `cv-${job.company.toLowerCase().replace(/\s+/g, '-')}.pdf`,
+            html2canvas: { scale: 2, useCORS: true },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+          })
+          .from(el)
+          .save();
+
+        document.body.removeChild(el);
+      }
+
+      await fetchSavedJobs();
+      showSuccess(`CVs gerados: ${data.succeeded}/${data.processed} vagas.`);
+    } catch (err) {
+      showError(err instanceof Error ? err.message : 'Batch CV generation failed');
+    } finally {
+      setBatchGenerating(false);
     }
   };
 
@@ -824,6 +1007,10 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
           onDelete={handleBulkDelete}
           onExport={handleExport}
           isDeleting={bulkDeleting || exporting}
+          onBatchAnalyze={selectedIds.size > 0 ? handleBatchAnalyze : undefined}
+          onBatchGenerateCVs={selectedIds.size > 0 ? handleBatchGenerateCVs : undefined}
+          batchAnalyzing={batchAnalyzing}
+          batchGenerating={batchGenerating}
         />
         <button
           onClick={() => setAddingJob(true)}
@@ -887,6 +1074,9 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
                     </p>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
+                    {job.aiGrade && (
+                      <AIGradeBadge grade={job.aiGrade} />
+                    )}
                     {job.application && (
                       <span className={`px-2 py-1 text-xs rounded capitalize ${getStatusColor(job.application.status)}`}>
                         {job.application.status}
@@ -1097,6 +1287,31 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
                   )}
                 </div>
 
+                {/* AI Analysis Panel */}
+                {(() => {
+                  const analysis = getAIAnalysis(job);
+                  if (!analysis) return null;
+                  return (
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <button
+                          onClick={() => setExpandedAnalysis(expandedAnalysis === job.id ? null : job.id)}
+                          className="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                          </svg>
+                          {expandedAnalysis === job.id ? 'Ocultar Análise IA' : 'Ver Análise IA'}
+                        </button>
+                        <span className="text-xs text-zinc-400">
+                          Nota: <span className="font-bold text-zinc-600 dark:text-zinc-300">{analysis.grade}</span> · {analysis.skillFitPercent}% fit
+                        </span>
+                      </div>
+                      {expandedAnalysis === job.id && <AIAnalysisPanel analysis={analysis} />}
+                    </div>
+                  );
+                })()}
+
                 {/* AI Enriched Data */}
                 {(() => {
                   const enriched = getEnrichedData(job);
@@ -1182,6 +1397,59 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
                 {expandedId === job.id ? 'Show less' : 'Show more'}
               </button>
               <div className="flex items-center gap-2">
+                {/* AI Analyze Button */}
+                <button
+                  onClick={() => handleAnalyze(job)}
+                  disabled={analyzing === job.id}
+                  className="px-3 py-1.5 text-sm bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-lg hover:bg-indigo-200 dark:hover:bg-indigo-900/50 disabled:opacity-50 transition-colors flex items-center gap-1"
+                  title={job.aiAnalyzedAt ? 'Re-analyze with AI' : 'Analyze job fit with AI'}
+                >
+                  {analyzing === job.id ? (
+                    <>
+                      <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                      Analisando...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                      </svg>
+                      {job.aiAnalyzedAt ? 'Re-analyze' : 'Analyze'}
+                    </>
+                  )}
+                </button>
+                {/* CV Generator Button */}
+                <CVGeneratorButton
+                  job={job}
+                  onGenerated={fetchSavedJobs}
+                />
+                {/* Interview Prep Button */}
+                <button
+                  onClick={() => handleInterviewPrep(job)}
+                  disabled={generatingPrep === job.id}
+                  className="px-3 py-1.5 text-sm bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-lg hover:bg-emerald-200 dark:hover:bg-emerald-900/50 disabled:opacity-50 transition-colors flex items-center gap-1"
+                  title={job.interviewPrep ? 'Ver preparação para entrevista' : 'Gerar preparação para entrevista'}
+                >
+                  {generatingPrep === job.id ? (
+                    <>
+                      <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                      Gerando...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                      </svg>
+                      {job.interviewPrep ? 'Ver Prep' : 'Prep Entrevista'}
+                    </>
+                  )}
+                </button>
                 <button
                   onClick={() => handleEnrich(job)}
                   disabled={enriching === job.id}
@@ -1247,6 +1515,17 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
           </div>
         </div>
       ))}
+
+      {/* Interview Prep Modal */}
+      {prepModal && (
+        <InterviewPrepModal
+          isOpen={true}
+          onClose={() => setPrepModal(null)}
+          prep={prepModal.prep}
+          jobTitle={prepModal.job.title}
+          company={prepModal.job.company}
+        />
+      )}
 
       {/* Contact Editing Modal */}
       {editingContact && (
