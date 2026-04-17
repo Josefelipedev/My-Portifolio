@@ -90,9 +90,9 @@ function getTypeIcon(type: string) {
 export async function EducationSection() {
   const education = await getEducation();
 
-  // Split education into left and right columns for U-shape
-  const leftItems = education.filter((_, i) => i % 2 === 0);
-  const rightItems = education.filter((_, i) => i % 2 === 1);
+  // Group by type: Degrees (Higher Education) on left, Courses/Certifications on right
+  const degrees = education.filter((edu) => edu.type === 'degree');
+  const certificationsAndCourses = education.filter((edu) => edu.type === 'course' || edu.type === 'certification');
 
   return (
     <SectionWrapper id="education">
@@ -138,7 +138,7 @@ export async function EducationSection() {
                 x1="10%"
                 y1="0"
                 x2="10%"
-                y2={`${Math.max(leftItems.length * 15, 50)}%`}
+                y2={`${Math.max(degrees.length * 15, 50)}%`}
                 stroke="url(#uGradient)"
                 strokeWidth="2"
                 strokeLinecap="round"
@@ -146,7 +146,7 @@ export async function EducationSection() {
               />
               {/* Bottom curve */}
               <path
-                d={`M ${10}% ${Math.max(leftItems.length * 15, 50)}% Q 50% ${Math.max(leftItems.length * 15 + 20, 70)}% ${90}% ${Math.max(rightItems.length * 15, 50)}%`}
+                d={`M ${10}% ${Math.max(degrees.length * 15, 50)}% Q 50% ${Math.max(degrees.length * 15 + 20, 70)}% ${90}% ${Math.max(certificationsAndCourses.length * 15, 50)}%`}
                 fill="none"
                 stroke="url(#uGradient)"
                 strokeWidth="2"
@@ -158,7 +158,7 @@ export async function EducationSection() {
                 x1="90%"
                 y1="0"
                 x2="90%"
-                y2={`${Math.max(rightItems.length * 15, 50)}%`}
+                y2={`${Math.max(certificationsAndCourses.length * 15, 50)}%`}
                 stroke="url(#uGradient)"
                 strokeWidth="2"
                 strokeLinecap="round"
@@ -233,11 +233,15 @@ export async function EducationSection() {
               </div>
             </div>
 
-            {/* Desktop: Two columns forming U-shape */}
+            {/* Desktop: Two columns - Degrees | Courses & Certifications */}
             <div className="hidden md:grid md:grid-cols-2 gap-8">
-              {/* Left Column */}
+              {/* Left Column - Higher Education */}
               <div className="space-y-6">
-                {leftItems.map((edu, index) => {
+                <h3 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-4 flex items-center gap-2">
+                  <span className="w-3 h-3 rounded-full bg-gradient-to-r from-red-500 to-rose-600" />
+                  Higher Education
+                </h3>
+                {degrees.map((edu, index) => {
                   const config = getTypeConfig(edu.type);
                   return (
                     <div
@@ -316,15 +320,19 @@ export async function EducationSection() {
                 })}
               </div>
 
-              {/* Right Column */}
-              <div className="space-y-6 mt-12">
-                {rightItems.map((edu, index) => {
+              {/* Right Column - Courses & Certifications */}
+              <div className="space-y-6">
+                <h3 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100 mb-4 flex items-center gap-2">
+                  <span className="w-3 h-3 rounded-full bg-gradient-to-r from-blue-500 to-cyan-500" />
+                  Courses & Certifications
+                </h3>
+                {certificationsAndCourses.map((edu, index) => {
                   const config = getTypeConfig(edu.type);
                   return (
                     <div
                       key={edu.id}
                       className="relative animate-fade-in-up"
-                      style={{ animationDelay: `${(index + leftItems.length) * 150}ms` }}
+                      style={{ animationDelay: `${(index + degrees.length) * 150}ms` }}
                     >
                       {/* Timeline dot */}
                       <div className={`absolute -right-4 top-4 w-8 h-8 rounded-full bg-gradient-to-br ${config.gradient} flex items-center justify-center text-white shadow-lg ring-4 ring-white dark:ring-zinc-900 z-10`}>
@@ -399,7 +407,7 @@ export async function EducationSection() {
             </div>
 
             {/* Bottom curve indicator - shows only on desktop when there are items on both sides */}
-            {leftItems.length > 0 && rightItems.length > 0 && (
+            {degrees.length > 0 && certificationsAndCourses.length > 0 && (
               <div className="hidden md:flex justify-center mt-8">
                 <div className="w-32 h-8 relative">
                   <div className="absolute inset-0 border-b-2 border-l-2 border-r-2 border-red-500/20 rounded-b-full" />

@@ -16,6 +16,9 @@ const PRICING: Record<string, { input: number; output: number }> = {
 export type AIFeature =
   | 'job-extraction'
   | 'job-enrichment'
+  | 'job-analysis'
+  | 'cv-generation'
+  | 'interview-prep'
   | 'project-summary'
   | 'bio-generation'
   | 'readme-analysis'

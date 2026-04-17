@@ -274,6 +274,17 @@ model SavedJob {
   enrichedData  String?   @db.Text // JSON with additional extracted data
   enrichedAt    DateTime? // When enrichment was performed
 
+  // AI Job Rating fields
+  aiGrade       String?   // "A" | "B" | "C" | "D" | "F"
+  aiAnalysis    String?   @db.Text // JSON with full breakdown
+  aiAnalyzedAt  DateTime?
+
+  // CV Generation
+  generatedCvAt DateTime?
+
+  // Interview Prep
+  interviewPrep String?   @db.Text // JSON with STAR stories, tech topics, salary script
+
   application   JobApplication?
 
   @@index([source])
@@ -303,6 +314,27 @@ model JobApplication {
   @@index([status])
   @@index([createdAt])
   @@index([appliedAt])
+}
+
+// ==========================================
+// Company Portal Tracker (Greenhouse / Ashby / Lever)
+// ==========================================
+
+model CompanyPortal {
+  id              String    @id @default(cuid())
+  company         String
+  careersUrl      String
+  portalType      String    // "greenhouse" | "ashby" | "lever" | "custom"
+  portalSlug      String?   // company slug used by the ATS API
+  titleFilters    String?   @db.Text  // JSON: { include: string[], exclude: string[] }
+  isActive        Boolean   @default(true)
+  lastScannedAt   DateTime?
+  lastMatchCount  Int       @default(0)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([isActive])
+  @@index([lastScannedAt])
 }
 
 // ==========================================
