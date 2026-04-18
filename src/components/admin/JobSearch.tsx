@@ -113,6 +113,9 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
   const [page, setPage] = useState(1);
   const [totalJobs, setTotalJobs] = useState(0);
   const [hasMore, setHasMore] = useState(false);
+  const [fromCache, setFromCache] = useState(false);
+  const [cachedUntil, setCachedUntil] = useState<string | null>(null);
+  const [pendingRefresh, setPendingRefresh] = useState(false);
   const PAGE_SIZE = 25;
   // Advanced filters state
   const [filters, setFilters] = useState<JobFilters>({
@@ -239,11 +242,13 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
     return () => document.removeEventListener('click', handleClickOutside);
   }, [showSourceDropdown, showCountryDropdown]);
 
-  const handleSearch = async (e: React.FormEvent, loadMore = false) => {
+  const handleSearch = async (e: React.FormEvent, loadMore = false, forceRefresh = false) => {
     e.preventDefault();
     if (!keyword.trim()) return;
 
     const currentPage = loadMore ? page + 1 : 1;
+    const shouldRefresh = forceRefresh || pendingRefresh;
+    if (pendingRefresh) setPendingRefresh(false);
 
     try {
       if (loadMore) {
@@ -256,6 +261,8 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
       setIsSmartSearch(false);
       if (!loadMore) {
         setSmartSearchKeywords([]);
+        setFromCache(false);
+        setCachedUntil(null);
       }
 
       const params = new URLSearchParams({
@@ -265,6 +272,7 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
         page: String(currentPage),
         pageSize: String(PAGE_SIZE),
         maxAgeDays,
+        ...(shouldRefresh ? { refresh: 'true' } : {}),
       });
       const response = await fetch(`/api/jobs/search?${params}`);
       const data = await response.json();
@@ -277,8 +285,11 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
         setJobs(prev => [...prev, ...data.jobs]);
       } else {
         setJobs(data.jobs);
-        // Save to history (only for new searches, not load more)
-        saveSearchToHistory(keyword, getCountryParam(), getSourceParam(), data.total);
+        setFromCache(data.fromCache ?? false);
+        setCachedUntil(data.cachedUntil ?? null);
+        if (!data.fromCache) {
+          saveSearchToHistory(keyword, getCountryParam(), getSourceParam(), data.total);
+        }
       }
       setPage(currentPage);
       setTotalJobs(data.total);
@@ -354,19 +365,20 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
   };
 
   // Handler for selecting a search from history
-  const handleSelectHistorySearch = (kw: string, countries: string, sources: string) => {
+  const handleSelectHistorySearch = (kw: string, countries: string, sources: string, forceRefresh = false) => {
     setKeyword(kw);
-    // Parse countries
     if (countries === 'all') {
       setSelectedCountries(new Set(['all']));
     } else {
       setSelectedCountries(new Set(countries.split(',')));
     }
-    // Parse sources
     if (sources === 'all') {
       setSelectedSources(new Set(['all']));
     } else {
       setSelectedSources(new Set(sources.split(',')));
+    }
+    if (forceRefresh) {
+      setPendingRefresh(true);
     }
   };
 
@@ -729,6 +741,40 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
       {error && (
         <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4 mb-6">
           <p className="text-red-600 dark:text-red-400">{error}</p>
+        </div>
+      )}
+
+      {/* Cache Banner */}
+      {fromCache && cachedUntil && jobs.length > 0 && (
+        <div className="flex items-center justify-between gap-3 mb-4 px-4 py-2.5 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-xl">
+          <div className="flex items-center gap-2 text-sm text-emerald-700 dark:text-emerald-300">
+            <svg className="w-4 h-4 text-emerald-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+            <span>
+              Resultado em cache · expira em{' '}
+              <span className="font-semibold">
+                {(() => {
+                  const diffMs = new Date(cachedUntil).getTime() - Date.now();
+                  const diffMins = Math.floor(diffMs / 60000);
+                  const diffHours = Math.floor(diffMs / 3600000);
+                  if (diffMins < 1) return 'instantes';
+                  if (diffMins < 60) return `${diffMins}min`;
+                  return `${diffHours}h`;
+                })()}
+              </span>
+            </span>
+          </div>
+          <button
+            onClick={(e) => handleSearch(e, false, true)}
+            className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-200 font-medium transition-colors"
+            title="Buscar dados atualizados"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            Atualizar
+          </button>
         </div>
       )}
 
