@@ -342,15 +342,18 @@ model CompanyPortal {
 // ==========================================
 
 model JobSearchHistory {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   keyword     String
-  countries   String   // comma-separated
-  sources     String   // comma-separated
-  filters     String?  @db.Text // JSON
+  countries   String    // comma-separated
+  sources     String    // comma-separated
+  filters     String?   @db.Text // JSON
   resultCount Int
-  searchedAt  DateTime @default(now())
+  results     String?   @db.Text // JSON array of JobListing[] — persistent cache
+  cachedUntil DateTime?           // when the cached results expire
+  searchedAt  DateTime  @default(now())
 
   @@index([searchedAt])
+  @@index([keyword, countries, sources])
 }
 
 // ==========================================
