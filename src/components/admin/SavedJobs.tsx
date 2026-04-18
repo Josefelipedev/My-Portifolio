@@ -63,7 +63,11 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
   const { confirm, prompt } = useConfirm();
   const [jobs, setJobs] = useState<SavedJob[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [totalCount, setTotalCount] = useState(0);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [applying, setApplying] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -110,26 +114,36 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
   });
 
   useEffect(() => {
-    fetchSavedJobs();
+    fetchSavedJobs(1);
   }, []);
 
-  const fetchSavedJobs = async () => {
+  const fetchSavedJobs = async (pageNum: number = 1) => {
     try {
-      setLoading(true);
-      const response = await fetch('/api/jobs/saved');
+      pageNum === 1 ? setLoading(true) : setLoadingMore(true);
+      const response = await fetch(`/api/jobs/saved?page=${pageNum}&limit=50`);
       const data = await response.json();
 
       if (!response.ok) {
         throw new Error(data.error || 'Failed to fetch saved jobs');
       }
 
-      setJobs(data);
+      if (pageNum === 1) {
+        setJobs(data.jobs);
+      } else {
+        setJobs((prev) => [...prev, ...data.jobs]);
+      }
+      setTotalCount(data.total);
+      setHasMore(data.hasMore);
+      setPage(pageNum);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load saved jobs');
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   };
+
+  const loadMore = () => fetchSavedJobs(page + 1);
 
   const handleDelete = async (id: string) => {
     const confirmed = await confirm({
@@ -174,7 +188,7 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
         throw new Error(data.error || 'Failed to create application');
       }
 
-      await fetchSavedJobs();
+      await fetchSavedJobs(1);
       onApplicationCreated();
     } catch (err) {
       showError(err instanceof Error ? err.message : 'Failed to create application');
@@ -437,7 +451,7 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
                 ...j,
                 aiGrade: data.analysis.grade,
                 aiAnalysis: JSON.stringify(data.analysis),
-                aiAnalyzedAt: new Date().toISOString(),
+                aiAnalyzedAt: data.analyzedAt ?? new Date().toISOString(),
               }
             : j
         )
@@ -554,10 +568,8 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
 
       const data = await response.json();
       setJobs((prev) => prev.filter((j) => !selectedIds.has(j.id)));
-      // Call onJobRemoved for each deleted job
-      for (let i = 0; i < data.count; i++) {
-        onJobRemoved();
-      }
+      setTotalCount((prev) => prev - (data.count ?? selectedIds.size));
+      onJobRemoved();
       setSelectedIds(new Set());
     } catch (err) {
       showError(err instanceof Error ? err.message : 'Failed to delete jobs');
@@ -582,7 +594,7 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
 
       if (!response.ok) throw new Error(data.error || 'Batch analyze failed');
 
-      await fetchSavedJobs();
+      await fetchSavedJobs(1);
       showSuccess(`Análise concluída: ${data.succeeded}/${data.processed} vagas analisadas.`);
       if (data.failed > 0) {
         showWarning(`${data.failed} vaga(s) falharam.`);
@@ -640,7 +652,7 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
         document.body.removeChild(el);
       }
 
-      await fetchSavedJobs();
+      await fetchSavedJobs(1);
       showSuccess(`CVs gerados: ${data.succeeded}/${data.processed} vagas.`);
     } catch (err) {
       showError(err instanceof Error ? err.message : 'Batch CV generation failed');
@@ -1001,7 +1013,7 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
       <div className="flex items-center justify-between">
         <BulkActionBar
           selectedCount={selectedIds.size}
-          totalCount={jobs.length}
+          totalCount={totalCount}
           onSelectAll={selectAll}
           onDeselectAll={deselectAll}
           onDelete={handleBulkDelete}
@@ -1695,6 +1707,29 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
               </p>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Load More */}
+      {hasMore && (
+        <div className="flex justify-center pt-2">
+          <button
+            onClick={loadMore}
+            disabled={loadingMore}
+            className="px-6 py-2 bg-zinc-100 dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-600 text-zinc-700 dark:text-zinc-300 rounded-lg hover:bg-zinc-200 dark:hover:bg-zinc-700 disabled:opacity-50 transition-colors flex items-center gap-2 text-sm"
+          >
+            {loadingMore ? (
+              <>
+                <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                Carregando...
+              </>
+            ) : (
+              `Carregar mais (${totalCount - jobs.length} restantes)`
+            )}
+          </button>
         </div>
       )}
 

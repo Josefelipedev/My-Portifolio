@@ -3,26 +3,40 @@ import prisma from '@/lib/prisma';
 import { isAuthenticated } from '@/lib/auth';
 import { success, error, Errors, validateRequired } from '@/lib/api-utils';
 
-// GET all saved jobs
-export async function GET() {
+// GET saved jobs with pagination
+export async function GET(request: Request) {
   try {
     if (!await isAuthenticated()) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const savedJobs = await prisma.savedJob.findMany({
-      orderBy: { savedAt: 'desc' },
-      include: {
-        application: {
-          select: {
-            id: true,
-            status: true,
+    const { searchParams } = new URL(request.url);
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '50', 10)));
+    const skip = (page - 1) * limit;
+
+    const [savedJobs, total] = await Promise.all([
+      prisma.savedJob.findMany({
+        orderBy: { savedAt: 'desc' },
+        skip,
+        take: limit,
+        include: {
+          application: {
+            select: { id: true, status: true },
           },
         },
-      },
-    });
+      }),
+      prisma.savedJob.count(),
+    ]);
 
-    return success(savedJobs);
+    return success({
+      jobs: savedJobs,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+      hasMore: skip + savedJobs.length < total,
+    });
   } catch (err) {
     return error(err);
   }

@@ -2,6 +2,7 @@
 import Together from 'together-ai';
 import { trackAIUsage, estimateTokens, checkQuotaLimits } from '@/lib/ai-tracking';
 import prisma from '@/lib/prisma';
+import resumeData from '@/data/resume.json';
 
 export interface AIJobAnalysis {
   grade: 'A' | 'B' | 'C' | 'D' | 'F';
@@ -13,23 +14,20 @@ export interface AIJobAnalysis {
   gaps: string[];
 }
 
-interface ResumeSkill {
-  name: string;
-  level: number;
-  category: string;
-}
+const VALID_GRADES = new Set(['A', 'B', 'C', 'D', 'F']);
 
-interface ResumeExperience {
-  title: string;
-  company: string;
-  responsibilities: string[];
-}
-
-interface ResumeData {
-  personalInfo: { name: string };
-  professionalSummary: { en: string };
-  skills: ResumeSkill[];
-  experience: ResumeExperience[];
+function validateAnalysis(obj: unknown): obj is AIJobAnalysis {
+  if (!obj || typeof obj !== 'object') return false;
+  const a = obj as Record<string, unknown>;
+  return (
+    typeof a.grade === 'string' && VALID_GRADES.has(a.grade) &&
+    typeof a.skillFitPercent === 'number' &&
+    typeof a.salaryAssessment === 'string' &&
+    typeof a.seniorityMatch === 'string' &&
+    typeof a.applicationTip === 'string' &&
+    Array.isArray(a.strengths) &&
+    Array.isArray(a.gaps)
+  );
 }
 
 function getTogetherClient(): Together | null {
@@ -48,8 +46,7 @@ export async function analyzeJob(savedJobId: string): Promise<AIJobAnalysis> {
   const client = getTogetherClient();
   if (!client) throw new Error('AI service not configured. Set TOGETHER_API_KEY.');
 
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const resume: ResumeData = require('@/data/resume.json');
+  const resume = resumeData;
 
   const topSkills = resume.skills
     .sort((a, b) => b.level - a.level)
@@ -123,7 +120,17 @@ Return ONLY the JSON, no markdown, no explanation.`;
     const jsonMatch = content.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error('No JSON found in AI response');
 
-    const analysis = JSON.parse(jsonMatch[0]) as AIJobAnalysis;
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(jsonMatch[0]);
+    } catch {
+      throw new Error('AI returned invalid JSON');
+    }
+
+    if (!validateAnalysis(parsed)) {
+      throw new Error('AI response missing required fields');
+    }
+    const analysis: AIJobAnalysis = parsed;
 
     // Persist to DB
     await prisma.savedJob.update({

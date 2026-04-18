@@ -123,8 +123,10 @@ export async function searchJobs(
     }
   }
 
-  const results = await Promise.all(searches);
-  let allJobs = results.flat();
+  const settled = await Promise.allSettled(searches);
+  let allJobs = settled
+    .filter((r): r is PromiseFulfilledResult<JobListing[]> => r.status === 'fulfilled')
+    .flatMap((r) => r.value);
 
   // Deduplicate jobs
   allJobs = deduplicateJobs(allJobs);

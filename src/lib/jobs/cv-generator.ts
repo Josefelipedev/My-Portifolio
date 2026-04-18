@@ -2,53 +2,20 @@
 import Together from 'together-ai';
 import { trackAIUsage, estimateTokens, checkQuotaLimits } from '@/lib/ai-tracking';
 import prisma from '@/lib/prisma';
+import resumeData from '@/data/resume.json';
 import { type CustomCVContent } from './cv-html';
 
 export type { CustomCVContent };
 export { buildCVHtml } from './cv-html';
 
-interface ResumeSkill {
-  name: string;
-  level: number;
-  category: string;
-}
-
-interface ResumeExperience {
-  title: string;
-  company: string;
-  location: string;
-  startDate: string;
-  endDate: string;
-  responsibilities: string[];
-}
-
-interface ResumeEducation {
-  degree: string;
-  institution: string;
-  startDate: string;
-  endDate: string;
-}
-
-interface ResumeCertification {
-  name: string;
-  issuer: string;
-}
-
-interface ResumePersonalInfo {
-  name: string;
-  email: string;
-  phone: string;
-  linkedin: string;
-  github: string;
-}
-
-interface ResumeData {
-  personalInfo: ResumePersonalInfo;
-  professionalSummary: { en: string };
-  skills: ResumeSkill[];
-  experience: ResumeExperience[];
-  education: ResumeEducation[];
-  certifications: ResumeCertification[];
+function validateCustomCV(obj: unknown): obj is CustomCVContent {
+  if (!obj || typeof obj !== 'object') return false;
+  const cv = obj as Record<string, unknown>;
+  return (
+    typeof cv.summary === 'string' &&
+    Array.isArray(cv.skills) &&
+    Array.isArray(cv.experience)
+  );
 }
 
 function getTogetherClient(): Together | null {
@@ -67,8 +34,7 @@ export async function generateCustomCV(savedJobId: string): Promise<CustomCVCont
   const client = getTogetherClient();
   if (!client) throw new Error('AI service not configured. Set TOGETHER_API_KEY.');
 
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const resume: ResumeData = require('@/data/resume.json');
+  const resume = resumeData;
 
   const allSkills = resume.skills.map((s) => s.name).join(', ');
   const expSummary = resume.experience
@@ -145,7 +111,17 @@ Return ONLY the JSON.`;
     const jsonMatch = content.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error('No JSON found in AI response');
 
-    const customCV = JSON.parse(jsonMatch[0]) as CustomCVContent;
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(jsonMatch[0]);
+    } catch {
+      throw new Error('AI returned invalid JSON');
+    }
+
+    if (!validateCustomCV(parsed)) {
+      throw new Error('AI response missing required CV fields');
+    }
+    const customCV: CustomCVContent = parsed;
 
     // Merge into existing enrichedData under 'customizedCv' key
     let enrichedData: Record<string, unknown> = {};
