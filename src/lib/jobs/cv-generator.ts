@@ -3,10 +3,19 @@ import Together from 'together-ai';
 import { trackAIUsage, estimateTokens, checkQuotaLimits } from '@/lib/ai-tracking';
 import prisma from '@/lib/prisma';
 import resumeData from '@/data/resume.json';
-import { type CustomCVContent } from './cv-html';
+export interface CustomCVContent {
+  summary: string;
+  skills: string[];
+  experience: Array<{
+    title: string;
+    company: string;
+    startDate: string;
+    endDate: string;
+    location: string;
+    bullets: string[];
+  }>;
+}
 
-export type { CustomCVContent };
-export { buildCVHtml } from './cv-html';
 
 function validateCustomCV(obj: unknown): obj is CustomCVContent {
   if (!obj || typeof obj !== 'object') return false;

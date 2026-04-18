@@ -623,33 +623,36 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
       if (!response.ok) throw new Error(data.error || 'Batch CV generation failed');
 
       // Trigger PDF downloads for successful generations
-      const { buildCVHtml } = await import('@/lib/jobs/cv-html');
-      const resumeModule = await import('@/data/resume.json');
-      const resumeInfo = resumeModule.default.personalInfo;
-      const html2pdfModule = await import('html2pdf.js');
-      const html2pdf = html2pdfModule.default;
+      const [{ pdf }, { default: CVDocument }, { default: resumeModule }, React] = await Promise.all([
+        import('@react-pdf/renderer'),
+        import('@/components/admin/jobs/CVDocument'),
+        import('@/data/resume.json'),
+        import('react'),
+      ]);
+      const resumeInfo = resumeModule.personalInfo;
 
       for (const item of data.cvData) {
         if (!item.success || !item.customCV) continue;
         const job = jobs.find((j) => j.id === item.jobId);
         if (!job) continue;
 
-        const html = buildCVHtml(item.customCV, resumeInfo, job.title, job.company);
-        const el = document.createElement('div');
-        el.innerHTML = html;
-        document.body.appendChild(el);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const doc = React.createElement(CVDocument, {
+          cv: item.customCV,
+          personalInfo: resumeInfo,
+          jobTitle: job.title,
+          company: job.company,
+        }) as any;
+        const blob = await pdf(doc).toBlob();
 
-        await html2pdf()
-          .set({
-            margin: 0,
-            filename: `cv-${job.company.toLowerCase().replace(/\s+/g, '-')}.pdf`,
-            html2canvas: { scale: 2, useCORS: true },
-            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-          })
-          .from(el)
-          .save();
-
-        document.body.removeChild(el);
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `cv-${job.company.toLowerCase().replace(/\s+/g, '-')}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
       }
 
       await fetchSavedJobs(1);
