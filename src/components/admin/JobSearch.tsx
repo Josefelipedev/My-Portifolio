@@ -52,11 +52,11 @@ const COUNTRY_OPTIONS = [
 ];
 
 const DATE_FILTER_OPTIONS = [
-  { value: '0', label: 'Todas as datas' },
-  { value: '7', label: 'Ultimos 7 dias' },
-  { value: '15', label: 'Ultimos 15 dias' },
-  { value: '30', label: 'Ultimo mes' },
-  { value: '60', label: 'Ultimos 2 meses' },
+  { value: '0', label: 'All dates' },
+  { value: '7', label: 'Last 7 days' },
+  { value: '15', label: 'Last 15 days' },
+  { value: '30', label: 'Last month' },
+  { value: '60', label: 'Last 2 months' },
 ];
 
 const SOURCE_OPTIONS = [
@@ -119,6 +119,10 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
   const [pendingRefresh, setPendingRefresh] = useState(false);
   const [sourceErrors, setSourceErrors] = useState<{ source: string; error: string }[]>([]);
   const PAGE_SIZE = 25;
+  // Smart search client-side pagination cache
+  const [allSmartResults, setAllSmartResults] = useState<JobListing[]>([]);
+  // Expandable tags per job
+  const [expandedTags, setExpandedTags] = useState<Set<string>>(new Set());
   // Advanced filters state
   const [filters, setFilters] = useState<JobFilters>({
     salaryMin: 0,
@@ -167,13 +171,13 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
   };
 
   const getCountryLabel = () => {
-    if (selectedCountries.has('all')) return 'Todos os paises';
+    if (selectedCountries.has('all')) return 'All countries';
     if (selectedCountries.size === 1) {
       const country = Array.from(selectedCountries)[0];
       const opt = COUNTRY_OPTIONS.find(c => c.value === country);
       return opt ? `${opt.flag} ${opt.label}` : country;
     }
-    return `${selectedCountries.size} paises`;
+    return `${selectedCountries.size} countries`;
   };
 
   // Source multi-select functions
@@ -210,21 +214,29 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
   };
 
   const getSourceLabel = () => {
-    if (selectedSources.has('all')) return 'Todas as fontes';
+    if (selectedSources.has('all')) return 'All sources';
     if (selectedSources.size === 1) {
       const source = Array.from(selectedSources)[0];
       return SOURCE_OPTIONS.find(s => s.value === source)?.label || source;
     }
-    return `${selectedSources.size} fontes`;
+    return `${selectedSources.size} sources`;
   };
 
-  // Fetch API status on mount and auto-run AI search
+  // Fetch API status and hydrate saved IDs on mount
   useEffect(() => {
     fetch('/api/jobs/search?status=true')
       .then(res => res.ok && res.headers.get('content-type')?.includes('json') ? res.json() : null)
       .then(data => data && setApiStatus(data.apis || []))
       .catch(() => {});
 
+    fetch('/api/jobs/saved?page=1&limit=500')
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data?.jobs) {
+          setSavedIds(new Set(data.jobs.map((j: { externalId: string }) => j.externalId)));
+        }
+      })
+      .catch(() => {});
   }, []);
 
   // Close dropdowns when clicking outside
@@ -244,8 +256,7 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
     return () => document.removeEventListener('click', handleClickOutside);
   }, [showSourceDropdown, showCountryDropdown]);
 
-  const handleSearch = async (e: React.FormEvent, loadMore = false, forceRefresh = false) => {
-    e.preventDefault();
+  const performSearch = async (loadMore = false, forceRefresh = false) => {
     if (!keyword.trim()) return;
 
     const currentPage = loadMore ? page + 1 : 1;
@@ -280,7 +291,7 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
       const response = await fetch(`/api/jobs/search?${params}`);
       const contentType = response.headers.get('content-type') || '';
       if (!contentType.includes('application/json')) {
-        throw new Error(`Resposta inesperada do servidor (${response.status})`);
+        throw new Error(`Unexpected server response (${response.status})`);
       }
       const data = await response.json();
 
@@ -313,28 +324,35 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
     }
   };
 
-  const handleLoadMore = () => {
-    const fakeEvent = { preventDefault: () => {} } as React.FormEvent;
-    handleSearch(fakeEvent, true);
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    performSearch();
   };
 
+  const handleLoadMore = () => performSearch(true);
+  const handleRefresh = () => performSearch(false, true);
+
   const handleSmartSearch = async (loadMore = false) => {
-    const currentPage = loadMore ? page + 1 : 1;
+    // If loading more, paginate client-side from cached results
+    if (loadMore && allSmartResults.length > 0) {
+      const nextJobs = allSmartResults.slice(jobs.length, jobs.length + PAGE_SIZE);
+      setJobs(prev => [...prev, ...nextJobs]);
+      setPage(prev => prev + 1);
+      setHasMore(jobs.length + nextJobs.length < allSmartResults.length);
+      return;
+    }
 
     try {
-      if (loadMore) {
-        setLoadingMore(true);
-      } else {
-        setLoading(true);
-        setPage(1);
-      }
+      setLoading(true);
+      setPage(1);
       setError(null);
       setIsSmartSearch(true);
+      setAllSmartResults([]);
 
       const params = new URLSearchParams({
         country: getCountryParam(),
         source: getSourceParam(),
-        limit: String(PAGE_SIZE * currentPage), // For smart search, fetch cumulative
+        limit: String(200),
         maxAgeDays,
       });
       const response = await fetch(`/api/jobs/smart-search?${params}`);
@@ -344,18 +362,12 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
         throw new Error(data.error || 'Failed to perform smart search');
       }
 
-      // Smart search returns all results at once, so we paginate client-side
-      const startIndex = loadMore ? jobs.length : 0;
-      const newJobs = data.jobs.slice(startIndex, startIndex + PAGE_SIZE);
-
-      if (loadMore) {
-        setJobs(prev => [...prev, ...newJobs]);
-      } else {
-        setJobs(newJobs);
-      }
-      setPage(currentPage);
-      setTotalJobs(data.total || data.jobs.length);
-      setHasMore(startIndex + PAGE_SIZE < data.jobs.length);
+      const allResults: JobListing[] = data.jobs || [];
+      setAllSmartResults(allResults);
+      setJobs(allResults.slice(0, PAGE_SIZE));
+      setPage(1);
+      setTotalJobs(allResults.length);
+      setHasMore(allResults.length > PAGE_SIZE);
       setSmartSearchKeywords(data.keywords || []);
       if (data.apis) {
         setApiStatus(data.apis);
@@ -368,9 +380,7 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
     }
   };
 
-  const handleSmartSearchLoadMore = () => {
-    handleSmartSearch(true);
-  };
+  const handleSmartSearchLoadMore = () => handleSmartSearch(true);
 
   // Handler for selecting a search from history
   const handleSelectHistorySearch = (kw: string, countries: string, sources: string, forceRefresh = false) => {
@@ -423,7 +433,7 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
         return newSet;
       });
       onJobSaved();
-      toast.showSuccess('Vaga salva com sucesso!');
+      toast.showSuccess('Job saved successfully!');
     } catch (err) {
       toast.showError(err instanceof Error ? err.message : 'Erro ao salvar vaga');
     } finally {
@@ -514,6 +524,9 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
             <button
               type="button"
               onClick={() => setShowCountryDropdown(!showCountryDropdown)}
+              aria-haspopup="listbox"
+              aria-expanded={showCountryDropdown}
+              aria-label="Select countries"
               className="px-4 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 flex items-center gap-2 min-w-[160px]"
             >
               <span className="truncate">{getCountryLabel()}</span>
@@ -522,9 +535,8 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
               </svg>
             </button>
             {showCountryDropdown && (
-              <div className="absolute z-50 mt-1 w-48 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg">
+              <div role="listbox" aria-multiselectable="true" aria-label="Countries" className="absolute z-50 mt-1 w-48 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg">
                 <div className="p-2">
-                  {/* All Countries Option */}
                   <label className="flex items-center gap-2 px-2 py-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded cursor-pointer">
                     <input
                       type="checkbox"
@@ -532,10 +544,9 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
                       onChange={() => toggleCountry('all')}
                       className="w-4 h-4 rounded border-zinc-300 text-red-500 focus:ring-red-500"
                     />
-                    <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">🌍 Todos os paises</span>
+                    <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">🌍 All countries</span>
                   </label>
                   <div className="border-t border-zinc-200 dark:border-zinc-700 my-1" />
-                  {/* Individual Countries */}
                   {COUNTRY_OPTIONS.map(opt => (
                     <label key={opt.value} className="flex items-center gap-2 px-2 py-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded cursor-pointer">
                       <input
@@ -558,6 +569,9 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
             <button
               type="button"
               onClick={() => setShowSourceDropdown(!showSourceDropdown)}
+              aria-haspopup="listbox"
+              aria-expanded={showSourceDropdown}
+              aria-label="Select sources"
               className="px-4 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 flex items-center gap-2 min-w-[140px]"
             >
               <span className="truncate">{getSourceLabel()}</span>
@@ -566,9 +580,8 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
               </svg>
             </button>
             {showSourceDropdown && (
-              <div className="absolute z-50 mt-1 w-56 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg">
+              <div role="listbox" aria-multiselectable="true" aria-label="Sources" className="absolute z-50 mt-1 w-56 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg">
                 <div className="p-2">
-                  {/* All Sources Option */}
                   <label className="flex items-center gap-2 px-2 py-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded cursor-pointer">
                     <input
                       type="checkbox"
@@ -576,10 +589,9 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
                       onChange={() => toggleSource('all')}
                       className="w-4 h-4 rounded border-zinc-300 text-red-500 focus:ring-red-500"
                     />
-                    <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">Todas as fontes</span>
+                    <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">All sources</span>
                   </label>
                   <div className="border-t border-zinc-200 dark:border-zinc-700 my-1" />
-                  {/* Individual Sources */}
                   {SOURCE_OPTIONS.map(opt => (
                     <label key={opt.value} className="flex items-center gap-2 px-2 py-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded cursor-pointer">
                       <input
@@ -602,7 +614,7 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
             value={maxAgeDays}
             onChange={(e) => setMaxAgeDays(e.target.value)}
             className="px-4 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
-            title="Filtrar por data"
+            title="Filter by date"
           >
             {DATE_FILTER_OPTIONS.map(opt => (
               <option key={opt.value} value={opt.value}>
@@ -637,7 +649,7 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
             onClick={() => handleSmartSearch()}
             disabled={loading}
             className="px-6 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-medium rounded-lg hover:from-purple-600 hover:to-pink-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2"
-            title="Busca inteligente baseada no seu curriculo"
+            title="Smart search based on your resume"
           >
             {loading && isSmartSearch ? (
               <>
@@ -675,13 +687,13 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
           <svg className="w-5 h-5 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
           </svg>
-          <span className="font-medium text-zinc-700 dark:text-zinc-300">Sugestões de busca</span>
+          <span className="font-medium text-zinc-700 dark:text-zinc-300">Search suggestions</span>
         </div>
 
         {/* Resume-based suggestions */}
         {smartSearchKeywords.length > 0 && (
           <div className="mb-3">
-            <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-2">📄 Baseado no seu currículo:</p>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-2">📄 Based on your resume:</p>
             <div className="flex flex-wrap gap-2">
               {smartSearchKeywords.slice(0, 8).map((kw, i) => (
                 <button
@@ -698,7 +710,7 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
 
         {/* Popular terms */}
         <div>
-          <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-2">🔥 Termos populares:</p>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-2">🔥 Popular terms:</p>
           <div className="flex flex-wrap gap-2">
             {POPULAR_SEARCH_TERMS.map((item, i) => (
               <button
@@ -724,10 +736,10 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
             <svg className="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
             </svg>
-            <span className="font-medium text-purple-700 dark:text-purple-300">Busca Inteligente Ativa</span>
+            <span className="font-medium text-purple-700 dark:text-purple-300">AI Smart Search Active</span>
           </div>
           <p className="text-sm text-purple-600 dark:text-purple-400 mb-2">
-            Keywords extraidas do seu curriculo:
+            Keywords extracted from your resume:
           </p>
           <div className="flex flex-wrap gap-2">
             {smartSearchKeywords.slice(0, 10).map((kw, i) => (
@@ -756,7 +768,7 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
       {sourceErrors.length > 0 && (
         <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl">
           <p className="text-xs font-medium text-amber-700 dark:text-amber-400 mb-2">
-            {sourceErrors.length} fonte{sourceErrors.length > 1 ? 's' : ''} com erro nesta busca:
+            {sourceErrors.length} source{sourceErrors.length > 1 ? 's' : ''} with errors in this search:
           </p>
           <ul className="space-y-1">
             {sourceErrors.map((e, i) => (
@@ -777,13 +789,13 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
             </svg>
             <span>
-              Resultado em cache · expira em{' '}
+              Cached result · expires in{' '}
               <span className="font-semibold">
                 {(() => {
                   const diffMs = new Date(cachedUntil).getTime() - Date.now();
                   const diffMins = Math.floor(diffMs / 60000);
                   const diffHours = Math.floor(diffMs / 3600000);
-                  if (diffMins < 1) return 'instantes';
+                  if (diffMins < 1) return 'moments';
                   if (diffMins < 60) return `${diffMins}min`;
                   return `${diffHours}h`;
                 })()}
@@ -791,33 +803,56 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
             </span>
           </div>
           <button
-            onClick={(e) => handleSearch(e, false, true)}
+            onClick={handleRefresh}
             className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-200 font-medium transition-colors"
-            title="Buscar dados atualizados"
+            title="Fetch fresh data"
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
-            Atualizar
+            Refresh
           </button>
         </div>
       )}
 
+      {/* Skeleton Loading */}
+      {loading && (
+        <div className="space-y-4">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="bg-white dark:bg-zinc-800 rounded-xl border border-zinc-200 dark:border-zinc-700 p-4 animate-pulse">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-lg bg-zinc-200 dark:bg-zinc-700 flex-shrink-0" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-4 bg-zinc-200 dark:bg-zinc-700 rounded w-3/4" />
+                  <div className="h-3 bg-zinc-200 dark:bg-zinc-700 rounded w-1/3" />
+                  <div className="flex gap-2 mt-2">
+                    <div className="h-3 bg-zinc-200 dark:bg-zinc-700 rounded w-20" />
+                    <div className="h-3 bg-zinc-200 dark:bg-zinc-700 rounded w-16" />
+                    <div className="h-3 bg-zinc-200 dark:bg-zinc-700 rounded w-24" />
+                  </div>
+                </div>
+                <div className="h-6 w-20 bg-zinc-200 dark:bg-zinc-700 rounded flex-shrink-0" />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Results */}
-      {jobs.length > 0 && (
+      {!loading && jobs.length > 0 && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <p className="text-sm text-zinc-500 dark:text-zinc-400">
-              Mostrando {filteredJobs.length} de {totalJobs} vagas
+              Showing {filteredJobs.length} of {totalJobs} jobs
               {filteredJobs.length !== jobs.length && (
                 <span className="text-zinc-400 dark:text-zinc-500">
-                  {' '}({jobs.length - filteredJobs.length} filtradas)
+                  {' '}({jobs.length - filteredJobs.length} filtered)
                 </span>
               )}
             </p>
             {hasMore && (
               <span className="text-xs text-zinc-400 dark:text-zinc-500">
-                Pagina {page}
+                Page {page}
               </span>
             )}
           </div>
@@ -902,7 +937,7 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
                     {/* Tags */}
                     {job.tags && job.tags.length > 0 && (
                       <div className="flex flex-wrap gap-1 mt-2">
-                        {job.tags.slice(0, 5).map((tag) => (
+                        {(expandedTags.has(job.id) ? job.tags : job.tags.slice(0, 5)).map((tag) => (
                           <span
                             key={tag}
                             className="px-2 py-0.5 bg-zinc-100 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400 text-xs rounded"
@@ -911,9 +946,17 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
                           </span>
                         ))}
                         {job.tags.length > 5 && (
-                          <span className="text-xs text-zinc-400">
-                            +{job.tags.length - 5} more
-                          </span>
+                          <button
+                            onClick={() => setExpandedTags(prev => {
+                              const next = new Set(prev);
+                              if (next.has(job.id)) next.delete(job.id);
+                              else next.add(job.id);
+                              return next;
+                            })}
+                            className="text-xs text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300"
+                          >
+                            {expandedTags.has(job.id) ? 'Show less' : `+${job.tags.length - 5} more`}
+                          </button>
                         )}
                       </div>
                     )}
@@ -931,7 +974,7 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
                     ) : (
                       <div className="text-center py-4">
                         <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-3">
-                          Descricao nao disponivel. Clique abaixo para ver a vaga completa.
+                          Description not available. Click below to view the full job.
                         </p>
                         <a
                           href={job.url}
@@ -942,7 +985,7 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                           </svg>
-                          Ver vaga no site original
+                          View job on original site
                         </a>
                       </div>
                     )}
@@ -1013,14 +1056,14 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                     </svg>
-                    Carregando...
+                    Loading...
                   </>
                 ) : (
                   <>
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                     </svg>
-                    Carregar Mais ({totalJobs - jobs.length} restantes)
+                    Load More ({totalJobs - jobs.length} remaining)
                   </>
                 )}
               </button>
@@ -1030,7 +1073,7 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
       )}
 
       {/* Empty State */}
-      {!loading && jobs.length === 0 && keyword && (
+      {!loading && !loadingMore && jobs.length === 0 && keyword && (
         <div className="text-center py-12">
           <div className="w-16 h-16 mx-auto mb-4 bg-zinc-100 dark:bg-zinc-800 rounded-full flex items-center justify-center">
             <svg className="w-8 h-8 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1044,7 +1087,7 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
       )}
 
       {/* Initial State */}
-      {!loading && jobs.length === 0 && !keyword && (
+      {!loading && !loadingMore && jobs.length === 0 && !keyword && (
         <div className="text-center py-12">
           <div className="w-16 h-16 mx-auto mb-4 bg-zinc-100 dark:bg-zinc-800 rounded-full flex items-center justify-center">
             <svg className="w-8 h-8 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">

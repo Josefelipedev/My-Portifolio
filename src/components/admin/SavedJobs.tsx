@@ -245,7 +245,7 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
 
   const openEmailComposer = (job: SavedJob) => {
     setComposingEmail(job);
-    setEmailSubject(`Candidatura: ${job.title} - ${job.company}`);
+    setEmailSubject(`Application: ${job.title} - ${job.company}`);
     setEmailBody('');
     setCopied(false);
   };
@@ -283,7 +283,7 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
   };
 
   const copyEmailToClipboard = async () => {
-    const fullEmail = `Assunto: ${emailSubject}\n\n${emailBody}`;
+    const fullEmail = `Subject: ${emailSubject}\n\n${emailBody}`;
     try {
       await navigator.clipboard.writeText(fullEmail);
       setCopied(true);
@@ -296,7 +296,7 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
 
   const handleExtractJobInfo = async () => {
     if (!pasteText || pasteText.trim().length < 20) {
-      showError('Cole pelo menos 20 caracteres de informacao da vaga');
+      showError('Paste at least 20 characters of job information');
       return;
     }
 
@@ -327,9 +327,9 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
       });
 
       setPasteText('');
-      showSuccess('Informacoes extraidas! Revise e salve.');
+      showSuccess('Info extracted! Review and save.');
     } catch (err) {
-      showError(err instanceof Error ? err.message : 'Falha ao extrair informacoes');
+      showError(err instanceof Error ? err.message : 'Failed to extract info');
     } finally {
       setExtractingJob(false);
     }
@@ -377,7 +377,7 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
         jobType: '',
         tags: '',
       });
-      showSuccess('Vaga adicionada com sucesso!');
+      showSuccess('Job added successfully!');
     } catch (err) {
       showError(err instanceof Error ? err.message : 'Failed to add job');
     } finally {
@@ -457,7 +457,7 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
         )
       );
       setExpandedAnalysis(job.id);
-      showSuccess(`Análise concluída! Nota: ${data.analysis.grade}`);
+      showSuccess(`Analysis complete! Grade: ${data.analysis.grade}`);
     } catch (err) {
       showError(err instanceof Error ? err.message : 'Failed to analyze job');
     } finally {
@@ -504,7 +504,7 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
         )
       );
       setPrepModal({ job: { ...job, interviewPrep: JSON.stringify(data.prep) }, prep: data.prep });
-      showSuccess('Preparação para entrevista gerada!');
+      showSuccess('Interview prep generated!');
     } catch (err) {
       showError(err instanceof Error ? err.message : 'Failed to generate interview prep');
     } finally {
@@ -548,7 +548,7 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
   const handleBulkDelete = async () => {
     const confirmed = await confirm({
       title: 'Delete Saved Jobs',
-      message: `Deletar ${selectedIds.size} vagas salvas?`,
+      message: `Delete ${selectedIds.size} saved jobs?`,
       type: 'danger',
       confirmText: 'Delete All',
     });
@@ -595,9 +595,9 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
       if (!response.ok) throw new Error(data.error || 'Batch analyze failed');
 
       await fetchSavedJobs(1);
-      showSuccess(`Análise concluída: ${data.succeeded}/${data.processed} vagas analisadas.`);
+      showSuccess(`Analysis complete: ${data.succeeded}/${data.processed} jobs analyzed.`);
       if (data.failed > 0) {
-        showWarning(`${data.failed} vaga(s) falharam.`);
+        showWarning(`${data.failed} job(s) failed.`);
       }
     } catch (err) {
       showError(err instanceof Error ? err.message : 'Batch analyze failed');
@@ -653,7 +653,7 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
       }
 
       await fetchSavedJobs(1);
-      showSuccess(`CVs gerados: ${data.succeeded}/${data.processed} vagas.`);
+      showSuccess(`CVs generated: ${data.succeeded}/${data.processed} jobs.`);
     } catch (err) {
       showError(err instanceof Error ? err.message : 'Batch CV generation failed');
     } finally {
@@ -779,7 +779,7 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
           </svg>
-          Adicionar Vaga Manualmente
+          Add Job Manually
         </button>
 
         {/* Manual Job Entry Modal for Empty State */}
@@ -791,7 +791,7 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
                   <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                   </svg>
-                  Adicionar Vaga Manualmente
+                  Add Job Manually
                 </h3>
                 <button
                   onClick={() => {
@@ -813,16 +813,16 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                     </svg>
-                    Extracao Automatica com IA
+                    AI Auto-Extraction
                   </h4>
                   <p className="text-xs text-purple-600 dark:text-purple-400 mb-3">
-                    Cole a informacao da vaga e a IA extrai automaticamente titulo, empresa, descricao, etc.
+                    Paste job info and AI will automatically extract title, company, description, etc.
                   </p>
                   <textarea
                     value={pasteText}
                     onChange={(e) => setPasteText(e.target.value)}
                     rows={4}
-                    placeholder="Cole aqui a descricao completa da vaga, email recebido, ou qualquer texto com informacoes da vaga..."
+                    placeholder="Paste the full job description, received email, or any text with job information..."
                     className="w-full px-3 py-2 border border-purple-300 dark:border-purple-600 rounded-lg bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 text-sm"
                   />
                   <button
@@ -836,14 +836,14 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                         </svg>
-                        Extraindo informacoes...
+                        Extracting info...
                       </>
                     ) : (
                       <>
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                         </svg>
-                        Extrair com IA
+                        Extract with AI
                       </>
                     )}
                   </button>
@@ -854,32 +854,32 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
                     <div className="w-full border-t border-zinc-200 dark:border-zinc-700"></div>
                   </div>
                   <div className="relative flex justify-center text-xs">
-                    <span className="px-2 bg-white dark:bg-zinc-800 text-zinc-500">ou preencha manualmente</span>
+                    <span className="px-2 bg-white dark:bg-zinc-800 text-zinc-500">or fill in manually</span>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
-                      Titulo da Vaga *
+                      Job Title *
                     </label>
                     <input
                       type="text"
                       value={manualJob.title}
                       onChange={(e) => setManualJob({ ...manualJob, title: e.target.value })}
-                      placeholder="Ex: Desenvolvedor Full Stack"
+                      placeholder="e.g., Full Stack Developer"
                       className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100"
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
-                      Empresa *
+                      Company *
                     </label>
                     <input
                       type="text"
                       value={manualJob.company}
                       onChange={(e) => setManualJob({ ...manualJob, company: e.target.value })}
-                      placeholder="Ex: Tech Company"
+                      placeholder="e.g., Tech Company"
                       className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100"
                     />
                   </div>
@@ -887,13 +887,13 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
 
                 <div>
                   <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
-                    Descricao da Vaga
+                    Job Description
                   </label>
                   <textarea
                     value={manualJob.description}
                     onChange={(e) => setManualJob({ ...manualJob, description: e.target.value })}
                     rows={4}
-                    placeholder="Descricao da vaga..."
+                    placeholder="Job description..."
                     className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100"
                   />
                 </div>
@@ -901,7 +901,7 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
-                      URL da Vaga
+                      Job URL
                     </label>
                     <input
                       type="url"
@@ -913,13 +913,13 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
-                      Localizacao
+                      Location
                     </label>
                     <input
                       type="text"
                       value={manualJob.location}
                       onChange={(e) => setManualJob({ ...manualJob, location: e.target.value })}
-                      placeholder="Ex: Remoto, Sao Paulo, Portugal"
+                      placeholder="e.g., Remote, Lisbon, São Paulo"
                       className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100"
                     />
                   </div>
@@ -928,26 +928,26 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
-                      Salario
+                      Salary
                     </label>
                     <input
                       type="text"
                       value={manualJob.salary}
                       onChange={(e) => setManualJob({ ...manualJob, salary: e.target.value })}
-                      placeholder="Ex: €2000-3000"
+                      placeholder="e.g., €2000-3000"
                       className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100"
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
-                      Tipo
+                      Type
                     </label>
                     <select
                       value={manualJob.jobType}
                       onChange={(e) => setManualJob({ ...manualJob, jobType: e.target.value })}
                       className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100"
                     >
-                      <option value="">Selecione...</option>
+                      <option value="">Select...</option>
                       <option value="Full-time">Full-time</option>
                       <option value="Part-time">Part-time</option>
                       <option value="Contract">Contract</option>
@@ -981,14 +981,14 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                         </svg>
-                        Salvando...
+                        Saving...
                       </>
                     ) : (
                       <>
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                         </svg>
-                        Salvar Vaga
+                        Save Job
                       </>
                     )}
                   </button>
@@ -996,7 +996,7 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
                     onClick={() => setAddingJob(false)}
                     className="px-4 py-2 bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300 rounded-lg hover:bg-zinc-300 dark:hover:bg-zinc-600"
                   >
-                    Cancelar
+                    Cancel
                   </button>
                 </div>
               </div>
@@ -1031,7 +1031,7 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
           </svg>
-          Adicionar Vaga
+          Add Job
         </button>
       </div>
 
@@ -1193,7 +1193,7 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    Informacoes da Vaga
+                    Job Information
                   </h4>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
                     <div className="bg-white dark:bg-zinc-800 rounded-lg p-2">
@@ -1202,7 +1202,7 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
                     </div>
                     {job.jobType && (
                       <div className="bg-white dark:bg-zinc-800 rounded-lg p-2">
-                        <span className="block text-xs text-zinc-500 dark:text-zinc-400">Tipo</span>
+                        <span className="block text-xs text-zinc-500 dark:text-zinc-400">Type</span>
                         <span className="font-medium text-zinc-700 dark:text-zinc-300">{job.jobType}</span>
                       </div>
                     )}
@@ -1220,7 +1220,7 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
                     )}
                     {job.salary && (
                       <div className="bg-white dark:bg-zinc-800 rounded-lg p-2">
-                        <span className="block text-xs text-zinc-500 dark:text-zinc-400">Salario</span>
+                        <span className="block text-xs text-zinc-500 dark:text-zinc-400">Salary</span>
                         <span className="font-medium text-green-600 dark:text-green-400">{job.salary}</span>
                       </div>
                     )}
@@ -1443,7 +1443,7 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
                   onClick={() => handleInterviewPrep(job)}
                   disabled={generatingPrep === job.id}
                   className="px-3 py-1.5 text-sm bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-lg hover:bg-emerald-200 dark:hover:bg-emerald-900/50 disabled:opacity-50 transition-colors flex items-center gap-1"
-                  title={job.interviewPrep ? 'Ver preparação para entrevista' : 'Gerar preparação para entrevista'}
+                  title={job.interviewPrep ? 'View interview prep' : 'Generate interview prep'}
                 >
                   {generatingPrep === job.id ? (
                     <>
@@ -1451,7 +1451,7 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                       </svg>
-                      Gerando...
+                      Generating...
                     </>
                   ) : (
                     <>
@@ -1629,21 +1629,21 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                     </svg>
-                    Gerando com base no seu curriculo...
+                    Generating from your resume...
                   </>
                 ) : (
                   <>
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                     </svg>
-                    Gerar Email com IA (baseado no curriculo)
+                    Generate Email with AI (based on resume)
                   </>
                 )}
               </button>
 
               <div>
                 <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
-                  Assunto
+                  Subject
                 </label>
                 <input
                   type="text"
@@ -1654,13 +1654,13 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
               </div>
               <div>
                 <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
-                  Mensagem
+                  Message
                 </label>
                 <textarea
                   value={emailBody}
                   onChange={(e) => setEmailBody(e.target.value)}
                   rows={12}
-                  placeholder="Clique em 'Gerar Email com IA' para criar uma mensagem personalizada baseada no seu curriculo..."
+                  placeholder="Click 'Generate Email with AI' to create a personalized message based on your resume..."
                   className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 font-mono text-sm"
                 />
               </div>
@@ -1679,14 +1679,14 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                       </svg>
-                      Copiado!
+                      Copied!
                     </>
                   ) : (
                     <>
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                       </svg>
-                      Copiar
+                      Copy
                     </>
                   )}
                 </button>
@@ -1698,12 +1698,12 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                     </svg>
-                    Abrir no App de Email
+                    Open in Email App
                   </a>
                 )}
               </div>
               <p className="text-xs text-zinc-500 text-center">
-                A IA gera uma sugestao baseada no seu curriculo. Voce envia manualmente.
+                AI generates a suggestion based on your resume. You send it manually.
               </p>
             </div>
           </div>
@@ -1742,7 +1742,7 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
                 <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                 </svg>
-                Adicionar Vaga Manualmente
+                Add Job Manually
               </h3>
               <button
                 onClick={() => {
@@ -1764,16 +1764,16 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                   </svg>
-                  Extracao Automatica com IA
+                  AI Auto-Extraction
                 </h4>
                 <p className="text-xs text-purple-600 dark:text-purple-400 mb-3">
-                  Cole a informacao da vaga e a IA extrai automaticamente titulo, empresa, descricao, etc.
+                  Paste job info and AI will automatically extract title, company, description, etc.
                 </p>
                 <textarea
                   value={pasteText}
                   onChange={(e) => setPasteText(e.target.value)}
                   rows={4}
-                  placeholder="Cole aqui a descricao completa da vaga, email recebido, ou qualquer texto com informacoes da vaga..."
+                  placeholder="Paste the full job description, received email, or any text with job information..."
                   className="w-full px-3 py-2 border border-purple-300 dark:border-purple-600 rounded-lg bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 text-sm"
                 />
                 <button
@@ -1787,14 +1787,14 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                       </svg>
-                      Extraindo informacoes...
+                      Extracting info...
                     </>
                   ) : (
                     <>
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                       </svg>
-                      Extrair com IA
+                      Extract with AI
                     </>
                   )}
                 </button>
@@ -1805,32 +1805,32 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
                   <div className="w-full border-t border-zinc-200 dark:border-zinc-700"></div>
                 </div>
                 <div className="relative flex justify-center text-xs">
-                  <span className="px-2 bg-white dark:bg-zinc-800 text-zinc-500">ou preencha manualmente</span>
+                  <span className="px-2 bg-white dark:bg-zinc-800 text-zinc-500">or fill in manually</span>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
-                    Titulo da Vaga *
+                    Job Title *
                   </label>
                   <input
                     type="text"
                     value={manualJob.title}
                     onChange={(e) => setManualJob({ ...manualJob, title: e.target.value })}
-                    placeholder="Ex: Desenvolvedor Full Stack"
+                    placeholder="e.g., Full Stack Developer"
                     className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100"
                   />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
-                    Empresa *
+                    Company *
                   </label>
                   <input
                     type="text"
                     value={manualJob.company}
                     onChange={(e) => setManualJob({ ...manualJob, company: e.target.value })}
-                    placeholder="Ex: Tech Company"
+                    placeholder="e.g., Tech Company"
                     className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100"
                   />
                 </div>
@@ -1838,13 +1838,13 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
 
               <div>
                 <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
-                  Descricao da Vaga
+                  Job Description
                 </label>
                 <textarea
                   value={manualJob.description}
                   onChange={(e) => setManualJob({ ...manualJob, description: e.target.value })}
                   rows={4}
-                  placeholder="Descricao da vaga..."
+                  placeholder="Job description..."
                   className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100"
                 />
               </div>
@@ -1852,7 +1852,7 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
-                    URL da Vaga
+                    Job URL
                   </label>
                   <input
                     type="url"
@@ -1864,13 +1864,13 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
-                    Localizacao
+                    Location
                   </label>
                   <input
                     type="text"
                     value={manualJob.location}
                     onChange={(e) => setManualJob({ ...manualJob, location: e.target.value })}
-                    placeholder="Ex: Remoto, Sao Paulo, Portugal"
+                    placeholder="e.g., Remote, Lisbon, São Paulo"
                     className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100"
                   />
                 </div>
@@ -1879,26 +1879,26 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
-                    Salario
+                    Salary
                   </label>
                   <input
                     type="text"
                     value={manualJob.salary}
                     onChange={(e) => setManualJob({ ...manualJob, salary: e.target.value })}
-                    placeholder="Ex: €2000-3000"
+                    placeholder="e.g., €2000-3000"
                     className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100"
                   />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
-                    Tipo
+                    Type
                   </label>
                   <select
                     value={manualJob.jobType}
                     onChange={(e) => setManualJob({ ...manualJob, jobType: e.target.value })}
                     className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100"
                   >
-                    <option value="">Selecione...</option>
+                    <option value="">Select...</option>
                     <option value="Full-time">Full-time</option>
                     <option value="Part-time">Part-time</option>
                     <option value="Contract">Contract</option>
@@ -1932,14 +1932,14 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                       </svg>
-                      Salvando...
+                      Saving...
                     </>
                   ) : (
                     <>
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                       </svg>
-                      Salvar Vaga
+                      Save Job
                     </>
                   )}
                 </button>
