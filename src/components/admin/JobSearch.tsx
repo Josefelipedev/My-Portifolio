@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useToast } from '@/components/ui/Toast';
 import FilterPanel, { JobFilters, applyJobFilters } from './jobs/FilterPanel';
 import SearchHistory, { saveSearchToHistory } from './jobs/SearchHistory';
+import ApiKeySettings from './jobs/ApiKeySettings';
 
 interface JobListing {
   id: string;
@@ -116,6 +117,7 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
   const [fromCache, setFromCache] = useState(false);
   const [cachedUntil, setCachedUntil] = useState<string | null>(null);
   const [pendingRefresh, setPendingRefresh] = useState(false);
+  const [sourceErrors, setSourceErrors] = useState<{ source: string; error: string }[]>([]);
   const PAGE_SIZE = 25;
   // Advanced filters state
   const [filters, setFilters] = useState<JobFilters>({
@@ -219,8 +221,8 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
   // Fetch API status on mount and auto-run AI search
   useEffect(() => {
     fetch('/api/jobs/search?status=true')
-      .then(res => res.json())
-      .then(data => setApiStatus(data.apis || []))
+      .then(res => res.ok && res.headers.get('content-type')?.includes('json') ? res.json() : null)
+      .then(data => data && setApiStatus(data.apis || []))
       .catch(() => {});
 
   }, []);
@@ -263,6 +265,7 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
         setSmartSearchKeywords([]);
         setFromCache(false);
         setCachedUntil(null);
+        setSourceErrors([]);
       }
 
       const params = new URLSearchParams({
@@ -275,6 +278,10 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
         ...(shouldRefresh ? { refresh: 'true' } : {}),
       });
       const response = await fetch(`/api/jobs/search?${params}`);
+      const contentType = response.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) {
+        throw new Error(`Resposta inesperada do servidor (${response.status})`);
+      }
       const data = await response.json();
 
       if (!response.ok) {
@@ -287,6 +294,7 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
         setJobs(data.jobs);
         setFromCache(data.fromCache ?? false);
         setCachedUntil(data.cachedUntil ?? null);
+        setSourceErrors(data.sourceErrors ?? []);
         if (!data.fromCache) {
           saveSearchToHistory(keyword, getCountryParam(), getSourceParam(), data.total);
         }
@@ -447,20 +455,23 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
   return (
     <div>
       {/* API Status Banner */}
-      <div className="mb-4">
-        <button
-          onClick={() => setShowApiStatus(!showApiStatus)}
-          className="text-sm text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 flex items-center gap-2"
-        >
-          <span className={`w-2 h-2 rounded-full ${configuredApis === totalApis ? 'bg-green-500' : 'bg-yellow-500'}`} />
-          {configuredApis}/{totalApis} APIs configured
-          <svg className={`w-4 h-4 transition-transform ${showApiStatus ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
-        </button>
+      <div className="mb-4 space-y-3">
+        <div className="flex items-center gap-4 flex-wrap">
+          <button
+            onClick={() => setShowApiStatus(!showApiStatus)}
+            className="text-sm text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 flex items-center gap-2"
+          >
+            <span className={`w-2 h-2 rounded-full ${configuredApis === totalApis ? 'bg-green-500' : 'bg-yellow-500'}`} />
+            {configuredApis}/{totalApis} APIs configuradas
+            <svg className={`w-4 h-4 transition-transform ${showApiStatus ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          <ApiKeySettings />
+        </div>
 
         {showApiStatus && (
-          <div className="mt-2 p-3 bg-zinc-50 dark:bg-zinc-800/50 rounded-lg border border-zinc-200 dark:border-zinc-700">
+          <div className="p-3 bg-zinc-50 dark:bg-zinc-800/50 rounded-lg border border-zinc-200 dark:border-zinc-700">
             <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
               {apiStatus.map(api => (
                 <div key={api.name} className="flex items-center gap-2 text-sm">
@@ -477,14 +488,11 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
                     {api.name}
                   </span>
                   {api.needsKey && !api.configured && (
-                    <span className="text-xs text-amber-500">(needs key)</span>
+                    <span className="text-xs text-amber-500">(sem chave)</span>
                   )}
                 </div>
               ))}
             </div>
-            <p className="mt-2 text-xs text-zinc-500">
-              Add API keys to .env: ADZUNA_APP_ID, ADZUNA_APP_KEY, JOOBLE_API_KEY, RAPIDAPI_KEY
-            </p>
           </div>
         )}
       </div>
@@ -741,6 +749,23 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
       {error && (
         <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4 mb-6">
           <p className="text-red-600 dark:text-red-400">{error}</p>
+        </div>
+      )}
+
+      {/* Source Errors */}
+      {sourceErrors.length > 0 && (
+        <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl">
+          <p className="text-xs font-medium text-amber-700 dark:text-amber-400 mb-2">
+            {sourceErrors.length} fonte{sourceErrors.length > 1 ? 's' : ''} com erro nesta busca:
+          </p>
+          <ul className="space-y-1">
+            {sourceErrors.map((e, i) => (
+              <li key={i} className="flex items-start gap-2 text-xs text-amber-700 dark:text-amber-400">
+                <span className="font-semibold shrink-0">{e.source}:</span>
+                <span className="text-amber-600 dark:text-amber-500 break-all">{e.error}</span>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import {
   searchJobs,
   getApiStatus,
+  getLastSourceErrors,
   type JobSource,
   type JobSearchParams,
   type JobListing,
@@ -140,6 +141,7 @@ export async function GET(request: Request) {
       hasMore,
       fromCache,
       cachedUntil: fromCache && cacheEntry?.cachedUntil ? cacheEntry.cachedUntil : null,
+      sourceErrors: fromCache ? [] : getLastSourceErrors(),
       params: { keyword, source, country, location, category, maxAgeDays, page, pageSize },
       apis: getApiStatus(),
     });

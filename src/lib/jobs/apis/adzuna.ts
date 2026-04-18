@@ -2,10 +2,12 @@
 
 import type { JobListing, JobSearchParams, AdzunaResponse } from '../types';
 import { formatSalary } from '../helpers';
+import { getJobApiKeys } from '../api-keys';
 
 export async function searchAdzuna(params: JobSearchParams): Promise<JobListing[]> {
-  const appId = process.env.ADZUNA_APP_ID;
-  const appKey = process.env.ADZUNA_APP_KEY;
+  const keys = await getJobApiKeys();
+  const appId = keys.adzunaAppId;
+  const appKey = keys.adzunaAppKey;
 
   if (!appId || !appKey) {
     console.log('Adzuna API: Missing credentials (ADZUNA_APP_ID, ADZUNA_APP_KEY)');

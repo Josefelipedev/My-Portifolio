@@ -143,6 +143,9 @@ model SiteConfig {
 
   // WakaTime Configuration (JSON)
   wakatimeConfig String? @db.Text
+
+  // Job API Keys (JSON: { adzunaAppId, adzunaAppKey, joobleApiKey, rapidApiKey })
+  jobApiKeys     String? @db.Text
 }
 
 // ==========================================

@@ -21,6 +21,10 @@ import { searchGeekHunter } from './apis/geekhunter';
 import { isAIExtractionAvailable } from './ai-extraction';
 import { isPythonScraperAvailable } from './apis/python-scraper';
 
+export interface SourceError { source: string; error: string }
+let _lastSourceErrors: SourceError[] = [];
+export function getLastSourceErrors(): SourceError[] { return _lastSourceErrors; }
+
 /**
  * Main job search function that aggregates results from multiple sources
  * Accept single source or array of sources, and handle multiple countries
@@ -29,7 +33,7 @@ export async function searchJobs(
   params: JobSearchParams,
   source: JobSource | JobSource[] = 'all'
 ): Promise<JobListing[]> {
-  const searches: Promise<JobListing[]>[] = [];
+  const searches: { name: string; promise: Promise<JobListing[]> }[] = [];
 
   // Convert to array for easier handling
   const sources = Array.isArray(source) ? source : [source];
@@ -52,21 +56,17 @@ export async function searchJobs(
     return cachedResults;
   }
 
+  const push = (name: string, promise: Promise<JobListing[]>) => searches.push({ name, promise });
+
   // Remote sources (search if 'remote' or 'all' is selected)
   if (shouldSearchCountry('remote')) {
-    if (isAllSources || sources.includes('remoteok')) {
-      searches.push(searchRemoteOK(params));
-    }
-    if (isAllSources || sources.includes('remotive')) {
-      searches.push(searchRemotive(params));
-    }
+    if (isAllSources || sources.includes('remoteok')) push('RemoteOK', searchRemoteOK(params));
+    if (isAllSources || sources.includes('remotive')) push('Remotive', searchRemotive(params));
   }
 
   // EU sources
-  if (isAllSources || sources.includes('arbeitnow')) {
-    if (shouldSearchCountry('pt') || isAllCountries) {
-      searches.push(searchArbeitnow(params));
-    }
+  if ((isAllSources || sources.includes('arbeitnow')) && (shouldSearchCountry('pt') || isAllCountries)) {
+    push('Arbeitnow', searchArbeitnow(params));
   }
 
   // Country-specific sources (Adzuna, Jooble, JSearch)
@@ -77,53 +77,48 @@ export async function searchJobs(
 
   for (const country of countriesToSearch) {
     const countryParams = { ...params, country };
-
-    if (isAllSources || sources.includes('adzuna')) {
-      searches.push(searchAdzuna(countryParams));
-    }
-    if (isAllSources || sources.includes('jooble')) {
-      searches.push(searchJooble(countryParams));
-    }
-    if (isAllSources || sources.includes('jsearch')) {
-      searches.push(searchJSearch(countryParams));
-    }
+    if (isAllSources || sources.includes('adzuna')) push(`Adzuna (${country})`, searchAdzuna(countryParams));
+    if (isAllSources || sources.includes('jooble')) push(`Jooble (${country})`, searchJooble(countryParams));
+    if (isAllSources || sources.includes('jsearch')) push(`JSearch (${country})`, searchJSearch(countryParams));
   }
 
   // Portugal-specific: Net-Empregos
   if (sources.includes('netempregos') || (isAllSources && shouldSearchCountry('pt'))) {
-    searches.push(searchNetEmpregos(params));
+    push('Net-Empregos', searchNetEmpregos(params));
   }
 
   // Portugal-specific: ITJobs.pt
   if (sources.includes('itjobs') || (isAllSources && shouldSearchCountry('pt'))) {
-    searches.push(searchITJobs(params));
+    push('ITJobs.pt', searchITJobs(params));
   }
 
   // Brazil-specific: Vagas.com.br (JS scraper with Python fallback)
   if (sources.includes('vagascombr') || (isAllSources && shouldSearchCountry('br'))) {
-    searches.push(searchVagasComBr(params));
+    push('Vagas.com.br', searchVagasComBr(params));
   }
 
   // Brazil-specific: GeekHunter (JS scraper with Python fallback)
   if (sources.includes('geekhunter') || (isAllSources && shouldSearchCountry('br'))) {
-    searches.push(searchGeekHunter(params));
+    push('GeekHunter', searchGeekHunter(params));
   }
 
   // LinkedIn Jobs (Brazil and Portugal)
   if (sources.includes('linkedin') || isAllSources) {
-    // Search for each selected country
     for (const country of countriesToSearch) {
       if (country === 'br' || country === 'pt') {
-        searches.push(searchLinkedIn({ ...params, country }));
+        push(`LinkedIn (${country})`, searchLinkedIn({ ...params, country }));
       }
     }
-    // If no specific country, default to Brazil
     if (countriesToSearch.length === 0 || isAllCountries) {
-      searches.push(searchLinkedIn({ ...params, country: 'br' }));
+      push('LinkedIn (br)', searchLinkedIn({ ...params, country: 'br' }));
     }
   }
 
-  const settled = await Promise.allSettled(searches);
+  const settled = await Promise.allSettled(searches.map(s => s.promise));
+  _lastSourceErrors = settled
+    .map((r, i) => r.status === 'rejected' ? { source: searches[i].name, error: String((r as PromiseRejectedResult).reason) } : null)
+    .filter((e): e is SourceError => e !== null);
+
   let allJobs = settled
     .filter((r): r is PromiseFulfilledResult<JobListing[]> => r.status === 'fulfilled')
     .flatMap((r) => r.value);

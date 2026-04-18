@@ -2,9 +2,11 @@
 
 import type { JobListing, JobSearchParams, JSearchResponse } from '../types';
 import { formatNumber } from '../helpers';
+import { getJobApiKeys } from '../api-keys';
 
 export async function searchJSearch(params: JobSearchParams): Promise<JobListing[]> {
-  const apiKey = process.env.RAPIDAPI_KEY;
+  const keys = await getJobApiKeys();
+  const apiKey = keys.rapidApiKey;
 
   if (!apiKey) {
     console.log('JSearch API: Missing credential (RAPIDAPI_KEY)');
