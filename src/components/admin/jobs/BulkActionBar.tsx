@@ -56,7 +56,7 @@ export default function BulkActionBar({
           onClick={onDeselectAll}
           className="text-sm text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
         >
-          Limpar selecao
+          Limpar seleção
         </button>
       </div>
 

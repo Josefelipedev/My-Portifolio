@@ -14,9 +14,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'jobId is required' }, { status: 400 });
     }
 
+    const analyzedAt = new Date().toISOString();
     const analysis = await analyzeJob(jobId);
 
-    return NextResponse.json({ success: true, analysis });
+    return NextResponse.json({ success: true, analysis, analyzedAt });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     const status = message.includes('quota') ? 429
