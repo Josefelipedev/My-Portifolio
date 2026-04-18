@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, type ReactNode } from 'react';
+import { useState, type ReactNode, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import JobSearch from './JobSearch';
 import SavedJobs from './SavedJobs';
 import JobApplications from './JobApplications';
@@ -18,9 +19,24 @@ interface JobsTabsProps {
 type TabType = 'search' | 'saved' | 'applications' | 'analytics' | 'alerts' | 'companies' | 'scraper' | 'agent-costs';
 
 export default function JobsTabs({ initialSavedCount, initialApplicationsCount }: JobsTabsProps) {
-  const [activeTab, setActiveTab] = useState<TabType>('search');
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const tabFromUrl = (searchParams.get('tab') as TabType) || 'search';
+  const [activeTab, setActiveTab] = useState<TabType>(tabFromUrl);
   const [savedCount, setSavedCount] = useState(initialSavedCount);
   const [applicationsCount, setApplicationsCount] = useState(initialApplicationsCount);
+
+  useEffect(() => {
+    const tab = (searchParams.get('tab') as TabType) || 'search';
+    setActiveTab(tab);
+  }, [searchParams]);
+
+  const handleTabChange = (tab: TabType) => {
+    setActiveTab(tab);
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('tab', tab);
+    router.push(`?${params.toString()}`, { scroll: false });
+  };
 
   const handleJobSaved = () => {
     setSavedCount((prev) => prev + 1);
@@ -122,7 +138,7 @@ export default function JobsTabs({ initialSavedCount, initialApplicationsCount }
         {tabs.map((tab) => (
           <button
             key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
+            onClick={() => handleTabChange(tab.id)}
             className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
               activeTab === tab.id
                 ? 'border-red-500 text-red-600 dark:text-red-400'
