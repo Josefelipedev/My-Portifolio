@@ -1,9 +1,11 @@
 // Jooble API (Needs API key - Global)
 
 import type { JobListing, JobSearchParams, JoobleResponse } from '../types';
+import { getJobApiKeys } from '../api-keys';
 
 export async function searchJooble(params: JobSearchParams): Promise<JobListing[]> {
-  const apiKey = process.env.JOOBLE_API_KEY;
+  const keys = await getJobApiKeys();
+  const apiKey = keys.joobleApiKey;
 
   if (!apiKey) {
     console.log('Jooble API: Missing credential (JOOBLE_API_KEY)');

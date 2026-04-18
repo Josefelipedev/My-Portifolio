@@ -20,6 +20,8 @@ export {
   searchJobs,
   searchJobsByCountry,
   getApiStatus,
+  getLastSourceErrors,
+  type SourceError,
 } from './aggregator';
 
 // Smart Search
