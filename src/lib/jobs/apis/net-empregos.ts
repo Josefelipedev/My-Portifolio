@@ -1,7 +1,6 @@
 // Net-Empregos Web Scraping (Portugal)
 
 import type { JobListing, JobSearchParams } from '../types';
-import { extractJobsWithAI } from '../ai-extraction';
 import { cleanHtmlText, parsePortugueseDate } from '../helpers';
 
 interface NetEmpregosJob {
@@ -33,25 +32,7 @@ export async function searchNetEmpregos(params: JobSearchParams): Promise<JobLis
 
     const html = await response.text();
 
-    // Try AI extraction first
-    let jobs: NetEmpregosJob[] = [];
-    const aiJobs = await extractJobsWithAI(html, 'Net-Empregos', 'https://www.net-empregos.com');
-
-    if (aiJobs.length > 0) {
-      // Use AI-extracted jobs
-      jobs = aiJobs.map(job => ({
-        title: job.title,
-        company: job.company,
-        location: job.location || 'Portugal',
-        url: job.url,
-        description: job.description || '',
-        date: '',
-      }));
-    } else {
-      // Fallback to regex parsing
-      console.log('Net-Empregos: AI extraction failed, using regex fallback');
-      jobs = parseNetEmpregosHTML(html);
-    }
+    const jobs: NetEmpregosJob[] = parseNetEmpregosHTML(html);
 
     return jobs.slice(0, params.limit || 50).map((job, index) => ({
       id: `netempregos-${Date.now()}-${index}`,
