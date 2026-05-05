@@ -22,7 +22,7 @@ export async function GET(request: Request) {
         take: limit,
         include: {
           application: {
-            select: { id: true, status: true },
+            select: { id: true, status: true, appliedAt: true },
           },
         },
       }),

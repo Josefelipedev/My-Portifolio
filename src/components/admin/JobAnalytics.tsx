@@ -45,12 +45,19 @@ interface TopCompany {
   [key: string]: string | number;
 }
 
+interface TopTag {
+  tag: string;
+  count: number;
+}
+
 interface AnalyticsData {
   funnel: FunnelData;
   weeklyActivity: WeeklyData[];
   sourceEffectiveness: SourceData[];
   avgTimeToInterview: number | null;
   topCompanies: TopCompany[];
+  topTags: TopTag[];
+  staleJobsCount: number;
   totalSavedJobs: number;
   totalApplications: number;
   recentSearches: number;
@@ -310,8 +317,45 @@ export default function JobAnalytics() {
             <div className="w-3 h-3 rounded-full bg-red-500" />
             <span className="text-sm text-red-700 dark:text-red-300">Rejected: {data.funnel.rejected}</span>
           </div>
+          {data.staleJobsCount > 0 && (
+            <div className="flex items-center gap-2 px-4 py-2 bg-amber-100 dark:bg-amber-900/30 rounded-lg">
+              <div className="w-3 h-3 rounded-full bg-amber-500" />
+              <span className="text-sm text-amber-700 dark:text-amber-300">Stale (30d+): {data.staleJobsCount}</span>
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Top Skills / Tags */}
+      {data.topTags && data.topTags.length > 0 && (
+        <div className="bg-white dark:bg-zinc-800 rounded-xl border border-zinc-200 dark:border-zinc-700 p-6">
+          <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-1">Top Skills in Saved Jobs</h3>
+          <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-4">Keywords appearing most in your saved job listings — prioritize these for your CV and cover letters.</p>
+          <div className="flex flex-wrap gap-2">
+            {data.topTags.map((item, i) => {
+              const max = data.topTags[0].count;
+              const intensity = Math.round((item.count / max) * 5);
+              const colors = [
+                'bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400',
+                'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400',
+                'bg-red-200 text-red-700 dark:bg-red-900/40 dark:text-red-300',
+                'bg-red-300 text-red-800 dark:bg-red-800/50 dark:text-red-200',
+                'bg-red-400 text-white dark:bg-red-700 dark:text-white',
+                'bg-red-500 text-white dark:bg-red-600 dark:text-white',
+              ];
+              return (
+                <span
+                  key={item.tag}
+                  className={`px-3 py-1 rounded-full text-sm font-medium ${colors[intensity]}`}
+                  title={`${item.count} job${item.count > 1 ? 's' : ''}`}
+                >
+                  {item.tag} <span className="opacity-60 text-xs">×{item.count}</span>
+                </span>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

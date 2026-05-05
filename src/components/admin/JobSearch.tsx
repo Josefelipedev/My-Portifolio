@@ -127,7 +127,9 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState<string | null>(null);
+  const [savingAndApplying, setSavingAndApplying] = useState<string | null>(null);
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
+  const [appliedIds, setAppliedIds] = useState<Set<string>>(new Set());
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [apiStatus, setApiStatus] = useState<ApiStatus[]>([]);
   const [showApiStatus, setShowApiStatus] = useState(false);
@@ -262,6 +264,11 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
       .then(data => {
         if (data?.jobs) {
           setSavedIds(new Set(data.jobs.map((j: { externalId: string }) => j.externalId)));
+          setAppliedIds(new Set(
+            data.jobs
+              .filter((j: { application?: { id: string } }) => j.application)
+              .map((j: { externalId: string }) => j.externalId)
+          ));
         }
       })
       .catch(() => {});
@@ -482,6 +489,62 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
       toast.showError(err instanceof Error ? err.message : 'Erro ao salvar vaga');
     } finally {
       setSaving(null);
+    }
+  };
+
+  const handleSaveAndApply = async (job: JobListing) => {
+    try {
+      setSavingAndApplying(job.id);
+      // Step 1: Save the job
+      const saveRes = await fetch('/api/jobs/saved', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          externalId: job.id,
+          source: job.source,
+          title: job.title,
+          company: job.company,
+          companyLogo: job.companyLogo,
+          description: job.description,
+          url: job.url,
+          location: job.location,
+          jobType: job.jobType,
+          salary: job.salary,
+          tags: job.tags,
+          postedAt: job.postedAt,
+        }),
+      });
+
+      if (!saveRes.ok) {
+        const d = await saveRes.json();
+        // If already saved, still try to get the id
+        if (!d.error?.includes('already saved')) throw new Error(d.error || 'Failed to save job');
+      }
+
+      const saved = await saveRes.json();
+      const savedJobId = saved.data?.id || saved.id;
+
+      setSavedIds(prev => new Set(prev).add(job.id));
+
+      // Step 2: Create application
+      const applyRes = await fetch(`/api/jobs/saved/${savedJobId}/apply`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'applied', appliedAt: new Date().toISOString() }),
+      });
+
+      if (!applyRes.ok) {
+        const d = await applyRes.json();
+        throw new Error(d.error || 'Failed to mark as applied');
+      }
+
+      setAppliedIds(prev => new Set(prev).add(job.id));
+      onJobSaved();
+      toast.showSuccess('Job saved and marked as applied!');
+    } catch (err) {
+      toast.showError(err instanceof Error ? err.message : 'Failed to save & apply');
+    } finally {
+      setSavingAndApplying(null);
     }
   };
 
@@ -1054,11 +1117,13 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
                       rel="noopener noreferrer"
                       className="px-3 py-1.5 text-sm bg-zinc-100 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300 rounded-lg hover:bg-zinc-200 dark:hover:bg-zinc-600 transition-colors"
                     >
-                      View Job
+                      View
                     </a>
+                    {/* Save button */}
                     <button
                       onClick={() => handleSaveJob(job)}
-                      disabled={saving === job.id || savedIds.has(job.id)}
+                      disabled={saving === job.id || savingAndApplying === job.id || savedIds.has(job.id)}
+                      title="Save job"
                       className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors flex items-center gap-1 ${
                         savedIds.has(job.id)
                           ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 cursor-default'
@@ -1066,23 +1131,49 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
                       }`}
                     >
                       {saving === job.id ? (
-                        'Saving...'
+                        <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        </svg>
                       ) : savedIds.has(job.id) ? (
-                        <>
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                          </svg>
-                          Saved
-                        </>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
                       ) : (
-                        <>
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
-                          </svg>
-                          Save
-                        </>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                        </svg>
                       )}
+                      {savedIds.has(job.id) ? 'Saved' : 'Save'}
                     </button>
+                    {/* Save & Apply button — only when not yet applied */}
+                    {!appliedIds.has(job.id) ? (
+                      <button
+                        onClick={() => handleSaveAndApply(job)}
+                        disabled={savingAndApplying === job.id || appliedIds.has(job.id)}
+                        title="Save and mark as applied"
+                        className="px-3 py-1.5 text-sm font-medium bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 transition-colors flex items-center gap-1"
+                      >
+                        {savingAndApplying === job.id ? (
+                          <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                          </svg>
+                        ) : (
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                          </svg>
+                        )}
+                        {savingAndApplying === job.id ? 'Saving...' : 'Apply'}
+                      </button>
+                    ) : (
+                      <span className="px-3 py-1.5 text-sm bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded-lg flex items-center gap-1">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        Applied
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>

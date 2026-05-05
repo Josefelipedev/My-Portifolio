@@ -50,6 +50,7 @@ interface SavedJob {
   application?: {
     id: string;
     status: string;
+    appliedAt?: string;
   };
 }
 
@@ -1010,8 +1011,25 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
     );
   }
 
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const staleJobs = jobs.filter(
+    (j) => !j.application && new Date(j.savedAt) < thirtyDaysAgo
+  );
+
   return (
     <div className="space-y-4">
+      {/* Stale jobs warning */}
+      {staleJobs.length > 0 && (
+        <div className="flex items-center gap-3 px-4 py-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-xl">
+          <svg className="w-5 h-5 text-amber-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+          </svg>
+          <p className="text-sm text-amber-700 dark:text-amber-300 flex-1">
+            <span className="font-semibold">{staleJobs.length} job{staleJobs.length > 1 ? 's' : ''}</span> saved over 30 days ago without an application — apply or remove them to keep your list focused.
+          </p>
+        </div>
+      )}
+
       {/* Header with Add Button */}
       <div className="flex items-center justify-between">
         <BulkActionBar
@@ -1044,6 +1062,8 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
           className={`bg-white dark:bg-zinc-800 rounded-xl border overflow-hidden transition-colors ${
             selectedIds.has(job.id)
               ? 'border-red-300 dark:border-red-700 ring-1 ring-red-200 dark:ring-red-800'
+              : !job.application && new Date(job.savedAt) < thirtyDaysAgo
+              ? 'border-amber-300 dark:border-amber-700'
               : 'border-zinc-200 dark:border-zinc-700'
           }`}
         >
@@ -1092,9 +1112,33 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
                     {job.aiGrade && (
                       <AIGradeBadge grade={job.aiGrade} />
                     )}
-                    {job.application && (
-                      <span className={`px-2 py-1 text-xs rounded capitalize ${getStatusColor(job.application.status)}`}>
+                    {job.application ? (
+                      <span className={`px-2.5 py-1 text-xs font-medium rounded-full capitalize flex items-center gap-1 ${getStatusColor(job.application.status)}`}>
+                        {job.application.status === 'applied' && (
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                          </svg>
+                        )}
+                        {job.application.status === 'interview' && (
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                          </svg>
+                        )}
+                        {job.application.status === 'offer' && (
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                        {job.application.status === 'rejected' && (
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        )}
                         {job.application.status}
+                      </span>
+                    ) : (
+                      <span className="px-2.5 py-1 text-xs text-zinc-400 dark:text-zinc-500 border border-dashed border-zinc-300 dark:border-zinc-600 rounded-full">
+                        Not applied
                       </span>
                     )}
                   </div>
@@ -1161,6 +1205,14 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
                     </svg>
                     Saved {formatDate(job.savedAt)}
                   </span>
+                  {job.application?.appliedAt && (
+                    <span className="flex items-center gap-1 text-blue-600 dark:text-blue-400">
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                      Applied {formatDate(job.application.appliedAt)}
+                    </span>
+                  )}
                   {job.enrichedAt && (
                     <span className="flex items-center gap-1 text-purple-500">
                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1184,6 +1236,48 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
                     ))}
                   </div>
                 )}
+
+                {/* Quick note preview / inline editor */}
+                <div className="mt-2">
+                  {editingNotes === job.id ? (
+                    <div className="flex gap-2 items-start">
+                      <textarea
+                        value={notesValue}
+                        onChange={(e) => setNotesValue(e.target.value)}
+                        rows={2}
+                        autoFocus
+                        className="flex-1 px-2 py-1.5 text-xs border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 resize-none"
+                        placeholder="Add a note about this job..."
+                      />
+                      <div className="flex flex-col gap-1">
+                        <button
+                          onClick={() => handleSaveNotes(job.id)}
+                          className="px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600"
+                        >
+                          Save
+                        </button>
+                        <button
+                          onClick={() => setEditingNotes(null)}
+                          className="px-2 py-1 text-xs bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400 rounded hover:bg-zinc-300 dark:hover:bg-zinc-600"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => { setEditingNotes(job.id); setNotesValue(job.notes || ''); }}
+                      className="flex items-start gap-1.5 text-xs text-zinc-400 dark:text-zinc-500 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors w-full text-left"
+                    >
+                      <svg className="w-3.5 h-3.5 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                      </svg>
+                      <span className="italic">
+                        {job.notes ? job.notes.substring(0, 80) + (job.notes.length > 80 ? '...' : '') : 'Add a note...'}
+                      </span>
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
 
