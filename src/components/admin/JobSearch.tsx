@@ -5,6 +5,7 @@ import { useToast } from '@/components/ui/Toast';
 import FilterPanel, { JobFilters, applyJobFilters } from './jobs/FilterPanel';
 import SearchHistory, { saveSearchToHistory } from './jobs/SearchHistory';
 import ApiKeySettings from './jobs/ApiKeySettings';
+import MatchScoreBadge from './jobs/MatchScoreBadge';
 
 interface JobListing {
   id: string;
@@ -20,6 +21,30 @@ interface JobListing {
   tags?: string[];
   postedAt?: string;
   country?: string;
+  relevanceScore?: number;
+  matchPercentage?: number;
+}
+
+interface ResumeSkill { name: string; level: number; }
+interface ResumeExperience { title: string; }
+interface ResumeData {
+  skills: ResumeSkill[];
+  experience: ResumeExperience[];
+}
+
+function calcMatchPercentage(job: JobListing, resume: ResumeData): number {
+  if (!resume.skills.length) return 0;
+  const text = `${job.title} ${job.description || ''} ${job.tags?.join(' ') || ''}`.toLowerCase();
+  let matched = 0;
+  for (const skill of resume.skills) {
+    if (text.includes(skill.name.toLowerCase())) matched++;
+  }
+  let pct = (matched / resume.skills.length) * 100;
+  for (const exp of resume.experience) {
+    const firstWord = exp.title.toLowerCase().split(' ')[0];
+    if (firstWord.length > 3 && job.title.toLowerCase().includes(firstWord)) pct += 10;
+  }
+  return Math.min(100, Math.round(pct));
 }
 
 interface ApiStatus {
@@ -123,6 +148,8 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
   const [allSmartResults, setAllSmartResults] = useState<JobListing[]>([]);
   // Expandable tags per job
   const [expandedTags, setExpandedTags] = useState<Set<string>>(new Set());
+  // Resume data for match scoring
+  const [resume, setResume] = useState<ResumeData>({ skills: [], experience: [] });
   // Advanced filters state
   const [filters, setFilters] = useState<JobFilters>({
     salaryMin: 0,
@@ -130,6 +157,7 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
     jobType: 'all',
     experienceLevel: 'all',
     sortBy: 'date',
+    minMatch: 0,
   });
 
   // Apply filters to jobs
@@ -222,7 +250,7 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
     return `${selectedSources.size} sources`;
   };
 
-  // Fetch API status and hydrate saved IDs on mount
+  // Fetch API status, saved IDs and resume data on mount
   useEffect(() => {
     fetch('/api/jobs/search?status=true')
       .then(res => res.ok && res.headers.get('content-type')?.includes('json') ? res.json() : null)
@@ -234,6 +262,15 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
       .then(data => {
         if (data?.jobs) {
           setSavedIds(new Set(data.jobs.map((j: { externalId: string }) => j.externalId)));
+        }
+      })
+      .catch(() => {});
+
+    fetch('/api/resume?section=all')
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data?.skills) {
+          setResume({ skills: data.skills, experience: data.experience || [] });
         }
       })
       .catch(() => {});
@@ -299,10 +336,13 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
         throw new Error(data.error || 'Failed to search jobs');
       }
 
+      const withScores = (list: JobListing[]) =>
+        list.map(j => ({ ...j, matchPercentage: calcMatchPercentage(j, resume) }));
+
       if (loadMore) {
-        setJobs(prev => [...prev, ...data.jobs]);
+        setJobs(prev => [...prev, ...withScores(data.jobs)]);
       } else {
-        setJobs(data.jobs);
+        setJobs(withScores(data.jobs));
         setFromCache(data.fromCache ?? false);
         setCachedUntil(data.cachedUntil ?? null);
         setSourceErrors(data.sourceErrors ?? []);
@@ -362,13 +402,17 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
         throw new Error(data.error || 'Failed to perform smart search');
       }
 
-      const allResults: JobListing[] = data.jobs || [];
+      const allResults: JobListing[] = (data.jobs || []).map((j: JobListing) => ({
+        ...j,
+        matchPercentage: calcMatchPercentage(j, resume),
+      }));
       setAllSmartResults(allResults);
       setJobs(allResults.slice(0, PAGE_SIZE));
       setPage(1);
       setTotalJobs(allResults.length);
       setHasMore(allResults.length > PAGE_SIZE);
       setSmartSearchKeywords(data.keywords || []);
+      setFilters(prev => ({ ...prev, sortBy: 'relevance' }));
       if (data.apis) {
         setApiStatus(data.apis);
       }
@@ -893,6 +937,9 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
                         </p>
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0">
+                        {job.matchPercentage !== undefined && resume.skills.length > 0 && (
+                          <MatchScoreBadge score={job.matchPercentage} maxScore={100} />
+                        )}
                         <span className={`px-2 py-1 text-xs rounded ${SOURCE_LABELS[job.source]?.color || 'bg-zinc-100 text-zinc-600'}`}>
                           {SOURCE_LABELS[job.source]?.label || job.source}
                         </span>

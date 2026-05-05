@@ -8,6 +8,7 @@ export interface JobFilters {
   jobType: 'all' | 'remote' | 'hybrid' | 'onsite';
   experienceLevel: 'all' | 'junior' | 'mid' | 'senior';
   sortBy: 'date' | 'salary' | 'relevance';
+  minMatch: number; // 0 = no filter, otherwise minimum match percentage
 }
 
 interface FilterPanelProps {
@@ -54,7 +55,8 @@ export default function FilterPanel({
     filters.jobType !== 'all' ||
     filters.experienceLevel !== 'all' ||
     filters.salaryMin > 0 ||
-    filters.salaryMax < 500000;
+    filters.salaryMax < 500000 ||
+    filters.minMatch > 0;
 
   const resetFilters = () => {
     onChange({
@@ -62,7 +64,8 @@ export default function FilterPanel({
       salaryMax: 500000,
       jobType: 'all',
       experienceLevel: 'all',
-      sortBy: 'date',
+      sortBy: filters.sortBy,
+      minMatch: 0,
     });
   };
 
@@ -153,6 +156,24 @@ export default function FilterPanel({
               </div>
             </div>
 
+            {/* Min Match */}
+            <div>
+              <label className="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1.5">
+                Match mínimo com CV
+              </label>
+              <select
+                value={filters.minMatch}
+                onChange={(e) => handleChange('minMatch', parseInt(e.target.value))}
+                className="w-full px-3 py-2 text-sm border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100"
+              >
+                <option value={0}>Sem filtro</option>
+                <option value={20}>≥ 20%</option>
+                <option value={40}>≥ 40%</option>
+                <option value={60}>≥ 60%</option>
+                <option value={80}>≥ 80%</option>
+              </select>
+            </div>
+
             {/* Sort By */}
             <div>
               <label className="block text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1.5">
@@ -202,6 +223,7 @@ export function applyJobFilters<T extends {
   salary?: string;
   tags?: string[];
   relevanceScore?: number;
+  matchPercentage?: number;
   postedAt?: string;
 }>(
   jobs: T[],
@@ -242,6 +264,11 @@ export function applyJobFilters<T extends {
           return true;
       }
     });
+  }
+
+  // Filter by minimum match percentage
+  if (filters.minMatch > 0) {
+    filtered = filtered.filter((job) => (job.matchPercentage ?? 0) >= filters.minMatch);
   }
 
   // Filter by salary (only if job has salary info)
