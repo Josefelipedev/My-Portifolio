@@ -1,7 +1,6 @@
 // ITJobs.pt Web Scraping (Portugal)
 
 import type { JobListing, JobSearchParams } from '../types';
-import { extractJobsWithAI } from '../ai-extraction';
 import { cleanHtmlText } from '../helpers';
 
 interface ITJobsJob {
@@ -33,25 +32,7 @@ export async function searchITJobs(params: JobSearchParams): Promise<JobListing[
 
     const html = await response.text();
 
-    // Try AI extraction first
-    let jobs: ITJobsJob[] = [];
-    const aiJobs = await extractJobsWithAI(html, 'ITJobs', 'https://www.itjobs.pt');
-
-    if (aiJobs.length > 0) {
-      // Use AI-extracted jobs
-      jobs = aiJobs.map(job => ({
-        title: job.title,
-        company: job.company,
-        location: job.location || 'Portugal',
-        url: job.url,
-        description: job.description || '',
-        salary: undefined,
-      }));
-    } else {
-      // Fallback to regex parsing
-      console.log('ITJobs: AI extraction failed, using regex fallback');
-      jobs = parseITJobsHTML(html);
-    }
+    const jobs: ITJobsJob[] = parseITJobsHTML(html);
 
     return jobs.slice(0, params.limit || 50).map((job, index) => ({
       id: `itjobs-${Date.now()}-${index}`,
