@@ -30,12 +30,19 @@ interface TopCompany {
   count: number;
 }
 
+interface TopTag {
+  tag: string;
+  count: number;
+}
+
 interface AnalyticsResponse {
   funnel: FunnelData;
   weeklyActivity: WeeklyData[];
   sourceEffectiveness: SourceData[];
   avgTimeToInterview: number | null;
   topCompanies: TopCompany[];
+  topTags: TopTag[];
+  staleJobsCount: number;
   totalSavedJobs: number;
   totalApplications: number;
   recentSearches: number;
@@ -203,12 +210,39 @@ export async function GET() {
       .sort((a, b) => b.count - a.count)
       .slice(0, 5);
 
+    // Get top tags from saved jobs
+    const allSavedJobs = await prisma.savedJob.findMany({
+      select: { tags: true, savedAt: true, application: { select: { id: true } } },
+    });
+
+    const tagCount = new Map<string, number>();
+    for (const job of allSavedJobs) {
+      if (!job.tags) continue;
+      for (const tag of job.tags.split(',')) {
+        const t = tag.trim().toLowerCase();
+        if (t.length > 1) tagCount.set(t, (tagCount.get(t) || 0) + 1);
+      }
+    }
+
+    const topTags = Array.from(tagCount.entries())
+      .map(([tag, count]) => ({ tag, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 15);
+
+    // Count stale jobs (saved 30+ days ago, no application)
+    const staleThreshold = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const staleJobsCount = allSavedJobs.filter(
+      (j) => !j.application && new Date(j.savedAt) < staleThreshold
+    ).length;
+
     const response: AnalyticsResponse = {
       funnel,
       weeklyActivity,
       sourceEffectiveness,
       avgTimeToInterview,
       topCompanies,
+      topTags,
+      staleJobsCount,
       totalSavedJobs: savedJobsCount,
       totalApplications: applications.length,
       recentSearches: recentSearchesCount,
