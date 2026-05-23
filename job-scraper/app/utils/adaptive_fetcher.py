@@ -17,7 +17,7 @@ from utils.browser import browser_manager
 
 logger = logging.getLogger(__name__)
 
-# Sites que SEMPRE precisam de JavaScript
+# Sites que SEMPRE precisam de JavaScript (React SPA)
 JS_REQUIRED_DOMAINS = {
     "geekhunter.com.br",
     "vagas.com.br",
@@ -25,11 +25,17 @@ JS_REQUIRED_DOMAINS = {
     "99jobs.com",
 }
 
-# User-Agent padrao
+# Sites com SSR/HTML estático — NÃO precisam de Playwright
+STATIC_DOMAINS = {
+    "itjobs.pt",       # HTML server-rendered
+    "net-empregos.com",
+}
+
+# User-Agent padrão (adaptive fetcher usa rotation via http_client onde possível)
 DEFAULT_USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
     "AppleWebKit/537.36 (KHTML, like Gecko) "
-    "Chrome/120.0.0.0 Safari/537.36"
+    "Chrome/124.0.0.0 Safari/537.36"
 )
 
 
