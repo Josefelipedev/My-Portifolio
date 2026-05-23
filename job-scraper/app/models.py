@@ -10,6 +10,7 @@ class JobSource(str, Enum):
     GEEKHUNTER = "geekhunter"
     VAGASCOMBR = "vagascombr"
     LINKEDIN = "linkedin"
+    ITJOBS = "itjobs"
 
 
 class JobListing(BaseModel):

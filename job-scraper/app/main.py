@@ -17,6 +17,7 @@ from models import (
 )
 from scrapers.geekhunter import GeekHunterScraper
 from scrapers.vagas import VagasComBrScraper
+from scrapers.itjobs import ITJobsScraper
 from agents.orchestrator import AgentOrchestrator, report_execution
 from agents.agno_job_extractor import get_agno_job_extractor
 from utils.http_client import fetch_html, extract_links
@@ -70,6 +71,7 @@ app.add_middleware(
 scrapers = {
     "geekhunter": GeekHunterScraper(),
     "vagascombr": VagasComBrScraper(),
+    "itjobs": ITJobsScraper(),
 }
 
 # Initialize agent orchestrator
@@ -295,10 +297,10 @@ async def search_with_agents(
     """
     stats["requests_total"] += 1
 
-    if source not in ("geekhunter", "vagascombr"):
+    if source not in ("geekhunter", "vagascombr", "itjobs"):
         raise HTTPException(
             status_code=400,
-            detail=f"Source '{source}' not supported by agent architecture. Use: geekhunter, vagascombr"
+            detail=f"Source '{source}' not supported by agent architecture. Use: geekhunter, vagascombr, itjobs"
         )
 
     try:
@@ -353,7 +355,7 @@ async def search_with_agents_detailed(
     Returns job listings plus debug information about each pipeline stage.
     Useful for debugging and understanding how the agents work.
     """
-    if source not in ("geekhunter", "vagascombr"):
+    if source not in ("geekhunter", "vagascombr", "itjobs"):
         raise HTTPException(
             status_code=400,
             detail=f"Source '{source}' not supported by agent architecture"
