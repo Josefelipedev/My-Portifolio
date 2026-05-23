@@ -9,3 +9,7 @@ tenacity==8.2.3
 python-dotenv==1.0.0
 cachetools==5.3.2
 together>=1.0.0
+# Migrado do clawlite
+requests==2.32.3
+readability-lxml==0.8.1
+markdownify==0.13.1

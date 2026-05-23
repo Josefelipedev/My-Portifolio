@@ -95,6 +95,10 @@ export { searchNetEmpregos } from './apis/net-empregos';
 export { searchVagasComBr } from './apis/vagas';
 export { searchGeekHunter } from './apis/geekhunter';
 export { searchLinkedIn } from './apis/linkedin';
+export { searchGupy } from './apis/gupy';
+export { searchIndeed } from './apis/indeed';
+export { searchCatho } from './apis/catho';
+export { searchProgramathor } from './apis/programathor';
 
 // Python Scraper exports
 export {

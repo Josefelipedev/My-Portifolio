@@ -9,7 +9,7 @@ import MatchScoreBadge from './jobs/MatchScoreBadge';
 
 interface JobListing {
   id: string;
-  source: 'remoteok' | 'remotive' | 'arbeitnow' | 'adzuna' | 'jooble' | 'jsearch' | 'netempregos' | 'vagascombr' | 'linkedin' | 'geekhunter';
+  source: 'remoteok' | 'remotive' | 'arbeitnow' | 'adzuna' | 'jooble' | 'jsearch' | 'netempregos' | 'vagascombr' | 'linkedin' | 'geekhunter' | 'gupy' | 'indeed' | 'catho' | 'programathor';
   title: string;
   company: string;
   companyLogo?: string;
@@ -68,6 +68,10 @@ const SOURCE_LABELS: Record<string, { label: string; color: string }> = {
   vagascombr: { label: 'Vagas.com.br', color: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400' },
   linkedin: { label: 'LinkedIn', color: 'bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-400' },
   geekhunter: { label: 'GeekHunter', color: 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400' },
+  gupy: { label: 'Gupy', color: 'bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-400' },
+  indeed: { label: 'Indeed', color: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400' },
+  catho: { label: 'Catho', color: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400' },
+  programathor: { label: 'Programathor', color: 'bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-400' },
 };
 
 const COUNTRY_OPTIONS = [
@@ -95,6 +99,10 @@ const SOURCE_OPTIONS = [
   { value: 'jooble', label: 'Jooble', region: 'Global' },
   { value: 'jsearch', label: 'JSearch', region: 'Global' },
   { value: 'geekhunter', label: 'GeekHunter', region: 'BR' },
+  { value: 'gupy', label: 'Gupy', region: 'BR' },
+  { value: 'indeed', label: 'Indeed', region: 'BR/PT' },
+  { value: 'catho', label: 'Catho', region: 'BR' },
+  { value: 'programathor', label: 'Programathor', region: 'BR' },
 ];
 
 // Popular search terms for developers

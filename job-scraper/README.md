@@ -1,165 +1,175 @@
 # Job Scraper Service
 
-Python-based job scraping service using Playwright for JavaScript-heavy websites.
+Serviço Python de scraping de vagas com Playwright (para SPAs) + HTTP simples + extração de conteúdo web.
+
+> Absorveu todas as funcionalidades do **clawlite** (scraping genérico, crawling, extração de conteúdo).
 
 ## Overview
 
-This service solves the problem of scraping job listings from sites that:
-- Use Single Page Application (SPA) frameworks (React, Vue, etc.)
-- Have JavaScript-rendered content
-- May have anti-bot protection
+Este serviço resolve dois problemas:
 
-## Supported Sources
+1. **Scraping de vagas** em sites JavaScript-heavy (React/SPA) com suporte a AI fallback
+2. **Extração de conteúdo web** genérico (Markdown limpo, crawling BFS, resumos)
 
-| Source | Description |
-|--------|-------------|
-| **GeekHunter** | Brazilian tech job board (SPA with React) |
-| **Vagas.com.br** | Major Brazilian job site |
+## Fontes de Vagas
+
+| Fonte | Site | Estratégia |
+|-------|------|-----------|
+| **GeekHunter** | geekhunter.com.br | Playwright + fallback regex por href |
+| **Vagas.com.br** | vagas.com.br | Playwright + fallback por `a.link-detalhes-vaga` |
 
 ## Quick Start
 
 ```bash
-# Build the Docker image
+# Build e start
 docker-compose build
-
-# Start the service
 docker-compose up -d
 
-# View logs
+# Logs
 docker-compose logs -f job-scraper
 
-# Stop the service
+# Stop
 docker-compose down
 ```
 
 ## API Endpoints
 
-### Health Check
+### Job Search
+
 ```bash
+# Health
 curl http://localhost:8000/health
-```
 
-### List Available Sources
-```bash
+# Listar fontes disponíveis
 curl http://localhost:8000/sources
-```
 
-### Search All Sources
-```bash
+# Buscar em todas as fontes
 curl "http://localhost:8000/search?keyword=desenvolvedor&limit=50"
-```
 
-### Search Specific Source
-```bash
+# Buscar fonte específica
 curl "http://localhost:8000/search/geekhunter?keyword=python&limit=20"
 curl "http://localhost:8000/search/vagascombr?keyword=react&limit=20"
+
+# Busca via agentes (com detalhes do pipeline)
+curl "http://localhost:8000/search/agent?keyword=typescript&source=geekhunter"
+curl "http://localhost:8000/search/agent/details?keyword=typescript&source=geekhunter"
 ```
 
-## Configuration
+### Web Scraping (do clawlite)
 
-Environment variables (set in `docker-compose.yml`):
+```bash
+# Extrair conteúdo de URL como Markdown
+curl -X POST http://localhost:8000/scrape \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://example.com/blog/post"}'
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `SCRAPER_TIMEOUT` | 30 | Request timeout in seconds |
-| `CACHE_TTL` | 300 | Cache time-to-live in seconds |
-| `LOG_LEVEL` | INFO | Logging level |
-| `REDIS_URL` | redis://localhost:6379/1 | Redis URL for caching |
+# Extrair com lista de links
+curl -X POST http://localhost:8000/extract \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://example.com"}'
 
-## Integration with Next.js
+# Crawl BFS de um site
+curl -X POST http://localhost:8000/crawl \
+  -H "Content-Type: application/json" \
+  -d '{"start_url": "https://example.com", "max_pages": 5, "depth": 2}'
 
-The service integrates with the portfolio's Next.js app automatically when `PYTHON_SCRAPER_URL` is set.
+# Resumo truncado de uma URL
+curl -X POST http://localhost:8000/summarize \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://example.com/article", "max_length": 300}'
+```
 
-Add to your `.env`:
+### Monitoramento
+
+```bash
+# Stats gerais
+curl http://localhost:8000/stats
+
+# Logs recentes
+curl "http://localhost:8000/logs?limit=50"
+curl "http://localhost:8000/logs?level=ERROR"
+
+# Stats de AI extraction
+curl http://localhost:8000/ai/stats
+```
+
+## Configuração
+
+Variáveis de ambiente (defina no `docker-compose.yml` ou `.env`):
+
+| Variável | Padrão | Descrição |
+|----------|--------|-----------|
+| `SCRAPER_TIMEOUT` | 30 | Timeout de requisição (segundos) |
+| `CACHE_TTL` | 300 | TTL do cache (segundos) |
+| `LOG_LEVEL` | INFO | Nível de log |
+| `MAX_RETRIES` | 3 | Tentativas em caso de erro |
+| `RETRY_DELAY` | 2.0 | Delay base entre retries (segundos) |
+| `REDIS_URL` | redis://localhost:6379/1 | URL do Redis |
+| `ENABLE_AI_FALLBACK` | true | Ativar AI extraction como fallback |
+| `AI_FALLBACK_THRESHOLD` | 3 | Mínimo de vagas antes de tentar AI |
+| `DEBUG_MODE` | true | Salvar screenshots/HTML de debug |
+| `DATAIMPULSE_PROXY_HOST` | — | Host do proxy DataImpulse |
+| `DATAIMPULSE_PROXY_PORT` | — | Porta do proxy DataImpulse |
+| `DATAIMPULSE_USERNAME` | — | Usuário do proxy |
+| `DATAIMPULSE_PASSWORD` | — | Senha do proxy |
+
+## Integração com Next.js
+
+Adicione ao `.env` do portfolio:
+
 ```
 PYTHON_SCRAPER_URL=http://localhost:8000
 ```
 
-The aggregator will:
-1. Check if Python scraper is available on startup
-2. Use Python scraper for GeekHunter and Vagas.com.br if available
-3. Fall back to JavaScript-based scrapers if service is down
+O aggregator do Next.js:
+1. Verifica se o serviço está disponível no startup
+2. Usa-o para GeekHunter e Vagas.com.br se disponível
+3. Faz fallback para scrapers JS se o serviço estiver offline
 
-## Development
-
-### Project Structure
+## Estrutura do Projeto
 
 ```
 job-scraper/
-├── docker-compose.yml     # Docker orchestration
-├── Dockerfile             # Container build config
-├── requirements.txt       # Python dependencies
+├── docker-compose.yml
+├── Dockerfile
+├── requirements.txt
 ├── app/
-│   ├── main.py           # FastAPI entry point
-│   ├── config.py         # Configuration
-│   ├── models.py         # Pydantic models
+│   ├── main.py              # FastAPI — todos os endpoints
+│   ├── config.py            # Configuração (proxy, timeouts, debug)
+│   ├── models.py            # Pydantic models (jobs + web scraping)
 │   ├── scrapers/
-│   │   ├── base.py       # Base scraper class
-│   │   ├── geekhunter.py # GeekHunter scraper
-│   │   └── vagas.py      # Vagas.com.br scraper
-│   ├── utils/
-│   │   ├── browser.py    # Playwright setup
-│   │   ├── parser.py     # HTML parsing helpers
-│   │   └── cache.py      # Caching utilities
-│   └── tests/
-│       └── test_scrapers.py
+│   │   ├── base.py          # Classe base
+│   │   ├── hybrid_scraper.py # HTTP + Playwright + AI fallback
+│   │   ├── geekhunter.py    # GeekHunter (CSS + regex fallback)
+│   │   └── vagas.py         # Vagas.com.br (li.vaga + link fallback)
+│   ├── agents/
+│   │   ├── orchestrator.py
+│   │   ├── agno_job_extractor.py
+│   │   ├── analyzer_agent.py
+│   │   ├── extractor_agent.py
+│   │   ├── page_agent.py
+│   │   └── search_agent.py
+│   └── utils/
+│       ├── adaptive_fetcher.py   # HTTP adaptativo (auto Playwright)
+│       ├── http_client.py        # HTTP simples com retry (tenacity)
+│       ├── content_extractor.py  # readability + markdownify
+│       ├── browser.py            # Playwright setup
+│       ├── cache.py              # Cache utilities
+│       └── parser.py             # HTML parsing helpers
 └── README.md
-```
-
-### Running Tests
-
-```bash
-# Inside container
-docker-compose exec job-scraper pytest tests/
-
-# Or locally with Python
-cd app && pytest tests/
-```
-
-### Adding a New Scraper
-
-1. Create `app/scrapers/newsite.py`:
-```python
-from scrapers.base import BaseScraper
-from models import JobListing, JobSource
-
-class NewSiteScraper(BaseScraper):
-    name = "newsite"
-    base_url = "https://newsite.com"
-
-    async def search(self, keyword: str, country: str, limit: int) -> list[JobListing]:
-        # Implementation here
-        pass
-```
-
-2. Register in `app/main.py`:
-```python
-from scrapers.newsite import NewSiteScraper
-
-scrapers = {
-    # ... existing scrapers
-    "newsite": NewSiteScraper(),
-}
-```
-
-3. Update `app/models.py`:
-```python
-class JobSource(str, Enum):
-    # ... existing sources
-    NEWSITE = "newsite"
 ```
 
 ## Troubleshooting
 
-### Container won't start
-- Check if port 8000 is available: `lsof -i :8000`
-- Verify Docker is running: `docker info`
+**Container não inicia:**
+- Verifica se porta 8000 está livre: `lsof -i :8000`
+- Playwright precisa de ao menos 1GB de RAM
 
-### No jobs returned
-- Check logs: `docker-compose logs job-scraper`
-- Verify the target site hasn't changed its HTML structure
-- Try increasing timeout: `SCRAPER_TIMEOUT=60`
+**Nenhuma vaga retornada:**
+- Veja logs: `docker-compose logs job-scraper`
+- A estrutura HTML do site pode ter mudado
+- Tente aumentar timeout: `SCRAPER_TIMEOUT=60`
 
-### Playwright browser errors
-- Ensure the container has enough memory (at least 1GB)
-- Chromium requires certain system dependencies (handled by Dockerfile)
+**Scraping bloqueado (403/429):**
+- Configure o proxy DataImpulse via variáveis de ambiente
+- O cliente HTTP (`http_client.py`) faz retry automático com backoff
