@@ -28,7 +28,11 @@ export type JobSourceType =
   | 'itjobs'
   | 'vagascombr'
   | 'linkedin'
-  | 'geekhunter';
+  | 'geekhunter'
+  | 'gupy'
+  | 'indeed'
+  | 'catho'
+  | 'programathor';
 
 export type JobSource = 'all' | JobSourceType;
 

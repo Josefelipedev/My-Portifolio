@@ -4,15 +4,23 @@ from fastapi.responses import FileResponse, HTMLResponse
 from datetime import datetime
 from collections import deque
 from typing import Optional, List, Dict, Any
+import asyncio
 import logging
 import time
 import os
 
-from models import SearchParams, SearchResponse, JobListing
+from models import (
+    SearchParams, SearchResponse, JobListing,
+    ScrapeRequest, ScrapeResponse,
+    CrawlRequest, CrawlResponse,
+    ExtractRequest, SummarizeRequest,
+)
 from scrapers.geekhunter import GeekHunterScraper
 from scrapers.vagas import VagasComBrScraper
 from agents.orchestrator import AgentOrchestrator, report_execution
 from agents.agno_job_extractor import get_agno_job_extractor
+from utils.http_client import fetch_html, extract_links
+from utils.content_extractor import extract_content
 from config import config
 
 # Custom log handler to store logs in memory
@@ -394,4 +402,125 @@ async def get_ai_stats():
             "ai_fallback_enabled": os.getenv("ENABLE_AI_FALLBACK", "true") == "true",
             "ai_fallback_threshold": int(os.getenv("AI_FALLBACK_THRESHOLD", "3")),
         },
+    }
+
+
+# ============================================================================
+# Web Scraping Endpoints (migrado do clawlite)
+# ============================================================================
+
+
+async def _scrape_url(url: str, use_proxy: bool, include_links: bool) -> ScrapeResponse:
+    """Busca e extrai conteúdo de uma URL."""
+    try:
+        html = await fetch_html(url, use_proxy=use_proxy)
+        extracted = extract_content(html, url)
+        links = extract_links(html, url) if include_links else []
+
+        return ScrapeResponse(
+            url=url,
+            title=extracted["title"],
+            content_markdown=extracted["content_markdown"],
+            word_count=extracted["word_count"],
+            links=links,
+            status="success",
+        )
+    except Exception as exc:
+        logger.error("Failed to scrape %s: %s", url, exc)
+        return ScrapeResponse(
+            url=url,
+            title="",
+            content_markdown="",
+            word_count=0,
+            links=[],
+            status="error",
+            error=str(exc),
+        )
+
+
+@app.post("/scrape", response_model=ScrapeResponse, tags=["Web Scraping"])
+async def scrape(req: ScrapeRequest):
+    """
+    Baixa uma URL e retorna o conteúdo como Markdown limpo.
+
+    Remove ads, menus, banners e ruído usando readability + markdownify.
+    """
+    result = await _scrape_url(req.url, req.use_proxy, req.include_links)
+    if result.status == "error":
+        raise HTTPException(status_code=422, detail=result.error)
+    return result
+
+
+@app.post("/extract", response_model=ScrapeResponse, tags=["Web Scraping"])
+async def extract(req: ExtractRequest):
+    """
+    Extrai conteúdo estruturado de uma URL (alias de /scrape com links).
+    """
+    result = await _scrape_url(req.url, req.use_proxy, include_links=True)
+    if result.status == "error":
+        raise HTTPException(status_code=422, detail=result.error)
+    return result
+
+
+@app.post("/crawl", response_model=CrawlResponse, tags=["Web Scraping"])
+async def crawl(req: CrawlRequest):
+    """
+    BFS crawl a partir de start_url até max_pages páginas na profundidade dada.
+
+    Útil para indexar seções completas de um site.
+    """
+    from urllib.parse import urlparse
+
+    visited: set[str] = set()
+    pages: list[ScrapeResponse] = []
+    queue: list[tuple[str, int]] = [(req.start_url, 0)]
+    base_domain = urlparse(req.start_url).netloc
+
+    while queue and len(pages) < req.max_pages:
+        url, depth = queue.pop(0)
+
+        if url in visited:
+            continue
+        visited.add(url)
+
+        logger.info("Crawling [depth=%d] %s", depth, url)
+        result = await _scrape_url(url, req.use_proxy, include_links=True)
+        pages.append(result)
+
+        if depth < req.depth and result.status == "success":
+            for link in result.links:
+                if link not in visited and urlparse(link).netloc == base_domain:
+                    queue.append((link, depth + 1))
+
+        if req.delay > 0:
+            await asyncio.sleep(req.delay)
+
+    return CrawlResponse(
+        start_url=req.start_url,
+        pages_crawled=len(pages),
+        pages=pages,
+        status="success",
+    )
+
+
+@app.post("/summarize", tags=["Web Scraping"])
+async def summarize(req: SummarizeRequest):
+    """
+    Busca uma URL e retorna um resumo truncado (primeiras N palavras).
+    """
+    result = await _scrape_url(req.url, req.use_proxy, include_links=False)
+    if result.status == "error":
+        raise HTTPException(status_code=422, detail=result.error)
+
+    words = result.content_markdown.split()
+    summary = " ".join(words[: req.max_length])
+    if len(words) > req.max_length:
+        summary += "…"
+
+    return {
+        "url": result.url,
+        "title": result.title,
+        "summary": summary,
+        "word_count": result.word_count,
+        "status": "success",
     }
