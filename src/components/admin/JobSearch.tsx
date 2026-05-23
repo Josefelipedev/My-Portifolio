@@ -9,7 +9,7 @@ import MatchScoreBadge from './jobs/MatchScoreBadge';
 
 interface JobListing {
   id: string;
-  source: 'remoteok' | 'remotive' | 'arbeitnow' | 'adzuna' | 'jooble' | 'jsearch' | 'netempregos' | 'vagascombr' | 'linkedin' | 'geekhunter' | 'gupy' | 'indeed' | 'catho' | 'programathor';
+  source: 'remoteok' | 'remotive' | 'arbeitnow' | 'adzuna' | 'jooble' | 'jsearch' | 'netempregos' | 'itjobs' | 'vagascombr' | 'linkedin' | 'geekhunter' | 'gupy' | 'indeed' | 'catho' | 'programathor';
   title: string;
   company: string;
   companyLogo?: string;
@@ -65,6 +65,7 @@ const SOURCE_LABELS: Record<string, { label: string; color: string }> = {
   jooble: { label: 'Jooble', color: 'bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-400' },
   jsearch: { label: 'JSearch', color: 'bg-pink-100 dark:bg-pink-900/30 text-pink-700 dark:text-pink-400' },
   netempregos: { label: 'Net-Empregos', color: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400' },
+  itjobs: { label: 'ITJobs.pt', color: 'bg-lime-100 dark:bg-lime-900/30 text-lime-700 dark:text-lime-400' },
   vagascombr: { label: 'Vagas.com.br', color: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400' },
   linkedin: { label: 'LinkedIn', color: 'bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-400' },
   geekhunter: { label: 'GeekHunter', color: 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400' },
@@ -93,6 +94,7 @@ const SOURCE_OPTIONS = [
   { value: 'remotive', label: 'Remotive', region: 'Remote' },
   { value: 'arbeitnow', label: 'Arbeitnow', region: 'EU' },
   { value: 'netempregos', label: 'Net-Empregos', region: 'PT' },
+  { value: 'itjobs', label: 'ITJobs.pt', region: 'PT' },
   { value: 'vagascombr', label: 'Vagas.com.br', region: 'BR' },
   { value: 'linkedin', label: 'LinkedIn', region: 'BR/PT' },
   { value: 'adzuna', label: 'Adzuna', region: 'PT/BR' },
