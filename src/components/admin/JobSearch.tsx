@@ -5,7 +5,7 @@ import { useToast } from '@/components/ui/Toast';
 import FilterPanel, { JobFilters, applyJobFilters } from './jobs/FilterPanel';
 import SearchHistory, { saveSearchToHistory } from './jobs/SearchHistory';
 import ApiKeySettings from './jobs/ApiKeySettings';
-import MatchScoreBadge from './jobs/MatchScoreBadge';
+import { MatchScoreWithReason, type MatchReason } from './jobs/MatchScoreBadge';
 
 interface JobListing {
   id: string;
@@ -23,6 +23,7 @@ interface JobListing {
   country?: string;
   relevanceScore?: number;
   matchPercentage?: number;
+  matchReason?: MatchReason;
 }
 
 interface ResumeSkill { name: string; level: number; }
@@ -32,19 +33,39 @@ interface ResumeData {
   experience: ResumeExperience[];
 }
 
-function calcMatchPercentage(job: JobListing, resume: ResumeData): number {
-  if (!resume.skills.length) return 0;
+function calcMatchPercentage(
+  job: JobListing,
+  resume: ResumeData,
+): { score: number; reason: MatchReason } {
+  if (!resume.skills.length) return { score: 0, reason: { matched: [], missing: [], titleMatch: false } };
+
   const text = `${job.title} ${job.description || ''} ${job.tags?.join(' ') || ''}`.toLowerCase();
-  let matched = 0;
+  const matched: string[] = [];
+  const missing: string[] = [];
+
   for (const skill of resume.skills) {
-    if (text.includes(skill.name.toLowerCase())) matched++;
+    if (text.includes(skill.name.toLowerCase())) {
+      matched.push(skill.name);
+    } else {
+      missing.push(skill.name);
+    }
   }
-  let pct = (matched / resume.skills.length) * 100;
+
+  let pct = (matched.length / resume.skills.length) * 100;
+  let titleMatch = false;
   for (const exp of resume.experience) {
     const firstWord = exp.title.toLowerCase().split(' ')[0];
-    if (firstWord.length > 3 && job.title.toLowerCase().includes(firstWord)) pct += 10;
+    if (firstWord.length > 3 && job.title.toLowerCase().includes(firstWord)) {
+      pct += 10;
+      titleMatch = true;
+      break;
+    }
   }
-  return Math.min(100, Math.round(pct));
+
+  return {
+    score: Math.min(100, Math.round(pct)),
+    reason: { matched, missing, titleMatch },
+  };
 }
 
 interface ApiStatus {
@@ -354,7 +375,10 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
       }
 
       const withScores = (list: JobListing[]) =>
-        list.map(j => ({ ...j, matchPercentage: calcMatchPercentage(j, resume) }));
+        list.map(j => {
+          const { score, reason } = calcMatchPercentage(j, resume);
+          return { ...j, matchPercentage: score, matchReason: reason };
+        });
 
       if (loadMore) {
         setJobs(prev => [...prev, ...withScores(data.jobs)]);
@@ -419,10 +443,10 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
         throw new Error(data.error || 'Failed to perform smart search');
       }
 
-      const allResults: JobListing[] = (data.jobs || []).map((j: JobListing) => ({
-        ...j,
-        matchPercentage: calcMatchPercentage(j, resume),
-      }));
+      const allResults: JobListing[] = (data.jobs || []).map((j: JobListing) => {
+        const { score, reason } = calcMatchPercentage(j, resume);
+        return { ...j, matchPercentage: score, matchReason: reason };
+      });
       setAllSmartResults(allResults);
       setJobs(allResults.slice(0, PAGE_SIZE));
       setPage(1);
@@ -1011,7 +1035,7 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0">
                         {job.matchPercentage !== undefined && resume.skills.length > 0 && (
-                          <MatchScoreBadge score={job.matchPercentage} maxScore={100} />
+                          <MatchScoreWithReason score={job.matchPercentage} reason={job.matchReason} />
                         )}
                         <span className={`px-2 py-1 text-xs rounded ${SOURCE_LABELS[job.source]?.color || 'bg-zinc-100 text-zinc-600'}`}>
                           {SOURCE_LABELS[job.source]?.label || job.source}
