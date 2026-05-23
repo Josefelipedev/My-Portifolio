@@ -2,7 +2,8 @@
 
 import type { JobListing, JobSearchParams, JobSourceType } from '../types';
 
-const PYTHON_SCRAPER_URL = process.env.PYTHON_SCRAPER_URL || 'http://localhost:8000';
+// Now served by multiscraper on port 8001 — job endpoints under /jobs/*
+const PYTHON_SCRAPER_URL = process.env.PYTHON_SCRAPER_URL || 'http://localhost:8001';
 
 interface PythonJob {
   id: string;
@@ -36,7 +37,7 @@ export async function searchPythonScraper(
   source?: 'geekhunter' | 'vagascombr'
 ): Promise<JobListing[]> {
   try {
-    const url = new URL(`${PYTHON_SCRAPER_URL}/search`);
+    const url = new URL(`${PYTHON_SCRAPER_URL}/jobs/search`);
     url.searchParams.set('keyword', params.keyword || 'desenvolvedor');
     url.searchParams.set('country', params.country || 'br');
     url.searchParams.set('limit', String(params.limit || 50));
@@ -104,7 +105,7 @@ export async function searchVagasComBrPython(
  */
 export async function isPythonScraperAvailable(): Promise<boolean> {
   try {
-    const response = await fetch(`${PYTHON_SCRAPER_URL}/health`, {
+    const response = await fetch(`${PYTHON_SCRAPER_URL}/health`, {  // /health is unchanged
       method: 'GET',
       signal: AbortSignal.timeout(3000),
     });
@@ -119,7 +120,7 @@ export async function isPythonScraperAvailable(): Promise<boolean> {
  */
 export async function getPythonScraperSources(): Promise<string[]> {
   try {
-    const response = await fetch(`${PYTHON_SCRAPER_URL}/sources`, {
+    const response = await fetch(`${PYTHON_SCRAPER_URL}/jobs/sources`, {
       method: 'GET',
       signal: AbortSignal.timeout(3000),
     });
