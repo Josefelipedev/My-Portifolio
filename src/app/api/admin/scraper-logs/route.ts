@@ -3,7 +3,8 @@ import { isAuthenticated } from '@/lib/auth';
 import { logger } from '@/lib/logger';
 import { sendScraperAlert } from '@/lib/email';
 
-const PYTHON_SCRAPER_URL = process.env.PYTHON_SCRAPER_URL || 'http://localhost:8000';
+// Job scraper is now part of multiscraper, running on port 8001
+const PYTHON_SCRAPER_URL = process.env.PYTHON_SCRAPER_URL || 'http://localhost:8001';
 
 interface ScraperHealth {
   status: string;
@@ -68,7 +69,7 @@ export async function GET(request: NextRequest) {
     if (isAvailable) {
       try {
         // Get sources
-        const sourcesResponse = await fetch(`${PYTHON_SCRAPER_URL}/sources`, {
+        const sourcesResponse = await fetch(`${PYTHON_SCRAPER_URL}/jobs/sources`, {
           signal: AbortSignal.timeout(5000),
         });
         if (sourcesResponse.ok) {
@@ -81,7 +82,7 @@ export async function GET(request: NextRequest) {
 
       try {
         // Get stats if available
-        const statsResponse = await fetch(`${PYTHON_SCRAPER_URL}/stats`, {
+        const statsResponse = await fetch(`${PYTHON_SCRAPER_URL}/jobs/stats`, {
           signal: AbortSignal.timeout(5000),
         });
         if (statsResponse.ok) {
@@ -238,7 +239,7 @@ export async function GET(request: NextRequest) {
       const sendAlert = searchParams.get('alert') === 'true';
 
       try {
-        const testUrl = `${PYTHON_SCRAPER_URL}/search/${source}?keyword=${encodeURIComponent(keyword)}&limit=5`;
+        const testUrl = `${PYTHON_SCRAPER_URL}/jobs/search/${source}?keyword=${encodeURIComponent(keyword)}&limit=5`;
         const testResponse = await fetch(testUrl, {
           signal: AbortSignal.timeout(60000), // 60s for scraping
         });
@@ -360,7 +361,7 @@ export async function GET(request: NextRequest) {
       },
       message: isAvailable
         ? 'Python scraper is running'
-        : 'Python scraper is not available. Start it with: cd job-scraper && docker compose up -d',
+        : 'Scraper not available. Start multiscraper: cd /path/to/multiscraper && docker compose up -d',
     });
   } catch (error) {
     console.error('Error checking scraper status:', error);
