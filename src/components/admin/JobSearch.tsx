@@ -9,7 +9,7 @@ import { MatchScoreWithReason, type MatchReason } from './jobs/MatchScoreBadge';
 
 interface JobListing {
   id: string;
-  source: 'remoteok' | 'remotive' | 'arbeitnow' | 'adzuna' | 'jooble' | 'jsearch' | 'netempregos' | 'itjobs' | 'vagascombr' | 'linkedin' | 'geekhunter' | 'gupy' | 'indeed' | 'catho' | 'programathor' | 'jobicy' | 'weworkremotely';
+  source: 'remoteok' | 'remotive' | 'arbeitnow' | 'adzuna' | 'jooble' | 'jsearch' | 'netempregos' | 'itjobs' | 'vagascombr' | 'linkedin' | 'geekhunter' | 'gupy' | 'indeed' | 'catho' | 'programathor' | 'jobicy' | 'weworkremotely' | 'buscojobs';
   title: string;
   company: string;
   companyLogo?: string;
@@ -96,6 +96,7 @@ const SOURCE_LABELS: Record<string, { label: string; color: string }> = {
   programathor: { label: 'Programathor', color: 'bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-400' },
   jobicy: { label: 'Jobicy', color: 'bg-fuchsia-100 dark:bg-fuchsia-900/30 text-fuchsia-700 dark:text-fuchsia-400' },
   weworkremotely: { label: 'WeWorkRemotely', color: 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400' },
+  buscojobs: { label: 'BuscoJobs.pt', color: 'bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400' },
 };
 
 const COUNTRY_OPTIONS = [
@@ -112,23 +113,65 @@ const DATE_FILTER_OPTIONS = [
   { value: '60', label: 'Last 2 months' },
 ];
 
-const SOURCE_OPTIONS = [
-  { value: 'remoteok', label: 'RemoteOK', region: 'Remote' },
-  { value: 'remotive', label: 'Remotive', region: 'Remote' },
-  { value: 'arbeitnow', label: 'Arbeitnow', region: 'EU' },
-  { value: 'netempregos', label: 'Net-Empregos', region: 'PT' },
-  { value: 'itjobs', label: 'ITJobs.pt', region: 'PT' },
-  { value: 'vagascombr', label: 'Vagas.com.br', region: 'BR' },
-  { value: 'linkedin', label: 'LinkedIn', region: 'BR/PT' },
-  { value: 'adzuna', label: 'Adzuna', region: 'PT/BR' },
-  { value: 'jooble', label: 'Jooble', region: 'Global' },
-  { value: 'jsearch', label: 'JSearch', region: 'Global' },
-  { value: 'geekhunter', label: 'GeekHunter', region: 'BR' },
-  { value: 'gupy', label: 'Gupy', region: 'BR' },
-  { value: 'indeed', label: 'Indeed', region: 'BR/PT' },
-  { value: 'catho', label: 'Catho', region: 'BR' },
-  { value: 'programathor', label: 'Programathor', region: 'BR' },
-];
+// Sources grouped by region — used for the grouped dropdown UI
+const SOURCE_GROUPS = [
+  {
+    id: 'remote',
+    label: 'Remote',
+    flag: '🏠',
+    sources: [
+      { value: 'remoteok', label: 'RemoteOK' },
+      { value: 'remotive', label: 'Remotive' },
+      { value: 'jobicy', label: 'Jobicy' },
+      { value: 'weworkremotely', label: 'WeWorkRemotely' },
+    ],
+  },
+  {
+    id: 'pt',
+    label: 'Portugal',
+    flag: '🇵🇹',
+    sources: [
+      { value: 'itjobs', label: 'ITJobs.pt' },
+      { value: 'netempregos', label: 'Net-Empregos' },
+      { value: 'buscojobs', label: 'BuscoJobs.pt' },
+      { value: 'arbeitnow', label: 'Arbeitnow (EU)' },
+    ],
+  },
+  {
+    id: 'br',
+    label: 'Brasil',
+    flag: '🇧🇷',
+    sources: [
+      { value: 'geekhunter', label: 'GeekHunter' },
+      { value: 'gupy', label: 'Gupy' },
+      { value: 'catho', label: 'Catho' },
+      { value: 'programathor', label: 'Programathor' },
+      { value: 'vagascombr', label: 'Vagas.com.br' },
+    ],
+  },
+  {
+    id: 'brpt',
+    label: 'BR + PT',
+    flag: '🌐',
+    sources: [
+      { value: 'linkedin', label: 'LinkedIn' },
+      { value: 'indeed', label: 'Indeed' },
+      { value: 'adzuna', label: 'Adzuna' },
+    ],
+  },
+  {
+    id: 'apikey',
+    label: 'Com API Key',
+    flag: '🔑',
+    sources: [
+      { value: 'jooble', label: 'Jooble' },
+      { value: 'jsearch', label: 'JSearch' },
+    ],
+  },
+] as const;
+
+// Flat list of all source values (for select-all logic)
+const ALL_SOURCE_VALUES = SOURCE_GROUPS.flatMap(g => g.sources.map(s => s.value));
 
 // Popular search terms for developers
 const POPULAR_SEARCH_TERMS = [
@@ -246,29 +289,66 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
   // Source multi-select functions
   const toggleSource = (source: string) => {
     setSelectedSources(prev => {
-      if (source === 'all') {
-        return new Set(['all']);
-      }
-      // If "all" is selected and user clicks an individual item, select all EXCEPT that item
+      if (source === 'all') return new Set(['all']);
+      // If currently "all", deselect everything except this one
       if (prev.has('all')) {
-        const allSources = SOURCE_OPTIONS.map(s => s.value);
-        const newSet = new Set(allSources.filter(s => s !== source));
+        const newSet = new Set(ALL_SOURCE_VALUES.filter(s => s !== source));
         return newSet.size === 0 ? new Set(['all']) : newSet;
       }
-      // Normal toggle
       const newSet = new Set(prev);
       if (newSet.has(source)) {
         newSet.delete(source);
         if (newSet.size === 0) return new Set(['all']);
       } else {
         newSet.add(source);
-        // If all individual items are selected, switch to 'all'
-        if (newSet.size === SOURCE_OPTIONS.length) {
-          return new Set(['all']);
-        }
+        if (newSet.size === ALL_SOURCE_VALUES.length) return new Set(['all']);
       }
       return newSet;
     });
+  };
+
+  // Toggle all sources in a group at once
+  const toggleSourceGroup = (groupSources: readonly { value: string }[]) => {
+    const groupValues = groupSources.map(s => s.value);
+    setSelectedSources(prev => {
+      // Are ALL sources of this group currently selected?
+      const currentlySelected = prev.has('all')
+        ? groupValues // if 'all', all are implicitly selected
+        : groupValues.filter(v => prev.has(v));
+      const allGroupSelected = currentlySelected.length === groupValues.length;
+
+      if (allGroupSelected) {
+        // Deselect all in this group
+        if (prev.has('all')) {
+          // Start from all sources, remove group
+          const newSet = new Set(ALL_SOURCE_VALUES.filter(v => !groupValues.includes(v)));
+          return newSet.size === 0 ? new Set(['all']) : newSet;
+        }
+        const newSet = new Set(prev);
+        groupValues.forEach(v => newSet.delete(v));
+        return newSet.size === 0 ? new Set(['all']) : newSet;
+      } else {
+        // Select all in this group
+        if (prev.has('all')) return new Set(['all']); // already all selected
+        const newSet = new Set(prev);
+        groupValues.forEach(v => newSet.add(v));
+        if (newSet.size === ALL_SOURCE_VALUES.length) return new Set(['all']);
+        return newSet;
+      }
+    });
+  };
+
+  // Is an entire group selected?
+  const isGroupSelected = (groupSources: readonly { value: string }[]) => {
+    if (selectedSources.has('all')) return true;
+    return groupSources.every(s => selectedSources.has(s.value));
+  };
+
+  // Is a group partially selected?
+  const isGroupPartial = (groupSources: readonly { value: string }[]) => {
+    if (selectedSources.has('all')) return false;
+    const selected = groupSources.filter(s => selectedSources.has(s.value));
+    return selected.length > 0 && selected.length < groupSources.length;
   };
 
   const getSourceParam = () => {
@@ -277,12 +357,17 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
   };
 
   const getSourceLabel = () => {
-    if (selectedSources.has('all')) return 'All sources';
-    if (selectedSources.size === 1) {
-      const source = Array.from(selectedSources)[0];
-      return SOURCE_OPTIONS.find(s => s.value === source)?.label || source;
+    if (selectedSources.has('all')) return 'Todas as fontes';
+    const count = selectedSources.size;
+    if (count === 0) return 'Selecionar fontes';
+    // Show group names when entire group is selected
+    const selectedGroups = SOURCE_GROUPS
+      .filter(g => isGroupSelected(g.sources))
+      .map(g => `${g.flag} ${g.label}`);
+    if (selectedGroups.length > 0 && selectedGroups.length <= 2) {
+      return selectedGroups.join(', ');
     }
-    return `${selectedSources.size} sources`;
+    return `${count} fontes`;
   };
 
   // Fetch API status, saved IDs and resume data on mount
@@ -707,7 +792,7 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
               </div>
             )}
           </div>
-          {/* Multi-select Source Dropdown */}
+          {/* Multi-select Source Dropdown — grouped by region */}
           <div className="relative" data-source-dropdown>
             <button
               type="button"
@@ -715,40 +800,113 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
               aria-haspopup="listbox"
               aria-expanded={showSourceDropdown}
               aria-label="Select sources"
-              className="px-4 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 flex items-center gap-2 min-w-[140px]"
+              className="px-4 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 flex items-center gap-2 min-w-[160px]"
             >
-              <span className="truncate">{getSourceLabel()}</span>
-              <svg className={`w-4 h-4 transition-transform ${showSourceDropdown ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <span className="truncate text-sm">{getSourceLabel()}</span>
+              <svg className={`w-4 h-4 ml-auto shrink-0 transition-transform ${showSourceDropdown ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
               </svg>
             </button>
+
             {showSourceDropdown && (
-              <div role="listbox" aria-multiselectable="true" aria-label="Sources" className="absolute z-50 mt-1 w-56 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg">
-                <div className="p-2">
-                  <label className="flex items-center gap-2 px-2 py-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded cursor-pointer">
+              <div
+                role="listbox"
+                aria-multiselectable="true"
+                aria-label="Sources"
+                className="absolute z-50 mt-1 right-0 w-72 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-xl overflow-hidden"
+              >
+                {/* All sources header */}
+                <div className="px-3 pt-3 pb-2 border-b border-zinc-100 dark:border-zinc-700">
+                  <label className="flex items-center gap-2 cursor-pointer group">
                     <input
                       type="checkbox"
                       checked={selectedSources.has('all')}
                       onChange={() => toggleSource('all')}
                       className="w-4 h-4 rounded border-zinc-300 text-red-500 focus:ring-red-500"
                     />
-                    <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">All sources</span>
+                    <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                      🌍 Todas as fontes
+                    </span>
+                    <span className="ml-auto text-xs text-zinc-400">{ALL_SOURCE_VALUES.length} sites</span>
                   </label>
-                  <div className="border-t border-zinc-200 dark:border-zinc-700 my-1" />
-                  {SOURCE_OPTIONS.map(opt => (
-                    <label key={opt.value} className="flex items-center gap-2 px-2 py-1.5 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={selectedSources.has(opt.value) || selectedSources.has('all')}
-                        onChange={() => toggleSource(opt.value)}
-                        className="w-4 h-4 rounded border-zinc-300 text-red-500 focus:ring-red-500"
-                      />
-                      <span className="text-sm text-zinc-900 dark:text-zinc-100">
-                        {opt.label}
-                      </span>
-                      <span className="text-xs text-zinc-400 ml-auto">{opt.region}</span>
-                    </label>
-                  ))}
+                </div>
+
+                {/* Groups */}
+                <div className="max-h-[420px] overflow-y-auto py-2 space-y-0.5">
+                  {SOURCE_GROUPS.map(group => {
+                    const groupAllSelected = isGroupSelected(group.sources);
+                    const groupPartial = isGroupPartial(group.sources);
+
+                    return (
+                      <div key={group.id} className="px-2">
+                        {/* Group header — click to toggle entire group */}
+                        <button
+                          type="button"
+                          onClick={() => toggleSourceGroup(group.sources)}
+                          className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-700/60 transition-colors group"
+                        >
+                          {/* Group checkbox indicator */}
+                          <span className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${
+                            groupAllSelected
+                              ? 'bg-red-500 border-red-500'
+                              : groupPartial
+                              ? 'bg-red-200 border-red-400 dark:bg-red-900/40 dark:border-red-500'
+                              : 'border-zinc-300 dark:border-zinc-600'
+                          }`}>
+                            {groupAllSelected && (
+                              <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                              </svg>
+                            )}
+                            {groupPartial && !groupAllSelected && (
+                              <span className="w-2 h-0.5 bg-red-500 dark:bg-red-400 rounded" />
+                            )}
+                          </span>
+                          <span className="text-sm font-medium text-zinc-700 dark:text-zinc-200">
+                            {group.flag} {group.label}
+                          </span>
+                          <span className="ml-auto text-xs text-zinc-400 group-hover:text-zinc-500">
+                            {groupAllSelected ? 'Deselecionar' : 'Selecionar todos'}
+                          </span>
+                        </button>
+
+                        {/* Individual sources in this group */}
+                        <div className="ml-6 mt-0.5 mb-1 space-y-0.5">
+                          {group.sources.map(src => {
+                            const isChecked = selectedSources.has('all') || selectedSources.has(src.value);
+                            return (
+                              <label
+                                key={src.value}
+                                className="flex items-center gap-2 px-2 py-1 hover:bg-zinc-50 dark:hover:bg-zinc-700/40 rounded-lg cursor-pointer"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={() => toggleSource(src.value)}
+                                  className="w-3.5 h-3.5 rounded border-zinc-300 text-red-500 focus:ring-red-500 focus:ring-offset-0"
+                                />
+                                <span className={`text-sm ${isChecked ? 'text-zinc-900 dark:text-zinc-100' : 'text-zinc-500 dark:text-zinc-400'}`}>
+                                  {src.label}
+                                </span>
+                              </label>
+                            );
+                          })}
+                        </div>
+
+                        {/* Divider between groups */}
+                        <div className="border-t border-zinc-100 dark:border-zinc-700/60 mx-1 mt-1" />
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Footer with count */}
+                <div className="px-3 py-2 border-t border-zinc-100 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/80">
+                  <p className="text-xs text-zinc-400 text-center">
+                    {selectedSources.has('all')
+                      ? `${ALL_SOURCE_VALUES.length} fontes seleccionadas`
+                      : `${selectedSources.size} de ${ALL_SOURCE_VALUES.length} fontes`}
+                  </p>
                 </div>
               </div>
             )}

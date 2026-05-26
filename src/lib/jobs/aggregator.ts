@@ -24,6 +24,7 @@ import { searchCatho } from './apis/catho';
 import { searchProgramathor } from './apis/programathor';
 import { searchJobicy } from './apis/jobicy';
 import { searchWeWorkRemotely } from './apis/weworkremotely';
+import { searchBuscoJobs } from './apis/buscojobs';
 import { isAIExtractionAvailable } from './ai-extraction';
 import { isPythonScraperAvailable } from './apis/python-scraper';
 
@@ -97,6 +98,11 @@ export async function searchJobs(
   // Portugal-specific: ITJobs.pt
   if (sources.includes('itjobs') || (isAllSources && shouldSearchCountry('pt'))) {
     push('ITJobs.pt', searchITJobs(params));
+  }
+
+  // Portugal-specific: BuscoJobs.pt
+  if (sources.includes('buscojobs') || (isAllSources && shouldSearchCountry('pt'))) {
+    push('BuscoJobs.pt', searchBuscoJobs(params));
   }
 
   // Brazil-specific: Vagas.com.br
@@ -226,6 +232,7 @@ export function getApiStatus(): ApiStatus[] {
     { name: 'Arbeitnow', configured: true, needsKey: false },
     { name: 'Net-Empregos', configured: true, needsKey: false },
     { name: 'ITJobs.pt', configured: true, needsKey: false },
+    { name: 'BuscoJobs.pt', configured: true, needsKey: false },
     { name: 'Vagas.com.br', configured: true, needsKey: false },
     { name: 'LinkedIn', configured: true, needsKey: false },
     { name: 'GeekHunter', configured: true, needsKey: false },
