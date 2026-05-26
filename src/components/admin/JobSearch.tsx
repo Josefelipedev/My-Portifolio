@@ -9,7 +9,7 @@ import { MatchScoreWithReason, type MatchReason } from './jobs/MatchScoreBadge';
 
 interface JobListing {
   id: string;
-  source: 'remoteok' | 'remotive' | 'arbeitnow' | 'adzuna' | 'jooble' | 'jsearch' | 'netempregos' | 'itjobs' | 'vagascombr' | 'linkedin' | 'geekhunter' | 'gupy' | 'indeed' | 'catho' | 'programathor';
+  source: 'remoteok' | 'remotive' | 'arbeitnow' | 'adzuna' | 'jooble' | 'jsearch' | 'netempregos' | 'itjobs' | 'vagascombr' | 'linkedin' | 'geekhunter' | 'gupy' | 'indeed' | 'catho' | 'programathor' | 'jobicy' | 'weworkremotely';
   title: string;
   company: string;
   companyLogo?: string;
@@ -94,6 +94,8 @@ const SOURCE_LABELS: Record<string, { label: string; color: string }> = {
   indeed: { label: 'Indeed', color: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400' },
   catho: { label: 'Catho', color: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400' },
   programathor: { label: 'Programathor', color: 'bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-400' },
+  jobicy: { label: 'Jobicy', color: 'bg-fuchsia-100 dark:bg-fuchsia-900/30 text-fuchsia-700 dark:text-fuchsia-400' },
+  weworkremotely: { label: 'WeWorkRemotely', color: 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400' },
 };
 
 const COUNTRY_OPTIONS = [

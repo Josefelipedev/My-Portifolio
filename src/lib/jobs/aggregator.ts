@@ -22,6 +22,8 @@ import { searchGupy } from './apis/gupy';
 import { searchIndeed } from './apis/indeed';
 import { searchCatho } from './apis/catho';
 import { searchProgramathor } from './apis/programathor';
+import { searchJobicy } from './apis/jobicy';
+import { searchWeWorkRemotely } from './apis/weworkremotely';
 import { isAIExtractionAvailable } from './ai-extraction';
 import { isPythonScraperAvailable } from './apis/python-scraper';
 
@@ -62,19 +64,20 @@ export async function searchJobs(
 
   const push = (name: string, promise: Promise<JobListing[]>) => searches.push({ name, promise });
 
-  // Remote sources (search if 'remote' or 'all' is selected)
-  if (shouldSearchCountry('remote')) {
+  // ── Remote-first sources (always included when 'all' or 'remote' selected) ──
+  if (shouldSearchCountry('remote') || isAllCountries) {
     if (isAllSources || sources.includes('remoteok')) push('RemoteOK', searchRemoteOK(params));
     if (isAllSources || sources.includes('remotive')) push('Remotive', searchRemotive(params));
+    if (isAllSources || sources.includes('jobicy')) push('Jobicy', searchJobicy(params));
+    if (isAllSources || sources.includes('weworkremotely')) push('WeWorkRemotely', searchWeWorkRemotely(params));
   }
 
-  // EU sources
-  if ((isAllSources || sources.includes('arbeitnow')) && (shouldSearchCountry('pt') || isAllCountries)) {
+  // EU sources (Arbeitnow covers PT + remote EU)
+  if ((isAllSources || sources.includes('arbeitnow')) && (shouldSearchCountry('pt') || shouldSearchCountry('remote') || isAllCountries)) {
     push('Arbeitnow', searchArbeitnow(params));
   }
 
   // Country-specific sources (Adzuna, Jooble, JSearch)
-  // Search each selected country separately for these APIs
   const countriesToSearch = isAllCountries
     ? ['pt', 'br']
     : countries.filter(c => c !== 'remote' && c !== 'all');
@@ -96,25 +99,23 @@ export async function searchJobs(
     push('ITJobs.pt', searchITJobs(params));
   }
 
-  // Brazil-specific: Vagas.com.br (JS scraper with Python fallback)
+  // Brazil-specific: Vagas.com.br
   if (sources.includes('vagascombr') || (isAllSources && shouldSearchCountry('br'))) {
     push('Vagas.com.br', searchVagasComBr(params));
   }
 
-  // Brazil-specific: GeekHunter (JS scraper with Python fallback)
+  // Brazil-specific: GeekHunter
   if (sources.includes('geekhunter') || (isAllSources && shouldSearchCountry('br'))) {
     push('GeekHunter', searchGeekHunter(params));
   }
 
-  // LinkedIn Jobs (Brazil and Portugal)
+  // LinkedIn Jobs — search each country once (no duplicates)
   if (sources.includes('linkedin') || isAllSources) {
-    for (const country of countriesToSearch) {
-      if (country === 'br' || country === 'pt') {
-        push(`LinkedIn (${country})`, searchLinkedIn({ ...params, country }));
-      }
-    }
-    if (countriesToSearch.length === 0 || isAllCountries) {
-      push('LinkedIn (br)', searchLinkedIn({ ...params, country: 'br' }));
+    const linkedinCountries = countriesToSearch.length > 0
+      ? countriesToSearch.filter(c => c === 'br' || c === 'pt')
+      : ['br'];
+    for (const country of linkedinCountries) {
+      push(`LinkedIn (${country})`, searchLinkedIn({ ...params, country }));
     }
   }
 
@@ -133,15 +134,13 @@ export async function searchJobs(
     push('Programathor', searchProgramathor(params));
   }
 
-  // Brazil and Portugal: Indeed (RSS)
+  // Indeed (RSS) — search each country once (no duplicates)
   if (sources.includes('indeed') || isAllSources) {
-    for (const country of countriesToSearch) {
-      if (country === 'br' || country === 'pt') {
-        push(`Indeed (${country})`, searchIndeed({ ...params, country }));
-      }
-    }
-    if (countriesToSearch.length === 0 || isAllCountries) {
-      push('Indeed (br)', searchIndeed({ ...params, country: 'br' }));
+    const indeedCountries = countriesToSearch.length > 0
+      ? countriesToSearch.filter(c => c === 'br' || c === 'pt')
+      : ['br'];
+    for (const country of indeedCountries) {
+      push(`Indeed (${country})`, searchIndeed({ ...params, country }));
     }
   }
 
@@ -222,6 +221,8 @@ export function getApiStatus(): ApiStatus[] {
   return [
     { name: 'RemoteOK', configured: true, needsKey: false },
     { name: 'Remotive', configured: true, needsKey: false },
+    { name: 'Jobicy', configured: true, needsKey: false },
+    { name: 'WeWorkRemotely', configured: true, needsKey: false },
     { name: 'Arbeitnow', configured: true, needsKey: false },
     { name: 'Net-Empregos', configured: true, needsKey: false },
     { name: 'ITJobs.pt', configured: true, needsKey: false },
