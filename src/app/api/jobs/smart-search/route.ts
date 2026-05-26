@@ -1,16 +1,8 @@
 import { NextResponse } from 'next/server';
-import { readFile } from 'fs/promises';
-import path from 'path';
-import { smartJobSearch, type ResumeData, type JobSource, getApiStatus } from '@/lib/jobs';
+import { smartJobSearch, type JobSource, getApiStatus } from '@/lib/jobs';
 import { isAuthenticated } from '@/lib/auth';
 import { error, withCacheHeaders } from '@/lib/api-utils';
-
-// Load resume data from JSON file
-async function loadResumeData(): Promise<ResumeData> {
-  const resumePath = path.join(process.cwd(), 'src/data/resume.json');
-  const content = await readFile(resumePath, 'utf-8');
-  return JSON.parse(content) as ResumeData;
-}
+import { loadResumeData } from '@/app/api/jobs/resume/route';
 
 export async function GET(request: Request) {
   try {

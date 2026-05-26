@@ -32,7 +32,9 @@ export type JobSourceType =
   | 'gupy'
   | 'indeed'
   | 'catho'
-  | 'programathor';
+  | 'programathor'
+  | 'jobicy'
+  | 'weworkremotely';
 
 export type JobSource = 'all' | JobSourceType;
 

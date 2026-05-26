@@ -553,3 +553,14 @@ model AgentExecution {
   @@index([createdAt])
 }
 
+// ==========================================
+// Resume Configuration (for Job Search)
+// ==========================================
+
+model ResumeConfig {
+  id        String   @id @default("main")
+  data      String   @db.Text // Full resume as JSON
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+}
+

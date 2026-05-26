@@ -13,6 +13,18 @@ import { deduplicateJobs } from './deduplication';
 import { scoreJobs, calculateMatchPercentage } from './scoring';
 import { searchJobs } from './aggregator';
 
+// Maps PT/BR variants for common tech roles
+const ROLE_VARIANTS: Record<string, string[]> = {
+  developer: ['developer', 'desenvolvedor', 'programador'],
+  engineer: ['engineer', 'engenheiro'],
+  'full-stack': ['full-stack', 'fullstack', 'full stack'],
+  backend: ['backend', 'back-end', 'back end'],
+  frontend: ['frontend', 'front-end', 'front end'],
+  mobile: ['mobile', 'mobile developer'],
+  devops: ['devops', 'dev ops'],
+  software: ['software', 'software engineer', 'engenheiro de software'],
+};
+
 /**
  * Extract keywords from resume data
  */
@@ -52,25 +64,50 @@ export function extractKeywordsFromResume(resume: ResumeData): string[] {
 }
 
 /**
- * Generate search queries from keywords
+ * Generate diverse search queries (EN + PT/BR variants) from keywords
  */
-export function generateSearchQueries(keywords: string[]): string[] {
-  const queries: string[] = [];
+export function generateSearchQueries(keywords: string[], country?: string): string[] {
+  const queries = new Set<string>();
 
-  // Top skills as individual queries
-  const topKeywords = keywords.slice(0, 5);
-  queries.push(...topKeywords);
+  // Top 8 skills as individual queries (was 5)
+  const topKeywords = keywords.slice(0, 8);
+  topKeywords.forEach(kw => queries.add(kw));
 
-  // Combinations
+  // Skill combinations with the top keyword
   if (topKeywords.length >= 2) {
-    queries.push(`${topKeywords[0]} ${topKeywords[1]}`);
+    queries.add(`${topKeywords[0]} ${topKeywords[1]}`);
+  }
+  if (topKeywords.length >= 3) {
+    queries.add(`${topKeywords[0]} ${topKeywords[2]}`);
   }
 
-  // Common developer search terms
-  const roleQueries = ['full-stack developer', 'backend developer', 'frontend developer', 'software engineer'];
-  queries.push(...roleQueries.slice(0, 2));
+  // Role-based queries — add PT/BR variants for local searches
+  const isLocal = country === 'pt' || country === 'br';
+  const roleQueries = [
+    'full-stack developer',
+    'backend developer',
+    'frontend developer',
+    'software engineer',
+  ];
+  roleQueries.forEach(q => queries.add(q));
 
-  return Array.from(new Set(queries));
+  if (isLocal || !country || country === 'all') {
+    // Portuguese variants boost results on PT/BR boards
+    queries.add('desenvolvedor full-stack');
+    queries.add('desenvolvedor backend');
+    queries.add('programador');
+  }
+
+  // Add role variants based on skills found
+  for (const [role, variants] of Object.entries(ROLE_VARIANTS)) {
+    if (keywords.some(k => k.includes(role))) {
+      // Only add one variant per role to avoid too many queries
+      queries.add(variants[0]);
+      if (isLocal && variants.length > 1) queries.add(variants[1]);
+    }
+  }
+
+  return Array.from(queries);
 }
 
 /**
@@ -88,16 +125,18 @@ export async function smartJobSearch(
   } = options;
 
   const keywords = extractKeywordsFromResume(resume);
-  const queries = generateSearchQueries(keywords);
+  const queries = generateSearchQueries(keywords, country);
 
   // Convert source to array for easier handling
   const sources = Array.isArray(source) ? source : [source];
   const isAllSources = sources.includes('all');
 
-  // Search with top keywords in parallel using the selected source(s)
-  const searchPromises: Promise<JobListing[]>[] = queries.slice(0, 3).map(query =>
+  // Search with top 5 queries in parallel (was 3) for more results
+  const MAX_QUERIES = 5;
+  const perQueryLimit = Math.ceil((limit * 2) / MAX_QUERIES); // fetch 2× to allow for dedup
+  const searchPromises: Promise<JobListing[]>[] = queries.slice(0, MAX_QUERIES).map(query =>
     searchJobs(
-      { keyword: query, country, limit: Math.ceil(limit / 3), maxAgeDays },
+      { keyword: query, country, limit: perQueryLimit, maxAgeDays },
       isAllSources ? 'all' : sources
     )
   );
