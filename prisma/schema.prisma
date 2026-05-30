@@ -564,3 +564,28 @@ model ResumeConfig {
   createdAt DateTime @default(now())
 }
 
+// ==========================================
+// Books / Reading List
+// ==========================================
+
+model Book {
+  id         String    @id @default(cuid())
+  title      String
+  author     String
+  coverUrl   String?
+  progress   Int       @default(0)   // 0-100
+  status     String    @default("reading") // reading | completed | want_to_read | paused
+  startedAt  DateTime?
+  finishedAt DateTime?
+  rating     Int?      // 1-5
+  notes      String?   @db.Text
+  isbn       String?
+  totalPages Int?
+  order      Int       @default(0)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([status])
+  @@index([order])
+}
+

@@ -13,6 +13,7 @@ interface Translations {
     skills: string;
     projects: string;
     experience: string;
+    books: string;
     contact: string;
   };
   // Hero Section
@@ -97,6 +98,7 @@ const translations: Record<Language, Translations> = {
       skills: 'Skills',
       projects: 'Projetos',
       experience: 'Experiência',
+      books: 'Livros',
       contact: 'Contato',
     },
     hero: {
@@ -171,6 +173,7 @@ const translations: Record<Language, Translations> = {
       skills: 'Skills',
       projects: 'Projects',
       experience: 'Experience',
+      books: 'Books',
       contact: 'Contact',
     },
     hero: {
