@@ -154,6 +154,42 @@ export default function BooksAdminPage() {
     }
   };
 
+  const handleDownloadSample = () => {
+    const sample = [
+      {
+        title: 'Clean Code',
+        author: 'Robert C. Martin',
+        coverUrl: 'https://covers.openlibrary.org/b/isbn/9780132350884-M.jpg',
+        progress: 65,
+        status: 'reading',
+        rating: 5,
+        notes: 'Great book about writing maintainable code.',
+        isbn: '9780132350884',
+        totalPages: 431,
+      },
+      {
+        title: 'The Pragmatic Programmer',
+        author: 'David Thomas, Andrew Hunt',
+        progress: 100,
+        status: 'completed',
+        rating: 5,
+      },
+      {
+        title: 'Designing Data-Intensive Applications',
+        author: 'Martin Kleppmann',
+        progress: 0,
+        status: 'want_to_read',
+      },
+    ];
+    const blob = new Blob([JSON.stringify(sample, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'books-sample.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -199,6 +235,15 @@ export default function BooksAdminPage() {
 
   const headerActions = (
     <div className="flex items-center gap-3 flex-wrap">
+      <button
+        onClick={handleDownloadSample}
+        className="flex items-center gap-2 px-4 py-2 bg-zinc-600 text-white font-medium rounded-lg hover:bg-zinc-500 transition-colors"
+      >
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+        </svg>
+        Sample JSON
+      </button>
       <label className={`flex items-center gap-2 px-4 py-2 bg-zinc-700 text-white font-medium rounded-lg hover:bg-zinc-600 transition-colors cursor-pointer ${importing ? 'opacity-50 pointer-events-none' : ''}`}>
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
@@ -254,10 +299,12 @@ export default function BooksAdminPage() {
       </div>
 
       {/* Import hint */}
-      <div className="bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800 rounded-xl p-4 mb-6">
-        <p className="text-sm text-blue-700 dark:text-blue-400">
-          <strong>Import from Koodo Reader:</strong> Export your reading data from Koodo Reader as JSON (Settings → Backup → Export), then click "Import JSON" above.
-          The importer supports title, author, cover, progress, status and rating fields.
+      <div className="bg-zinc-800/50 border border-zinc-700 rounded-xl p-4 mb-6">
+        <p className="text-sm text-zinc-400 mb-2">
+          <strong className="text-zinc-200">Import via JSON</strong> — clica em <strong className="text-zinc-200">Sample JSON</strong> para descarregar um ficheiro de exemplo com o formato correcto. Preenche com os teus livros e importa com o botão <strong className="text-zinc-200">Import JSON</strong>.
+        </p>
+        <p className="text-xs text-zinc-500">
+          Campos suportados: <code className="text-zinc-300">title</code>, <code className="text-zinc-300">author</code>, <code className="text-zinc-300">coverUrl</code>, <code className="text-zinc-300">progress</code> (0–100), <code className="text-zinc-300">status</code> (reading | completed | want_to_read | paused), <code className="text-zinc-300">rating</code> (1–5), <code className="text-zinc-300">notes</code>, <code className="text-zinc-300">isbn</code>, <code className="text-zinc-300">totalPages</code>.
         </p>
       </div>
 
