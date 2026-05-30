@@ -43,6 +43,7 @@ export function Navigation() {
     { label: t.nav.skills, href: '#skills' },
     { label: t.nav.projects, href: '#projects' },
     { label: t.nav.experience, href: '#experience' },
+    { label: t.nav.books, href: '#books' },
     { label: t.nav.contact, href: '#contact' },
   ];
 
@@ -50,7 +51,7 @@ export function Navigation() {
     setIsScrolled(window.scrollY > 50);
 
     // Find active section
-    const sections = ['hero', 'about', 'github', 'skills', 'projects', 'experience', 'contact'];
+    const sections = ['hero', 'about', 'github', 'skills', 'projects', 'experience', 'books', 'contact'];
     for (const section of [...sections].reverse()) {
       const element = document.getElementById(section);
       if (element) {

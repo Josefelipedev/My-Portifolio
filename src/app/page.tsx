@@ -6,6 +6,7 @@ import { WakaTimeStatsSection } from '@/components/sections/WakaTimeStatsSection
 import { SkillsSection } from '@/components/sections/SkillsSection';
 import { ProjectsSection } from '@/components/sections/ProjectsSection';
 import { ExperiencesSection } from '@/components/sections/ExperiencesSection';
+import { BooksSection } from '@/components/sections/BooksSection';
 import { ContactSection } from '@/components/sections/ContactSection';
 import { Footer } from '@/components/ui/Footer';
 
@@ -23,6 +24,7 @@ export default function Home() {
         <SkillsSection />
         <ProjectsSection />
         <ExperiencesSection />
+        <BooksSection />
         <ContactSection />
       </main>
       <Footer />
