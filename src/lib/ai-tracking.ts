@@ -24,6 +24,7 @@ export type AIFeature =
   | 'readme-analysis'
   | 'skills-suggestion'
   | 'resume-analysis'
+  | 'knowledge-ingestion'
   | 'alert-suggestions'
   | 'wakatime-ranking'
   | 'generate-email';

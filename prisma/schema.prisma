@@ -565,6 +565,47 @@ model ResumeConfig {
 }
 
 // ==========================================
+// Private Professional Knowledge Base
+// ==========================================
+
+model KnowledgeSource {
+  id          String   @id @default(cuid())
+  title       String?
+  rawText     String   @db.Text
+  processedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  items       KnowledgeItem[]
+
+  @@index([createdAt])
+  @@index([processedAt])
+}
+
+model KnowledgeItem {
+  id          String   @id @default(cuid())
+  type        String   // skill | project | experience | achievement | course | certification | language | tool | domain | responsibility | evidence
+  title       String
+  content     String   @db.Text
+  tags        String?  // Comma-separated tags
+  source      String   @default("manual") // manual | ai_text | resume | github | admin
+  sourceId    String?
+  confidence  Int      @default(4) // 1-5
+  priority    Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  knowledgeSource KnowledgeSource? @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+
+  @@index([type])
+  @@index([source])
+  @@index([sourceId])
+  @@index([isActive])
+  @@index([priority])
+}
+
+// ==========================================
 // Books / Reading List
 // ==========================================
 
@@ -588,4 +629,3 @@ model Book {
   @@index([status])
   @@index([order])
 }
-
