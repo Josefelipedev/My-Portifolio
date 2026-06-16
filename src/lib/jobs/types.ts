@@ -30,7 +30,6 @@ export type JobSourceType =
   | 'linkedin'
   | 'geekhunter'
   | 'gupy'
-  | 'indeed'
   | 'catho'
   | 'programathor'
   | 'jobicy'

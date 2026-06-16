@@ -19,7 +19,6 @@ import { searchVagasComBr } from './apis/vagas';
 import { searchLinkedIn } from './apis/linkedin';
 import { searchGeekHunter } from './apis/geekhunter';
 import { searchGupy } from './apis/gupy';
-import { searchIndeed } from './apis/indeed';
 import { searchCatho } from './apis/catho';
 import { searchProgramathor } from './apis/programathor';
 import { searchJobicy } from './apis/jobicy';
@@ -140,16 +139,6 @@ export async function searchJobs(
     push('Programathor', searchProgramathor(params));
   }
 
-  // Indeed (RSS) — search each country once (no duplicates)
-  if (sources.includes('indeed') || isAllSources) {
-    const indeedCountries = countriesToSearch.length > 0
-      ? countriesToSearch.filter(c => c === 'br' || c === 'pt')
-      : ['br'];
-    for (const country of indeedCountries) {
-      push(`Indeed (${country})`, searchIndeed({ ...params, country }));
-    }
-  }
-
   const settled = await Promise.allSettled(searches.map(s => s.promise));
   _lastSourceErrors = settled
     .map((r, i) => r.status === 'rejected' ? { source: searches[i].name, error: String((r as PromiseRejectedResult).reason) } : null)
@@ -237,7 +226,6 @@ export function getApiStatus(): ApiStatus[] {
     { name: 'LinkedIn', configured: true, needsKey: false },
     { name: 'GeekHunter', configured: true, needsKey: false },
     { name: 'Gupy', configured: true, needsKey: false },
-    { name: 'Indeed', configured: true, needsKey: false },
     { name: 'Catho', configured: true, needsKey: false },
     { name: 'Programathor', configured: true, needsKey: false },
     { name: 'Python Scraper', configured: hasPythonScraper, needsKey: false },
