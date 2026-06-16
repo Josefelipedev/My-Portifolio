@@ -9,7 +9,7 @@ import { MatchScoreWithReason, type MatchReason } from './jobs/MatchScoreBadge';
 
 interface JobListing {
   id: string;
-  source: 'remoteok' | 'remotive' | 'arbeitnow' | 'adzuna' | 'jooble' | 'jsearch' | 'netempregos' | 'itjobs' | 'vagascombr' | 'linkedin' | 'geekhunter' | 'gupy' | 'indeed' | 'catho' | 'programathor' | 'jobicy' | 'weworkremotely' | 'buscojobs';
+  source: 'remoteok' | 'remotive' | 'arbeitnow' | 'adzuna' | 'jooble' | 'jsearch' | 'netempregos' | 'itjobs' | 'vagascombr' | 'linkedin' | 'geekhunter' | 'gupy' | 'catho' | 'programathor' | 'jobicy' | 'weworkremotely' | 'buscojobs';
   title: string;
   company: string;
   companyLogo?: string;
@@ -91,7 +91,6 @@ const SOURCE_LABELS: Record<string, { label: string; color: string }> = {
   linkedin: { label: 'LinkedIn', color: 'bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-400' },
   geekhunter: { label: 'GeekHunter', color: 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400' },
   gupy: { label: 'Gupy', color: 'bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-400' },
-  indeed: { label: 'Indeed', color: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400' },
   catho: { label: 'Catho', color: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400' },
   programathor: { label: 'Programathor', color: 'bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-400' },
   jobicy: { label: 'Jobicy', color: 'bg-fuchsia-100 dark:bg-fuchsia-900/30 text-fuchsia-700 dark:text-fuchsia-400' },
@@ -155,7 +154,6 @@ const SOURCE_GROUPS = [
     flag: '🌐',
     sources: [
       { value: 'linkedin', label: 'LinkedIn' },
-      { value: 'indeed', label: 'Indeed' },
       { value: 'adzuna', label: 'Adzuna' },
     ],
   },
