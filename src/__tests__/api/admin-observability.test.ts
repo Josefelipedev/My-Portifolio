@@ -77,6 +77,11 @@ describe('admin-observability auth', () => {
     const res = await app.fetch(new Request('http://local/api/analytics'));
     expect(res.status).toBe(401);
   });
+
+  it('requires auth for ai-usage and agent-tracking (no global middleware here)', async () => {
+    expect((await app.fetch(new Request('http://local/api/admin/ai-usage'))).status).toBe(401);
+    expect((await app.fetch(new Request('http://local/api/admin/agent-tracking'))).status).toBe(401);
+  });
 });
 
 describe('admin-observability reads', () => {
