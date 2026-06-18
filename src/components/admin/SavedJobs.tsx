@@ -20,6 +20,9 @@ interface EnrichedData {
   salary?: string;
   workMode?: string;
   contractType?: string;
+  customizedCv?: {
+    providedKnowledge?: { id: string; title: string; type: string }[];
+  };
 }
 
 interface SavedJob {
@@ -1425,7 +1428,9 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
                 {(() => {
                   const enriched = getEnrichedData(job);
                   if (!enriched) return null;
+                  const facts = enriched.customizedCv?.providedKnowledge;
                   return (
+                    <>
                     <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-4">
                       <h4 className="text-sm font-medium text-purple-700 dark:text-purple-300 mb-3 flex items-center gap-2">
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1492,6 +1497,30 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
                         )}
                       </div>
                     </div>
+                    {/* Knowledge base facts used in the tailored CV */}
+                    {facts && facts.length > 0 && (
+                    <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mt-3">
+                      <h4 className="text-sm font-medium text-blue-700 dark:text-blue-300 mb-3 flex items-center gap-2">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.247m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.247" />
+                        </svg>
+                        Knowledge used in tailored CV ({facts.length})
+                      </h4>
+                      <div className="flex flex-wrap gap-2">
+                        {facts.map((fact) => (
+                          <span
+                            key={fact.id}
+                            className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md bg-white dark:bg-zinc-800 border border-blue-200 dark:border-blue-800 text-zinc-700 dark:text-zinc-300"
+                            title={fact.type}
+                          >
+                            <span className="text-blue-500 dark:text-blue-400">{fact.type}</span>
+                            {fact.title}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                    )}
+                    </>
                   );
                 })()}
               </div>
