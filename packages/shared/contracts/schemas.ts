@@ -111,11 +111,60 @@ export const siteConfigResponseSchema = z.object({
 });
 export type SiteConfigResponse = z.infer<typeof siteConfigResponseSchema>;
 
+/**
+ * A repo row from the GitHubRepoCache table (populated by the auth-gated
+ * import flow). The public API reads this cache so the homepage never hits
+ * GitHub directly. `topics` is stored comma-separated, mirroring the column.
+ */
+export const githubRepoSchema = z.object({
+  id: z.number().int(),
+  name: z.string(),
+  fullName: z.string(),
+  description: z.string().nullable(),
+  htmlUrl: z.string(),
+  homepage: z.string().nullable(),
+  language: z.string().nullable(),
+  topics: z.string().nullable(), // comma-separated
+  stargazers: z.number().int(),
+  forksCount: z.number().int(),
+  updatedAt: isoDate,
+  cachedAt: isoDate,
+});
+export type GitHubRepo = z.infer<typeof githubRepoSchema>;
+
+/**
+ * A yearly stats row from the WakaTimeYearCache table. The JSON-array columns
+ * (languages, editors, etc.) are stored as strings and passed through as-is —
+ * the web client parses them, matching the existing lib/wakatime.ts behaviour.
+ */
+export const wakatimeYearSchema = z.object({
+  id: z.string(), // e.g. "year_2024"
+  year: z.number().int(),
+  totalSeconds: z.number().int(),
+  totalHours: z.string(),
+  dailyAverage: z.string(),
+  bestDayDate: z.string().nullable(),
+  bestDaySeconds: z.number().int().nullable(),
+  bestDayText: z.string().nullable(),
+  languages: z.string(), // JSON array (string)
+  editors: z.string(), // JSON array (string)
+  operatingSystems: z.string(), // JSON array (string)
+  projects: z.string(), // JSON array (string)
+  categories: z.string(), // JSON array (string)
+  rangeStart: z.string(),
+  rangeEnd: z.string(),
+  rangeText: z.string(),
+  cachedAt: isoDate,
+});
+export type WakatimeYear = z.infer<typeof wakatimeYearSchema>;
+
 // List responses (the public GET endpoints return raw arrays).
 export const projectListSchema = z.array(projectSchema);
 export const experienceListSchema = z.array(experienceSchema);
 export const educationListSchema = z.array(educationSchema);
 export const skillListSchema = z.array(skillSchema);
+export const githubRepoListSchema = z.array(githubRepoSchema);
+export const wakatimeYearListSchema = z.array(wakatimeYearSchema);
 
 /** Error envelope returned by the API on non-2xx (see api-utils.error). */
 export const apiErrorSchema = z.object({
