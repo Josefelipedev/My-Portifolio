@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useToast } from '@/components/ui/Toast';
+import { apiFetch } from '@/lib/api-fetch';
 
 interface Skill {
   name: string;
@@ -67,7 +68,7 @@ export default function ResumeEditor() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    fetch('/api/jobs/resume')
+    apiFetch('/api/jobs/resume')
       .then(r => r.json())
       .then(d => { if (d.resume) setResume(d.resume); })
       .catch(() => showToast('Failed to load resume', 'error'))
@@ -77,7 +78,7 @@ export default function ResumeEditor() {
   async function save(data: ResumeData = resume) {
     setSaving(true);
     try {
-      const res = await fetch('/api/jobs/resume', {
+      const res = await apiFetch('/api/jobs/resume', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),

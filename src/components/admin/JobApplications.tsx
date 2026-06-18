@@ -5,6 +5,7 @@ import BulkActionBar from './jobs/BulkActionBar';
 import { exportApplicationsToCSV, exportApplicationsToPDF, ExportableApplication } from '@/lib/export';
 import { useToast } from '@/components/ui/Toast';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
+import { apiFetch } from '@/lib/api-fetch';
 
 interface JobApplication {
   id: string;
@@ -82,7 +83,7 @@ export default function JobApplications({ onApplicationDeleted }: JobApplication
   const fetchApplications = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/jobs/applications');
+      const response = await apiFetch('/api/jobs/applications');
       const data = await response.json();
 
       if (!response.ok) {
@@ -100,7 +101,7 @@ export default function JobApplications({ onApplicationDeleted }: JobApplication
   const handleUpdate = async (id: string) => {
     try {
       setUpdating(id);
-      const response = await fetch(`/api/jobs/applications/${id}`, {
+      const response = await apiFetch(`/api/jobs/applications/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -137,7 +138,7 @@ export default function JobApplications({ onApplicationDeleted }: JobApplication
 
     try {
       setDeleting(id);
-      const response = await fetch(`/api/jobs/applications/${id}`, { method: 'DELETE' });
+      const response = await apiFetch(`/api/jobs/applications/${id}`, { method: 'DELETE' });
 
       if (!response.ok) {
         throw new Error('Failed to delete application');
@@ -158,7 +159,7 @@ export default function JobApplications({ onApplicationDeleted }: JobApplication
 
     try {
       setAdding(true);
-      const response = await fetch('/api/jobs/applications', {
+      const response = await apiFetch('/api/jobs/applications', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(addForm),
@@ -219,7 +220,7 @@ export default function JobApplications({ onApplicationDeleted }: JobApplication
 
     try {
       setBulkDeleting(true);
-      const response = await fetch('/api/jobs/applications/bulk', {
+      const response = await apiFetch('/api/jobs/applications/bulk', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ids: Array.from(selectedIds) }),
@@ -250,7 +251,7 @@ export default function JobApplications({ onApplicationDeleted }: JobApplication
 
     try {
       setBulkUpdating(true);
-      const response = await fetch('/api/jobs/applications/bulk', {
+      const response = await apiFetch('/api/jobs/applications/bulk', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ids: Array.from(selectedIds), status }),
