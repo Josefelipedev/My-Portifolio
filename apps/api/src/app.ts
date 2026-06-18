@@ -23,6 +23,7 @@ import jobsSaved from './routes/jobs-saved';
 import jobsApplications from './routes/jobs-applications';
 import jobsMisc from './routes/jobs-misc';
 import jobsAi from './routes/jobs-ai';
+import auth from './routes/auth';
 
 const app = new Hono();
 
@@ -48,6 +49,7 @@ app.get('/health', (c) =>
 );
 
 // Ported domains (Phase 2). Mounted under /api to match the web paths.
+app.route('/api', auth); // public: csrf, login, verify, logout
 app.route('/api', content);
 app.route('/api', profile);
 app.route('/api', contact);
