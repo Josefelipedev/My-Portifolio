@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/components/ui/Toast';
+import { apiFetch } from '@/lib/api-fetch';
 
 interface AnalyticsData {
   overview: {
@@ -40,7 +41,7 @@ export default function AnalyticsClient({ data }: { data: AnalyticsData }) {
   const handleReset = async () => {
     setIsResetting(true);
     try {
-      const res = await fetch('/api/analytics', { method: 'DELETE' });
+      const res = await apiFetch('/api/analytics', { method: 'DELETE' });
       if (res.ok) {
         setShowResetModal(false);
         router.refresh();
