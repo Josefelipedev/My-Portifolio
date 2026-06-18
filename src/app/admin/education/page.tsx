@@ -1,16 +1,13 @@
 import AdminLayout from '@/components/admin/AdminLayout';
 import EducationAdmin from '@/components/admin/EducationAdmin';
-import prisma from '@/lib/prisma';
+import { serverApiFetch } from '@/lib/server-api';
+import type { Education } from '@portfolio/shared';
 
 export const dynamic = 'force-dynamic';
 
-async function getEducation() {
+async function getEducation(): Promise<Education[]> {
   try {
-    const education = await prisma.education.findMany({
-      orderBy: [{ startDate: 'desc' }, { order: 'asc' }, { createdAt: 'desc' }],
-    });
-    console.log('[AdminEducation] Found', education.length, 'education entries');
-    return education;
+    return await serverApiFetch<Education[]>('/api/education');
   } catch (error) {
     console.error('[AdminEducation] Error fetching education:', error);
     return [];
@@ -19,13 +16,9 @@ async function getEducation() {
 
 export default async function EducationAdminPage() {
   const education = await getEducation();
-
   return (
-    <AdminLayout
-      title="Education Management"
-      subtitle="Manage your degrees, courses, and certifications"
-    >
-      <EducationAdmin education={education} />
+    <AdminLayout title="Education Management" subtitle="Manage your degrees, courses, and certifications">
+      <EducationAdmin education={education as never} />
     </AdminLayout>
   );
 }
