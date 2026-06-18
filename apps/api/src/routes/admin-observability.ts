@@ -7,12 +7,13 @@
 //   - analytics (GET/DELETE)       -> requireAuth
 //   - visits GET                   -> admin read (requireAuth)
 //   - visits POST                  -> PUBLIC page-view tracking (web has NO auth check)
-//   - ai-usage (GET/PATCH)         -> the web handler had NO auth check; left public
-//                                     for parity (no requireAuth/requireCsrf)
-//   - agent-tracking (POST/GET/DELETE) -> the web handler had NO auth check; left
-//                                     public for parity
-// Mutations that ARE guarded (logs/analytics DELETE) also require CSRF, in line
-// with the API service convention for state-changing authed routes.
+//   - ai-usage (GET/PATCH)         -> requireAuth (+CSRF on PATCH). These are
+//   - agent-tracking (GET/POST/DELETE) -> requireAuth (+CSRF on mutations).
+//     NOTE: the web handlers have no per-handler isAuthenticated() because they
+//     live under /api/admin/* and rely on the Next middleware for auth. The API
+//     service has no such global guard, so the requireAuth must be explicit here
+//     — leaving them public would expose AI cost data + agent tracking.
+// Mutations that mutate state also require CSRF, per the API service convention.
 
 import { Hono } from 'hono';
 import { getCookie, setCookie } from 'hono/cookie';
@@ -102,7 +103,7 @@ router.delete('/admin/logs', requireAuth, requireCsrf, async (c) => {
 });
 
 // ---------------- AI usage (public, mirrors web) ----------------
-router.get('/admin/ai-usage', async (c) => {
+router.get('/admin/ai-usage', requireAuth, async (c) => {
   const days = parseInt(c.req.query('days') || '7', 10);
 
   const [stats, quota, today, month] = await Promise.all([
@@ -115,7 +116,7 @@ router.get('/admin/ai-usage', async (c) => {
   return c.json({ stats, quota, today, month });
 });
 
-router.patch('/admin/ai-usage', async (c) => {
+router.patch('/admin/ai-usage', requireAuth, requireCsrf, async (c) => {
   const body = (await c.req.json()) as {
     dailyLimit?: unknown;
     monthlyLimit?: unknown;
@@ -140,7 +141,7 @@ router.patch('/admin/ai-usage', async (c) => {
 });
 
 // ---------------- Agent tracking (public, mirrors web) ----------------
-router.post('/admin/agent-tracking', async (c) => {
+router.post('/admin/agent-tracking', requireAuth, requireCsrf, async (c) => {
   const body = (await c.req.json()) as {
     source?: string;
     keyword?: string;
@@ -202,7 +203,7 @@ router.post('/admin/agent-tracking', async (c) => {
   return c.json({ success: true, pipelineId: pipelineExecution.id });
 });
 
-router.get('/admin/agent-tracking', async (c) => {
+router.get('/admin/agent-tracking', requireAuth, async (c) => {
   const source = c.req.query('source');
   const status = c.req.query('status');
   const limit = parseInt(c.req.query('limit') || '50', 10);
@@ -279,7 +280,7 @@ router.get('/admin/agent-tracking', async (c) => {
   });
 });
 
-router.delete('/admin/agent-tracking', async (c) => {
+router.delete('/admin/agent-tracking', requireAuth, requireCsrf, async (c) => {
   const days = parseInt(c.req.query('days') || '7', 10);
   const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 
