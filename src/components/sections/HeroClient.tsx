@@ -11,8 +11,8 @@ interface EducationItem {
   institution: string;
   type: string;
   status: string;
-  startDate: Date | null;
-  endDate: Date | null;
+  startDate: string | null;
+  endDate: string | null;
   location: string | null;
   certificateUrl: string | null;
 }
