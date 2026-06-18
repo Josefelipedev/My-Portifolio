@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { fetchWithCSRF } from '@/lib/csrf-client';
+import { apiFetch } from '@/lib/api-fetch';
 
 interface UsageStats {
   total: {
@@ -99,7 +100,7 @@ export default function AIUsageStats() {
     setError(null);
 
     try {
-      const res = await fetch(`/api/admin/ai-usage?days=${days}`);
+      const res = await apiFetch(`/api/admin/ai-usage?days=${days}`);
       if (!res.ok) throw new Error('Failed to fetch data');
       const json = await res.json();
       setData(json);

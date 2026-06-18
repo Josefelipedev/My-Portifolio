@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import AdminLayout from '@/components/admin/AdminLayout';
+import { apiFetch } from '@/lib/api-fetch';
 
 interface WakaTimeConfig {
   enabled: boolean;
@@ -108,7 +109,7 @@ export default function WakaTimeAdminPage() {
   const fetchConfig = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/wakatime/settings');
+      const response = await apiFetch('/api/wakatime/settings');
       const data = await response.json();
       setConfig({ ...DEFAULT_CONFIG, ...data });
     } catch (err) {
@@ -123,7 +124,7 @@ export default function WakaTimeAdminPage() {
       setLoadingPreview(true);
       setShowPreview(true);
       // Fetch from WakaTime API via our endpoint
-      const response = await fetch('/api/wakatime/preview');
+      const response = await apiFetch('/api/wakatime/preview');
       if (response.ok) {
         const data = await response.json();
         setPreview(data);
@@ -143,7 +144,7 @@ export default function WakaTimeAdminPage() {
       setError(null);
       setSuccess(false);
 
-      const response = await fetch('/api/wakatime/settings', {
+      const response = await apiFetch('/api/wakatime/settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(config),
@@ -175,7 +176,7 @@ export default function WakaTimeAdminPage() {
       setRankingsFetched(null);
       setError(null);
 
-      const response = await fetch('/api/wakatime/fetch-rankings', {
+      const response = await apiFetch('/api/wakatime/fetch-rankings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
