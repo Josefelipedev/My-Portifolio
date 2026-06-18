@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { apiFetch } from '@/lib/api-fetch';
 
 interface AgentExecution {
   id: string;
@@ -80,7 +81,7 @@ export default function AgentCostTracker() {
       params.set('hours', filter.hours);
       params.set('limit', '20');
 
-      const response = await fetch(`/api/admin/agent-tracking?${params.toString()}`);
+      const response = await apiFetch(`/api/admin/agent-tracking?${params.toString()}`);
       if (!response.ok) throw new Error('Failed to fetch data');
 
       const result = await response.json();
