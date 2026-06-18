@@ -4,6 +4,7 @@ import { SignJWT } from 'jose';
 import { cookies, headers } from 'next/headers';
 import { checkLoginRateLimit, recordLoginAttempt, getClientIP } from '@/lib/rate-limit';
 import { env } from '@/lib/env';
+import { buildCookieOptions } from '@/lib/cookie-config';
 
 export async function POST(request: Request) {
   const headersList = await headers();
@@ -78,13 +79,11 @@ export async function POST(request: Request) {
     .setIssuedAt()
     .sign(secret);
 
-  (await cookies()).set('auth_token', token, {
-    httpOnly: true,
+  (await cookies()).set('auth_token', token, buildCookieOptions({
     secure: env.isProduction,
     sameSite: 'strict',
     maxAge: 3600, // 1 hour
-    path: '/',
-  });
+  }));
 
   return NextResponse.json({ message: 'Login successful' });
 }

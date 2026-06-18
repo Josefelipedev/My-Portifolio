@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { jwtVerify } from 'jose';
+import { handlePreflight, buildCorsHeaders } from '@/lib/cors';
 
 // Routes that require authentication
 const protectedRoutes = ['/admin', '/admin/github', '/admin/projects', '/admin/experiences'];
@@ -30,9 +31,25 @@ export async function middleware(request: NextRequest) {
   const token = request.cookies.get('auth_token')?.value;
   const method = request.method.toUpperCase();
 
+  // Cross-origin (Phase 3): answer CORS preflight before any auth/CSRF logic.
+  // No-op unless CORS_ALLOWED_ORIGINS is configured.
+  const preflight = handlePreflight(request);
+  if (preflight) return preflight;
+
+  // Attach CORS headers (credentialed) to every response we return for an
+  // allowed origin. buildCorsHeaders returns {} for same-origin/disallowed,
+  // so this is a no-op in the current same-origin setup.
+  const corsHeaders = buildCorsHeaders(request.headers.get('origin'));
+  const applyCors = <T extends NextResponse>(res: T): T => {
+    for (const [key, value] of Object.entries(corsHeaders)) {
+      res.headers.set(key, value);
+    }
+    return res;
+  };
+
   // Skip public routes
   if (publicRoutes.some(route => pathname === route || pathname.startsWith(route))) {
-    return NextResponse.next();
+    return applyCors(NextResponse.next());
   }
 
   // Check if route needs protection
@@ -51,23 +68,23 @@ export async function middleware(request: NextRequest) {
     if (!csrfCookie || !csrfHeader || csrfCookie !== csrfHeader || csrfCookie.length !== 64) {
       // Log the CSRF failure (will be picked up by audit system if needed)
       console.warn(`CSRF validation failed for ${method} ${pathname}`);
-      return NextResponse.json(
+      return applyCors(NextResponse.json(
         { error: 'Invalid CSRF token' },
         { status: 403 }
-      );
+      ));
     }
   }
 
   if (!isProtectedPage && !isProtectedApi) {
-    return NextResponse.next();
+    return applyCors(NextResponse.next());
   }
 
   // No token - redirect or return 401
   if (!token) {
     if (isProtectedApi) {
-      return NextResponse.json({ error: 'Não autorizado' }, { status: 401 });
+      return applyCors(NextResponse.json({ error: 'Não autorizado' }, { status: 401 }));
     }
-    return NextResponse.redirect(new URL('/admin/login', request.url));
+    return applyCors(NextResponse.redirect(new URL('/admin/login', request.url)));
   }
 
   // Verify JWT token
@@ -82,7 +99,7 @@ export async function middleware(request: NextRequest) {
       throw new Error('Invalid token payload');
     }
 
-    return NextResponse.next();
+    return applyCors(NextResponse.next());
   } catch {
     // Invalid token - clear it and redirect/return 401
     const response = isProtectedApi
@@ -90,7 +107,7 @@ export async function middleware(request: NextRequest) {
       : NextResponse.redirect(new URL('/admin/login', request.url));
 
     response.cookies.set('auth_token', '', { maxAge: 0 });
-    return response;
+    return applyCors(response);
   }
 }
 

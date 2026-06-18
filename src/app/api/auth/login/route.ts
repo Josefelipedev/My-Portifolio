@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { initiateLogin } from '@/lib/auth-service';
 import { checkLoginRateLimit, recordLoginAttempt, getClientIP } from '@/lib/rate-limit';
+import { buildCookieOptions } from '@/lib/cookie-config';
 
 export async function POST(request: Request) {
   try {
@@ -61,13 +62,11 @@ export async function POST(request: Request) {
       });
 
       // Set the auth cookie (14 days)
-      response.cookies.set('auth_token', result.token, {
-        httpOnly: true,
-        secure: false, // localhost doesn't use HTTPS
+      response.cookies.set('auth_token', result.token, buildCookieOptions({
+        secure: false, // dev login branch — localhost doesn't use HTTPS
         sameSite: 'lax',
         maxAge: 14 * 24 * 60 * 60, // 14 days
-        path: '/',
-      });
+      }));
 
       return response;
     }
