@@ -24,6 +24,7 @@ import jobsSaved from './routes/jobs-saved';
 import jobsApplications from './routes/jobs-applications';
 import jobsMisc from './routes/jobs-misc';
 import jobsAi from './routes/jobs-ai';
+import jobsAiInline from './routes/jobs-ai-inline';
 import knowledge from './routes/knowledge';
 import adminObservability from './routes/admin-observability';
 import auth from './routes/auth';
@@ -68,6 +69,7 @@ app.route('/api', jobsSaved); // jobs: saved-jobs CRUD + stats
 app.route('/api', jobsApplications); // jobs: applications CRUD + bulk ops
 app.route('/api', jobsMisc); // jobs: analytics, search history, alerts (base)
 app.route('/api', jobsAi); // jobs: tailored-CV generation + job-fit analysis
+app.route('/api', jobsAiInline); // jobs: inline AI (enrich, interview-prep, generate-email, extract)
 app.route('/api', knowledge); // knowledge-base admin: items CRUD + sources + AI processing
 app.route('/api', adminObservability); // admin observability: logs, ai-usage, agent-tracking, analytics, visits
 
