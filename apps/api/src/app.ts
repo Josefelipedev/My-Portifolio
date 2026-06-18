@@ -13,6 +13,7 @@ import contact from './routes/contact';
 import books from './routes/books';
 import github from './routes/github';
 import wakatime from './routes/wakatime';
+import admin from './routes/admin';
 
 const app = new Hono();
 
@@ -44,8 +45,10 @@ app.route('/api', contact);
 app.route('/api', books);
 app.route('/api', github);
 app.route('/api', wakatime);
+app.route('/api', admin); // authenticated routes (requireAuth + requireCsrf)
 
-// Phase 2 (remaining): auth, jobs, admin, ai, resume…
+// Phase 2 (remaining): port the authenticated mutations/domains (projects/
+// skills/experiences/education writes, jobs, ai, resume) under the admin group.
 
 app.notFound((c) =>
   c.json(apiErrorSchema.parse({ error: 'Not found', code: 'NOT_FOUND' }), 404),
