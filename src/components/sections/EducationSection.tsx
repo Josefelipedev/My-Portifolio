@@ -1,23 +1,19 @@
 import { SectionWrapper } from '../ui/SectionWrapper';
 import { GradientText } from '../ui/GradientText';
-import prisma from '@/lib/prisma';
+import { getEducation as fetchEducation } from '@/lib/data/content';
 
 async function getEducation() {
   try {
-    const education = await prisma.education.findMany({
-      orderBy: [{ startDate: 'desc' }, { order: 'asc' }, { createdAt: 'desc' }],
-    });
-    console.log('[EducationSection] Found', education.length, 'education entries');
-    return education;
+    return await fetchEducation();
   } catch (error) {
     console.error('[EducationSection] Error fetching education:', error);
     return [];
   }
 }
 
-function formatDate(date: Date | null): string {
+function formatDate(date: string | null): string {
   if (!date) return 'Present';
-  return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+  return new Date(date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
 }
 
 function getTypeConfig(type: string) {

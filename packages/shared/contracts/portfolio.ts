@@ -10,11 +10,13 @@ import {
   experienceListSchema,
   educationListSchema,
   skillListSchema,
+  bookListSchema,
   siteConfigResponseSchema,
   type Project,
   type Experience,
   type Education,
   type Skill,
+  type Book,
   type PublicSiteConfig,
 } from './schemas';
 
@@ -39,6 +41,11 @@ export class PortfolioApi {
   /** GET /api/skills — skills grouped by category. */
   listSkills(): Promise<Skill[]> {
     return this.http.get('/api/skills', skillListSchema);
+  }
+
+  /** GET /api/books — reading list, ordered by order/date. */
+  listBooks(): Promise<Book[]> {
+    return this.http.get('/api/books', bookListSchema);
   }
 
   /** GET /api/profile — public site configuration (no secrets), unwrapped. */
