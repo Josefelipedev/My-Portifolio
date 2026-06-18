@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useToast } from '@/components/ui/Toast';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { fetchWithCSRF } from '@/lib/csrf-client';
+import { apiFetch } from '@/lib/api-fetch';
 import AdminLayout from '@/components/admin/AdminLayout';
 
 interface Book {
@@ -62,7 +63,7 @@ export default function BooksAdminPage() {
   const fetchBooks = async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/books');
+      const res = await apiFetch('/api/books');
       const data = await res.json();
       setBooks(data);
     } finally {

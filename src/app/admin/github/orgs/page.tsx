@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useToast } from '@/components/ui/Toast';
 import { fetchWithCSRF } from '@/lib/csrf-client';
+import { apiFetch } from '@/lib/api-fetch';
 
 interface GitHubOrg {
   id: number;
@@ -47,7 +48,7 @@ export default function GitHubOrgsPage() {
     try {
       setLoading(true);
       setError(null);
-      const response = await fetch('/api/github/orgs');
+      const response = await apiFetch('/api/github/orgs');
       const data = await response.json();
 
       if (!response.ok) {
@@ -69,7 +70,7 @@ export default function GitHubOrgsPage() {
       setSelectedOrg(org);
       setRepos([]);
 
-      const response = await fetch(`/api/github/orgs/${org.login}/repos`);
+      const response = await apiFetch(`/api/github/orgs/${org.login}/repos`);
       const data = await response.json();
 
       if (!response.ok) {
