@@ -17,6 +17,7 @@ import github from './routes/github';
 import wakatime from './routes/wakatime';
 import admin from './routes/admin';
 import contentAdmin from './routes/content-admin';
+import contentImport from './routes/content-import';
 import ai from './routes/ai';
 import resume from './routes/resume';
 import jobsSaved from './routes/jobs-saved';
@@ -58,6 +59,7 @@ app.route('/api', github);
 app.route('/api', wakatime);
 app.route('/api', admin); // authenticated demo routes (requireAuth + requireCsrf)
 app.route('/api', contentAdmin); // authenticated content mutations (POST/PUT/DELETE)
+app.route('/api', contentImport); // authenticated books update/delete + books/education bulk imports
 app.route('/api', ai); // authenticated AI endpoints (skills/suggest, projects/analyze)
 app.route('/api', resume); // authenticated resume PDF analysis
 app.route('/api', jobsSaved); // jobs: saved-jobs CRUD + stats
