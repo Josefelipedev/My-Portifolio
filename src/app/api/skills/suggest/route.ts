@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { isAuthenticated } from '@/lib/auth';
 import { generateSkillsSuggestion, getCurrentAIProvider } from '@/lib/claude';
+import { buildKnowledgeContext } from '@/lib/knowledge';
 
 export async function POST(request: Request) {
   try {
@@ -40,11 +41,34 @@ export async function POST(request: Request) {
       existingSkills = skills.map((s) => s.name.toLowerCase());
     }
 
+    // Pull verified facts from the private knowledge base (skill/tool/domain/language/certification).
+    // Cap item count and per-item content length to keep the prompt (and token cost) bounded.
+    const KNOWLEDGE_ITEM_LIMIT = 40;
+    const KNOWLEDGE_CONTENT_CHARS = 400;
+    const knowledgeItems = await prisma.knowledgeItem.findMany({
+      where: {
+        isActive: true,
+        type: { in: ['skill', 'tool', 'domain', 'language', 'certification'] },
+      },
+      select: { type: true, title: true, content: true, tags: true, confidence: true, priority: true },
+      orderBy: [{ priority: 'desc' }, { confidence: 'desc' }, { updatedAt: 'desc' }],
+      take: KNOWLEDGE_ITEM_LIMIT,
+    });
+    const knowledgeContext =
+      knowledgeItems.length > 0
+        ? buildKnowledgeContext(
+            knowledgeItems.map((item) => ({
+              ...item,
+              content: item.content.slice(0, KNOWLEDGE_CONTENT_CHARS),
+            }))
+          )
+        : undefined;
+
     // Check if we have data to analyze
-    if (projects.length === 0 && experiences.length === 0) {
+    if (projects.length === 0 && experiences.length === 0 && !knowledgeContext) {
       return NextResponse.json(
         {
-          error: 'No projects or experiences found. Add some projects or experiences first to get skill suggestions.',
+          error: 'No projects, experiences or knowledge found. Add some projects, experiences or knowledge base items first to get skill suggestions.',
           suggestions: [],
         },
         { status: 400 }
@@ -64,6 +88,7 @@ export async function POST(request: Request) {
         technologies: e.technologies,
       })),
       existingSkills,
+      knowledgeContext,
     });
 
     // Filter out existing skills (case-insensitive)
@@ -81,6 +106,7 @@ export async function POST(request: Request) {
       analyzed: {
         projects: projects.length,
         experiences: experiences.length,
+        knowledge: knowledgeItems.length,
       },
     });
   } catch (error) {

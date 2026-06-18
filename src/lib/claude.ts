@@ -332,6 +332,7 @@ interface SkillsSuggestionInput {
   projects: { title: string; technologies: string; description: string }[];
   experiences: { title: string; technologies: string; description: string }[];
   existingSkills?: string[];
+  knowledgeContext?: string;
 }
 
 interface SkillSuggestion {
@@ -354,16 +355,22 @@ export async function generateSkillsSuggestion(input: SkillsSuggestionInput): Pr
     ? `\nExisting skills to SKIP (do not suggest these): ${input.existingSkills.join(', ')}`
     : '';
 
+  const knowledgeText = input.knowledgeContext?.trim()
+    ? `\n\nPRIVATE PROFESSIONAL KNOWLEDGE BASE (verified facts — treat as evidence):\n${input.knowledgeContext.trim()}`
+    : '';
+
   const prompt = `You are analyzing a developer's portfolio to suggest technical skills.
 
-Based on the projects and work experiences below, suggest a list of technical skills with proficiency levels.
+Based on the projects, work experiences, and verified knowledge below, suggest a list of technical skills with proficiency levels.
 
 PROJECTS:
 ${projectsList || 'No projects available'}
 
 WORK EXPERIENCES:
-${experiencesList || 'No experiences available'}
+${experiencesList || 'No experiences available'}${knowledgeText}
 ${existingSkillsText}
+
+Use only technologies that appear in the data above. Do not invent skills the developer has not demonstrated. The knowledge base may surface skills not visible in public projects — use it as supporting evidence.
 
 For each skill, provide:
 1. name: The technology/skill name (e.g., "React", "Node.js", "Docker")
