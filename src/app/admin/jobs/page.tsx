@@ -1,52 +1,28 @@
-import prisma from '@/lib/prisma';
 import JobsPageWrapper from '@/components/admin/JobsPageWrapper';
+import { serverApiFetch } from '@/lib/server-api';
 
-// Force dynamic to avoid build errors when tables don't exist yet
 export const dynamic = 'force-dynamic';
 
-async function getJobStats() {
-  try {
-    const [savedJobsCount, applicationsStats] = await Promise.all([
-      prisma.savedJob.count(),
-      prisma.jobApplication.groupBy({
-        by: ['status'],
-        _count: { status: true },
-      }),
-    ]);
-
-    const statsMap = applicationsStats.reduce(
-      (acc, item) => ({ ...acc, [item.status]: item._count.status }),
-      {} as Record<string, number>
-    );
-
-    const totalApplications =
-      (statsMap.saved || 0) +
-      (statsMap.applied || 0) +
-      (statsMap.interview || 0) +
-      (statsMap.offer || 0) +
-      (statsMap.rejected || 0);
-
-    return { savedJobsCount, statsMap, totalApplications, error: null };
-  } catch (error) {
-    console.error('Error fetching job stats:', error);
-    return {
-      savedJobsCount: 0,
-      statsMap: {} as Record<string, number>,
-      totalApplications: 0,
-      error: 'Database tables not found. Please run: npx prisma db push',
-    };
-  }
+interface StatsResp {
+  savedJobs: number;
+  applications: { saved: number; applied: number; interview: number; offer: number; rejected: number; total: number };
 }
 
 export default async function JobsAdminPage() {
-  const { savedJobsCount, statsMap, totalApplications, error } = await getJobStats();
-
+  let savedJobsCount = 0;
+  let totalApplications = 0;
+  let statsMap: Record<string, number> = {};
+  let error: string | null = null;
+  try {
+    const s = await serverApiFetch<StatsResp>('/api/jobs/stats');
+    savedJobsCount = s.savedJobs;
+    const { total, ...rest } = s.applications;
+    statsMap = rest;
+    totalApplications = total;
+  } catch {
+    error = 'Failed to load job stats from the API.';
+  }
   return (
-    <JobsPageWrapper
-      savedJobsCount={savedJobsCount}
-      totalApplications={totalApplications}
-      statsMap={statsMap}
-      error={error}
-    />
+    <JobsPageWrapper savedJobsCount={savedJobsCount} totalApplications={totalApplications} statsMap={statsMap} error={error} />
   );
 }
