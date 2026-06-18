@@ -23,6 +23,7 @@ import jobsSaved from './routes/jobs-saved';
 import jobsApplications from './routes/jobs-applications';
 import jobsMisc from './routes/jobs-misc';
 import jobsAi from './routes/jobs-ai';
+import adminObservability from './routes/admin-observability';
 import auth from './routes/auth';
 
 const app = new Hono();
@@ -64,6 +65,7 @@ app.route('/api', jobsSaved); // jobs: saved-jobs CRUD + stats
 app.route('/api', jobsApplications); // jobs: applications CRUD + bulk ops
 app.route('/api', jobsMisc); // jobs: analytics, search history, alerts (base)
 app.route('/api', jobsAi); // jobs: tailored-CV generation + job-fit analysis
+app.route('/api', adminObservability); // admin observability: logs, ai-usage, agent-tracking, analytics, visits
 
 // Phase 2 (remaining): jobs (enrich/interview-prep/generate-email/extract,
 // alerts run/scheduled, search/scraping, api-keys), summarize, admin/*.
