@@ -24,6 +24,7 @@ import jobsApplications from './routes/jobs-applications';
 import jobsMisc from './routes/jobs-misc';
 import jobsAi from './routes/jobs-ai';
 import knowledge from './routes/knowledge';
+import adminObservability from './routes/admin-observability';
 import auth from './routes/auth';
 
 const app = new Hono();
@@ -66,9 +67,11 @@ app.route('/api', jobsApplications); // jobs: applications CRUD + bulk ops
 app.route('/api', jobsMisc); // jobs: analytics, search history, alerts (base)
 app.route('/api', jobsAi); // jobs: tailored-CV generation + job-fit analysis
 app.route('/api', knowledge); // knowledge-base admin: items CRUD + sources + AI processing
+app.route('/api', adminObservability); // admin observability: logs, ai-usage, agent-tracking, analytics, visits
 
 // Phase 2 (remaining): jobs (enrich/interview-prep/generate-email/extract,
-// alerts run/scheduled, search/scraping, api-keys), summarize, admin/*.
+// alerts run/scheduled, search/scraping, api-keys), summarize, profile-sync,
+// resume compare/sync, scraper-logs, github/wakatime admin.
 
 app.notFound((c) =>
   c.json(apiErrorSchema.parse({ error: 'Not found', code: 'NOT_FOUND' }), 404),
