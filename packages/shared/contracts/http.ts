@@ -8,6 +8,13 @@
 import { z } from 'zod';
 import { apiErrorSchema } from './schemas';
 
+/**
+ * Portable subset of the fetch `credentials` option. Declared locally so the
+ * package type-checks under both the DOM lib (web/edge) and Node's lib
+ * (apps/api), without depending on the DOM-only `RequestCredentials` global.
+ */
+export type HttpCredentials = 'include' | 'omit' | 'same-origin';
+
 export class ApiClientError extends Error {
   constructor(
     message: string,
@@ -30,7 +37,7 @@ export interface HttpClientOptions {
    */
   getCsrfToken?: () => string | null | undefined | Promise<string | null | undefined>;
   /** Send cookies cross-origin (needed once auth moves behind the API). */
-  credentials?: RequestCredentials;
+  credentials?: HttpCredentials;
 }
 
 type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
@@ -39,7 +46,7 @@ export class HttpClient {
   private readonly baseUrl: string;
   private readonly fetchImpl: typeof fetch;
   private readonly getCsrfToken?: HttpClientOptions['getCsrfToken'];
-  private readonly credentials: RequestCredentials;
+  private readonly credentials: HttpCredentials;
 
   constructor(opts: HttpClientOptions) {
     this.baseUrl = opts.baseUrl.replace(/\/+$/, '');
