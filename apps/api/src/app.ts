@@ -11,6 +11,8 @@ import content from './routes/content';
 import profile from './routes/profile';
 import contact from './routes/contact';
 import books from './routes/books';
+import github from './routes/github';
+import wakatime from './routes/wakatime';
 
 const app = new Hono();
 
@@ -40,8 +42,10 @@ app.route('/api', content);
 app.route('/api', profile);
 app.route('/api', contact);
 app.route('/api', books);
+app.route('/api', github);
+app.route('/api', wakatime);
 
-// Phase 2 (remaining): auth, jobs, admin, ai, contact, github, wakatime…
+// Phase 2 (remaining): auth, jobs, admin, ai, resume…
 
 app.notFound((c) =>
   c.json(apiErrorSchema.parse({ error: 'Not found', code: 'NOT_FOUND' }), 404),
