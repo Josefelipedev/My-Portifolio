@@ -1,23 +1,7 @@
-import prisma from '@/lib/prisma';
 import { SectionWrapper } from '../ui/SectionWrapper';
 import { GradientText } from '../ui/GradientText';
-
-interface Book {
-  id: string;
-  title: string;
-  author: string;
-  coverUrl: string | null;
-  progress: number;
-  status: string;
-  rating: number | null;
-  notes: string | null;
-}
-
-async function getBooks(): Promise<Book[]> {
-  return prisma.book.findMany({
-    orderBy: [{ order: 'asc' }, { createdAt: 'desc' }],
-  });
-}
+import { getBooks } from '@/lib/data/content';
+import type { Book } from '@portfolio/shared';
 
 const STATUS_LABELS: Record<string, string> = {
   reading: 'Reading',

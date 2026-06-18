@@ -1,14 +1,7 @@
 import { SectionWrapper } from '../ui/SectionWrapper';
 import { GradientText } from '../ui/GradientText';
 import { ExperienceCard } from './ExperienceCard';
-import prisma from '@/lib/prisma';
-
-async function getExperiences() {
-  const experiences = await prisma.experience.findMany({
-    orderBy: [{ startDate: 'desc' }, { createdAt: 'desc' }],
-  });
-  return experiences;
-}
+import { getExperiences } from '@/lib/data/content';
 
 export async function ExperiencesSection() {
   const experiences = await getExperiences();

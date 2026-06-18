@@ -8,7 +8,7 @@
 
 import prisma from '@/lib/prisma';
 import { getApi, isApiConfigured } from '@/lib/api-client';
-import type { Project, Skill, Experience, Education } from '@portfolio/shared';
+import type { Project, Skill, Experience, Education, Book } from '@portfolio/shared';
 
 const asContract = <T>(rows: unknown): T => JSON.parse(JSON.stringify(rows)) as T;
 
@@ -42,4 +42,12 @@ export async function getEducation(): Promise<Education[]> {
     orderBy: [{ startDate: 'desc' }, { order: 'asc' }, { createdAt: 'desc' }],
   });
   return asContract<Education[]>(rows);
+}
+
+export async function getBooks(): Promise<Book[]> {
+  if (isApiConfigured()) return getApi().listBooks();
+  const rows = await prisma.book.findMany({
+    orderBy: [{ order: 'asc' }, { createdAt: 'desc' }],
+  });
+  return asContract<Book[]>(rows);
 }
