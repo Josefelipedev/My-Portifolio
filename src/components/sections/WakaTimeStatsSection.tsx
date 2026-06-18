@@ -1,148 +1,40 @@
-import { getWakaTimeStats, getWakaTimeAllTimeStats, getWakaTimeYearlyStats, getWakaTimeStatsForYear, WakaTimeStats } from '@/lib/wakatime';
-import { WakaTimeStatsClient } from './WakaTimeStatsClient';
-import prisma from '@/lib/prisma';
+// WakaTime homepage section — edge-safe. Fetches the orchestrated public
+// endpoint on the API service (GET /api/wakatime/stats), which composes the
+// config + current/all-time/yearly stats. No Prisma / lib/wakatime here.
 
-export interface WakaTimeConfig {
+import { WakaTimeStatsClient } from './WakaTimeStatsClient';
+
+interface WakaStatsResponse {
   enabled: boolean;
-  // Weekly stats (last 7 days)
-  showTotalTime: boolean;
-  showDailyAverage: boolean;
-  showBestDay: boolean;
-  showAllTime: boolean;
-  showLanguages: boolean;
-  showEditors: boolean;
-  showOS: boolean;
-  showProjects: boolean;
-  // Yearly stats section
-  showYearlyStats: boolean;
-  showYearSelector: boolean;
-  selectedYears: number[];
-  yearlyStatsType: 'last365' | 'calendar';
-  // Yearly display options
-  showYearlyTotalTime: boolean;
-  showYearlyDailyAverage: boolean;
-  showYearlyBestDay: boolean;
-  showYearlyLanguages: boolean;
-  showYearlyEditors: boolean;
-  showYearlyOS: boolean;
-  showYearlyProjects: boolean;
-  // Year in Review links
-  yearlyReportLinks: Record<number, string>;
-  showYearlyReportLink: boolean;
-  // Ranking badge
-  showRankingBadge: boolean;
-  rankingPercentile: number;
-  rankingTotalDevs: string;
-  yearlyRankings: Record<number, { percentile: number; totalDevs: string }>;
-  // Other
-  profileUrl: string;
-  cacheYearlyData: boolean;
+  config?: unknown;
+  stats?: unknown;
+  allTimeStats?: { totalSeconds: number; text: string } | null;
+  yearlyStats?: unknown;
+  yearlyStatsByYear?: Record<number, unknown>;
 }
 
-const DEFAULT_CONFIG: WakaTimeConfig = {
-  enabled: true,
-  showTotalTime: true,
-  showDailyAverage: true,
-  showBestDay: true,
-  showAllTime: true,
-  showLanguages: true,
-  showEditors: true,
-  showOS: true,
-  showProjects: true,
-  showYearlyStats: true,
-  showYearSelector: true,
-  selectedYears: [],
-  yearlyStatsType: 'last365',
-  showYearlyTotalTime: true,
-  showYearlyDailyAverage: true,
-  showYearlyBestDay: true,
-  showYearlyLanguages: true,
-  showYearlyEditors: true,
-  showYearlyOS: true,
-  showYearlyProjects: true,
-  yearlyReportLinks: {},
-  showYearlyReportLink: true,
-  showRankingBadge: true,
-  rankingPercentile: 1,
-  rankingTotalDevs: '500k+',
-  yearlyRankings: {
-    2023: { percentile: 1, totalDevs: '500k+' },
-    2024: { percentile: 1, totalDevs: '500k+' },
-    2025: { percentile: 4, totalDevs: '500k+' },
-  },
-  profileUrl: 'https://wakatime.com/@josefelipedev',
-  cacheYearlyData: true,
-};
-
-async function getWakaTimeConfig(): Promise<WakaTimeConfig> {
+async function getWakaTimeData(): Promise<WakaStatsResponse> {
+  const base = (process.env.NEXT_PUBLIC_API_BASE_URL || '').replace(/\/+$/, '');
   try {
-    // First check if the column exists by attempting a simple query
-    const result = await prisma.$queryRawUnsafe<{ wakatimeConfig: string | null }[]>(
-      `SELECT "wakatimeConfig" FROM "SiteConfig" WHERE id = 'main' LIMIT 1`
-    );
-
-    if (!result || result.length === 0 || !result[0].wakatimeConfig) {
-      return DEFAULT_CONFIG;
-    }
-
-    const parsed = JSON.parse(result[0].wakatimeConfig) as WakaTimeConfig;
-    return { ...DEFAULT_CONFIG, ...parsed };
-  } catch (error) {
-    // Column might not exist yet or other error - return defaults silently
-    console.log('WakaTime config not available, using defaults');
-    return DEFAULT_CONFIG;
+    const res = await fetch(`${base}/api/wakatime/stats`, { cache: 'no-store' });
+    if (!res.ok) return { enabled: false };
+    return (await res.json()) as WakaStatsResponse;
+  } catch {
+    return { enabled: false };
   }
 }
 
 export async function WakaTimeStatsSection() {
-  const config = await getWakaTimeConfig();
-
-  // If section is disabled, don't render anything
-  if (!config.enabled) {
-    return null;
-  }
-
-  // Fetch base stats
-  const [stats, allTimeStats] = await Promise.all([
-    getWakaTimeStats(),
-    getWakaTimeAllTimeStats(),
-  ]);
-
-  if (!stats) {
-    return null; // Don't render if no WakaTime data
-  }
-
-  // Fetch yearly stats based on config
-  let yearlyStats: WakaTimeStats | null = null;
-  let yearlyStatsByYear: Record<number, WakaTimeStats> = {};
-
-  if (config.showYearlyStats) {
-    if (config.yearlyStatsType === 'calendar' && config.selectedYears.length > 0) {
-      // Fetch stats for each selected year
-      const yearPromises = config.selectedYears.map(async (year) => {
-        const data = await getWakaTimeStatsForYear(year);
-        return { year, data };
-      });
-
-      const results = await Promise.all(yearPromises);
-      for (const { year, data } of results) {
-        if (data) {
-          yearlyStatsByYear[year] = data;
-        }
-      }
-    } else {
-      // Default to last 365 days
-      yearlyStats = await getWakaTimeYearlyStats();
-    }
-  }
+  const data = await getWakaTimeData();
+  if (!data.enabled || !data.stats) return null;
 
   return (
     <WakaTimeStatsClient
-      stats={stats}
-      allTimeStats={allTimeStats}
-      yearlyStats={yearlyStats}
-      yearlyStatsByYear={yearlyStatsByYear}
-      config={config}
+      stats={data.stats as never}
+      allTimeStats={data.allTimeStats ?? null}
+      yearlyStats={(data.yearlyStats ?? null) as never}
+      yearlyStatsByYear={(data.yearlyStatsByYear ?? {}) as never}
+      config={data.config as never}
     />
   );
 }

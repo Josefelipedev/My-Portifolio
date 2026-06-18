@@ -2,9 +2,7 @@ import { Navigation } from '@/components/ui/Navigation';
 import { HeroSection } from '@/components/sections/HeroSection';
 import { AboutSection } from '@/components/sections/AboutSection';
 import { GitHubStatsSection } from '@/components/sections/GitHubStatsSection';
-// WakaTimeStatsSection: temporarily out of the edge build — its data comes from
-// lib/wakatime (raw SQL + external API) not yet ported to apps/api. Re-add once
-// the WakaTime backend is on the API service.
+import { WakaTimeStatsSection } from '@/components/sections/WakaTimeStatsSection';
 import { SkillsSection } from '@/components/sections/SkillsSection';
 import { ProjectsSection } from '@/components/sections/ProjectsSection';
 import { ExperiencesSection } from '@/components/sections/ExperiencesSection';
@@ -22,6 +20,7 @@ export default function Home() {
         <HeroSection />
         <AboutSection />
         <GitHubStatsSection />
+        <WakaTimeStatsSection />
         <SkillsSection />
         <ProjectsSection />
         <ExperiencesSection />
