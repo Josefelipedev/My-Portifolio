@@ -1,40 +1,29 @@
-import prisma from '@/lib/prisma';
 import HeroClient from './HeroClient';
+import { getSiteConfig, getEducation } from '@/lib/data/content';
 
-async function getSiteConfig() {
-  const config = await prisma.siteConfig.findUnique({
-    where: { id: 'main' },
-  });
-  return config || {
-    githubUrl: 'https://github.com/Josefelipedev',
-    linkedinUrl: null,
-    email: 'josefelipedev@gmail.com',
-  };
-}
+const DEFAULT_CONFIG: { githubUrl: string | null; linkedinUrl: string | null; email: string | null } = {
+  githubUrl: 'https://github.com/Josefelipedev',
+  linkedinUrl: null,
+  email: 'josefelipedev@gmail.com',
+};
 
-async function getEducation() {
+async function getVisibleEducation() {
   try {
-    const education = await prisma.education.findMany({
-      where: { visible: true },
-      orderBy: [{ order: 'asc' }, { startDate: 'desc' }],
-    });
-    return education;
+    const education = await getEducation();
+    return education.filter((edu) => edu.visible).sort((a, b) => a.order - b.order);
   } catch {
     return [];
   }
 }
 
 export async function HeroSection() {
-  const [config, education] = await Promise.all([
-    getSiteConfig(),
-    getEducation(),
-  ]);
+  const [config, education] = await Promise.all([getSiteConfig(), getVisibleEducation()]);
 
   return (
     <HeroClient
-      githubUrl={config.githubUrl}
-      linkedinUrl={config.linkedinUrl}
-      email={config.email}
+      githubUrl={config?.githubUrl ?? DEFAULT_CONFIG.githubUrl}
+      linkedinUrl={config?.linkedinUrl ?? DEFAULT_CONFIG.linkedinUrl}
+      email={config?.email ?? DEFAULT_CONFIG.email}
       education={education.map(edu => ({
         id: edu.id,
         title: edu.title,
