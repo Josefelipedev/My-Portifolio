@@ -2,6 +2,10 @@
   "name": "myportfolio",
   "version": "0.1.0",
   "private": true,
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
   "prisma": {
     "seed": "npx tsx prisma/seed.ts"
   },

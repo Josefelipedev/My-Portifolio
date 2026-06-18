@@ -6,7 +6,7 @@ import {
   PortfolioApi,
   projectSchema,
   skillSchema,
-} from '@/shared/contracts';
+} from '@portfolio/shared';
 
 function mockFetch(status: number, body: unknown): typeof fetch {
   return vi.fn(async () => ({
