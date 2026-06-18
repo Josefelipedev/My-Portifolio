@@ -18,6 +18,11 @@ jobs:
   deploy:
     name: Build + Deploy Worker
     runs-on: ubuntu-latest
+    # Prisma 7's prisma.config.ts requires DATABASE_URL to be resolvable just to
+    # run `prisma generate` (postinstall) — it never connects here, the web is
+    # API-only. A throwaway value satisfies the config loader on the runner.
+    env:
+      DATABASE_URL: postgresql://build:build@localhost:5432/build
     steps:
       - uses: actions/checkout@v4
 
