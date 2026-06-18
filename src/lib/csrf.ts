@@ -3,6 +3,7 @@
 
 import { cookies } from 'next/headers';
 import { randomBytes, timingSafeEqual } from 'crypto';
+import { buildCookieOptions } from '@/lib/cookie-config';
 
 const CSRF_COOKIE = 'csrf_token';
 const CSRF_HEADER = 'x-csrf-token';
@@ -22,13 +23,11 @@ export async function setCSRFCookie(): Promise<string> {
   const token = generateCSRFToken();
   const cookieStore = await cookies();
 
-  cookieStore.set(CSRF_COOKIE, token, {
-    httpOnly: true,
+  cookieStore.set(CSRF_COOKIE, token, buildCookieOptions({
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'strict',
-    path: '/',
     maxAge: 60 * 60 * 24, // 24 hours
-  });
+  }));
 
   return token;
 }

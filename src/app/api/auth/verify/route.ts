@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { verifyCodeAndCreateSession } from '@/lib/auth-service';
 import { checkLoginRateLimit, recordLoginAttempt, getClientIP } from '@/lib/rate-limit';
+import { buildCookieOptions } from '@/lib/cookie-config';
 
 export async function POST(request: Request) {
   try {
@@ -49,13 +50,11 @@ export async function POST(request: Request) {
 
     // Set auth cookie (14 days)
     const cookieStore = await cookies();
-    cookieStore.set('auth_token', result.token!, {
-      httpOnly: true,
+    cookieStore.set('auth_token', result.token!, buildCookieOptions({
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
       maxAge: 14 * 24 * 60 * 60, // 14 days
-      path: '/',
-    });
+    }));
 
     // Reset rate limit on successful login
     recordLoginAttempt(ip, true);
