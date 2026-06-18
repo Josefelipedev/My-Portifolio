@@ -6,6 +6,7 @@ import FilterPanel, { JobFilters, applyJobFilters } from './jobs/FilterPanel';
 import SearchHistory, { saveSearchToHistory } from './jobs/SearchHistory';
 import ApiKeySettings from './jobs/ApiKeySettings';
 import { MatchScoreWithReason, type MatchReason } from './jobs/MatchScoreBadge';
+import { apiFetch } from '@/lib/api-fetch';
 
 interface JobListing {
   id: string;
@@ -370,12 +371,12 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
 
   // Fetch API status, saved IDs and resume data on mount
   useEffect(() => {
-    fetch('/api/jobs/search?status=true')
+    apiFetch('/api/jobs/search?status=true')
       .then(res => res.ok && res.headers.get('content-type')?.includes('json') ? res.json() : null)
       .then(data => data && setApiStatus(data.apis || []))
       .catch(() => {});
 
-    fetch('/api/jobs/saved?page=1&limit=500')
+    apiFetch('/api/jobs/saved?page=1&limit=500')
       .then(res => res.ok ? res.json() : null)
       .then(data => {
         if (data?.jobs) {
@@ -389,7 +390,7 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
       })
       .catch(() => {});
 
-    fetch('/api/resume?section=all')
+    apiFetch('/api/resume?section=all')
       .then(res => res.ok ? res.json() : null)
       .then(data => {
         if (data?.skills) {
@@ -448,7 +449,7 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
         maxAgeDays,
         ...(shouldRefresh ? { refresh: 'true' } : {}),
       });
-      const response = await fetch(`/api/jobs/search?${params}`);
+      const response = await apiFetch(`/api/jobs/search?${params}`);
       const contentType = response.headers.get('content-type') || '';
       if (!contentType.includes('application/json')) {
         throw new Error(`Unexpected server response (${response.status})`);
@@ -521,7 +522,7 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
         limit: String(200),
         maxAgeDays,
       });
-      const response = await fetch(`/api/jobs/smart-search?${params}`);
+      const response = await apiFetch(`/api/jobs/smart-search?${params}`);
       const data = await response.json();
 
       if (!response.ok) {
@@ -573,7 +574,7 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
   const handleSaveJob = async (job: JobListing) => {
     try {
       setSaving(job.id);
-      const response = await fetch('/api/jobs/saved', {
+      const response = await apiFetch('/api/jobs/saved', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -615,7 +616,7 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
     try {
       setSavingAndApplying(job.id);
       // Step 1: Save the job
-      const saveRes = await fetch('/api/jobs/saved', {
+      const saveRes = await apiFetch('/api/jobs/saved', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -646,7 +647,7 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
       setSavedIds(prev => new Set(prev).add(job.id));
 
       // Step 2: Create application
-      const applyRes = await fetch(`/api/jobs/saved/${savedJobId}/apply`, {
+      const applyRes = await apiFetch(`/api/jobs/saved/${savedJobId}/apply`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'applied', appliedAt: new Date().toISOString() }),

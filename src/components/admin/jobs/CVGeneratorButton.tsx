@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { type CustomCVContent } from '@/lib/jobs/cv-generator';
+import { apiFetch } from '@/lib/api-fetch';
 import resumeData from '@/data/resume.json';
 
 interface Job {
@@ -52,7 +53,7 @@ export default function CVGeneratorButton({ job, onGenerated }: CVGeneratorButto
       setGenerating(true);
       setError(null);
 
-      const response = await fetch(`/api/jobs/saved/${job.id}/generate-cv`, {
+      const response = await apiFetch(`/api/jobs/saved/${job.id}/generate-cv`, {
         method: 'POST',
       });
 
