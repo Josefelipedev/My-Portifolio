@@ -1,0 +1,605 @@
+import Together from 'together-ai';
+import type { Prisma } from '@prisma/client';
+import { trackAIUsage, estimateTokens, checkQuotaLimits, type AIFeature } from './ai-tracking';
+
+// AI Provider types
+type AIProvider = 'ollama' | 'together' | 'anthropic';
+
+interface AIConfig {
+  provider: AIProvider;
+  model: string;
+}
+
+// Get current AI provider from env
+function getAIConfig(): AIConfig {
+  const provider = (process.env.AI_PROVIDER as AIProvider) || 'together';
+
+  switch (provider) {
+    case 'ollama':
+      return {
+        provider: 'ollama',
+        model: process.env.OLLAMA_MODEL || 'llama3.2',
+      };
+    case 'anthropic':
+      return {
+        provider: 'anthropic',
+        model: 'claude-sonnet-4-20250514',
+      };
+    case 'together':
+    default:
+      return {
+        provider: 'together',
+        model: process.env.TOGETHER_MODEL || 'meta-llama/Llama-3.3-70B-Instruct-Turbo',
+      };
+  }
+}
+
+// Together AI client
+let togetherClient: Together | null = null;
+
+function getTogetherClient(): Together {
+  if (!togetherClient) {
+    const apiKey = process.env.TOGETHER_API_KEY;
+    if (!apiKey) {
+      throw new Error('TOGETHER_API_KEY environment variable is not set');
+    }
+    togetherClient = new Together({ apiKey });
+  }
+  return togetherClient;
+}
+
+// Ollama local API call
+async function callOllama(prompt: string, model: string): Promise<string> {
+  const ollamaUrl = process.env.OLLAMA_URL || 'http://localhost:11434';
+
+  const response = await fetch(`${ollamaUrl}/api/generate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model,
+      prompt,
+      stream: false,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Ollama API error: ${response.statusText}`);
+  }
+
+  const data = (await response.json()) as { response?: string };
+  return data.response?.trim() || '';
+}
+
+// Together AI call
+async function callTogether(prompt: string, model: string, maxTokens = 500): Promise<string> {
+  const client = getTogetherClient();
+
+  const response = await client.chat.completions.create({
+    model,
+    messages: [{ role: 'user', content: prompt }],
+    max_tokens: maxTokens,
+    temperature: 0.7,
+  });
+
+  return response.choices[0]?.message?.content?.trim() || '';
+}
+
+// Anthropic call (optional, if user has API key)
+async function callAnthropic(prompt: string, model: string): Promise<string> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey || apiKey === 'COLE_SUA_CHAVE_ANTHROPIC_AQUI') {
+    throw new Error('ANTHROPIC_API_KEY not configured. Use Together AI or Ollama instead.');
+  }
+
+  // Dynamic import to avoid errors if not using Anthropic
+  const { default: Anthropic } = await import('@anthropic-ai/sdk');
+  const client = new Anthropic({ apiKey });
+
+  const message = await client.messages.create({
+    model,
+    max_tokens: 300,
+    messages: [{ role: 'user', content: prompt }],
+  });
+
+  const content = message.content[0];
+  if (content.type === 'text') {
+    return content.text.trim();
+  }
+
+  throw new Error('Unexpected response format from Anthropic API');
+}
+
+// Unified AI call function
+async function callAI(prompt: string, maxTokens = 500): Promise<string> {
+  const config = getAIConfig();
+
+  switch (config.provider) {
+    case 'ollama':
+      return callOllama(prompt, config.model);
+    case 'anthropic':
+      return callAnthropic(prompt, config.model);
+    case 'together':
+    default:
+      return callTogether(prompt, config.model, maxTokens);
+  }
+}
+
+// AI call with usage tracking
+export async function callAIWithTracking(
+  prompt: string,
+  feature: AIFeature,
+  options: {
+    maxTokens?: number;
+    temperature?: number;
+    metadata?: Prisma.InputJsonValue;
+    checkQuota?: boolean;
+  } = {}
+): Promise<{ content: string; inputTokens: number; outputTokens: number }> {
+  const config = getAIConfig();
+
+  // Check quota limits before calling (only for Together AI)
+  if (options.checkQuota !== false && config.provider === 'together') {
+    const quotaCheck = await checkQuotaLimits();
+    if (!quotaCheck.withinLimits) {
+      throw new Error(
+        `AI quota exceeded. Daily: $${quotaCheck.dailyUsed.toFixed(2)}/$${quotaCheck.dailyLimit}, Monthly: $${quotaCheck.monthlyUsed.toFixed(2)}/$${quotaCheck.monthlyLimit}`
+      );
+    }
+  }
+
+  const startTime = Date.now();
+  let success = true;
+  let error: string | undefined;
+  let inputTokens = 0;
+  let outputTokens = 0;
+  let content = '';
+
+  try {
+    // Only track Together AI calls (Ollama is free, Anthropic has its own billing)
+    if (config.provider === 'together') {
+      const client = getTogetherClient();
+
+      const response = await client.chat.completions.create({
+        model: config.model,
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: options.maxTokens || 500,
+        temperature: options.temperature || 0.7,
+      });
+
+      inputTokens = response.usage?.prompt_tokens || estimateTokens(prompt);
+      outputTokens =
+        response.usage?.completion_tokens ||
+        estimateTokens(response.choices[0]?.message?.content || '');
+      content = response.choices[0]?.message?.content?.trim() || '';
+    } else {
+      // For other providers, just call the standard function
+      content = await callAI(prompt, options.maxTokens);
+      inputTokens = estimateTokens(prompt);
+      outputTokens = estimateTokens(content);
+    }
+
+    return { content, inputTokens, outputTokens };
+  } catch (err) {
+    success = false;
+    error = err instanceof Error ? err.message : 'Unknown error';
+    throw err;
+  } finally {
+    const latencyMs = Date.now() - startTime;
+
+    // Track usage (fire and forget)
+    if (config.provider === 'together') {
+      trackAIUsage({
+        feature,
+        model: config.model,
+        inputTokens,
+        outputTokens,
+        latencyMs,
+        success,
+        error,
+        metadata: options.metadata,
+      }).catch(() => {
+        // Silently ignore tracking errors
+      });
+    }
+  }
+}
+
+interface SummarizeInput {
+  repoName: string;
+  description: string | null;
+  readme: string | null;
+  languages: string[];
+  topics: string[];
+}
+
+export async function generateProjectSummary(input: SummarizeInput): Promise<string> {
+  const prompt = `You are a technical writer creating portfolio descriptions for a developer.
+
+Summarize this GitHub project for a developer portfolio in 2-3 concise sentences.
+Focus on: what the project does, key technologies used, and what makes it interesting or valuable.
+Be professional and avoid generic phrases. Write in third person.
+
+Project: ${input.repoName}
+${input.description ? `Description: ${input.description}` : ''}
+Languages: ${input.languages.length > 0 ? input.languages.join(', ') : 'Not specified'}
+Topics: ${input.topics.length > 0 ? input.topics.join(', ') : 'Not specified'}
+
+${input.readme ? `README (first 3000 chars):\n${input.readme.slice(0, 3000)}` : 'No README available.'}
+
+Write only the summary, no introduction or extra text.`;
+
+  const { content } = await callAIWithTracking(prompt, 'project-summary', {
+    maxTokens: 500,
+    temperature: 0.7,
+    metadata: { repoName: input.repoName },
+  });
+  return content;
+}
+
+export async function generateBioSuggestion(
+  repos: { name: string; description: string | null; language: string | null }[]
+): Promise<string> {
+  const repoList = repos
+    .slice(0, 10)
+    .map((r) => `- ${r.name}: ${r.description || 'No description'} (${r.language || 'Unknown'})`)
+    .join('\n');
+
+  const prompt = `Based on these GitHub repositories, write a brief professional bio (2-3 sentences) for a developer portfolio.
+Focus on their apparent expertise and interests based on the projects.
+
+Repositories:
+${repoList}
+
+Write only the bio, no introduction or extra text.`;
+
+  const { content } = await callAIWithTracking(prompt, 'bio-generation', {
+    maxTokens: 500,
+    temperature: 0.7,
+    metadata: { repoCount: repos.length },
+  });
+  return content;
+}
+
+// Export current provider info for UI
+export function getCurrentAIProvider(): { provider: AIProvider; model: string } {
+  return getAIConfig();
+}
+
+// README analysis for project creation
+export interface ReadmeAnalysisResult {
+  suggestedTitle: string;
+  suggestedDescription: string;
+  detectedTechnologies: string[];
+  aiSummary: string;
+}
+
+export async function analyzeReadmeForProject(
+  readme: string,
+  title?: string
+): Promise<ReadmeAnalysisResult> {
+  const prompt = `You are analyzing a project README to extract information for a developer portfolio.
+
+${title ? `Project Name: ${title}` : 'Project name not provided - suggest one based on the README.'}
+
+README Content:
+${readme.slice(0, 6000)}
+
+Based on this README, provide a JSON response with the following structure:
+{
+  "suggestedTitle": "A concise, professional project title (use the provided name if appropriate, or suggest a better one)",
+  "suggestedDescription": "A brief 1-2 sentence description for a portfolio card (max 200 chars)",
+  "detectedTechnologies": ["Array", "of", "technologies", "mentioned"],
+  "aiSummary": "A compelling 2-3 sentence summary highlighting what makes this project interesting, its key features, and technical achievements. Write in third person."
+}
+
+IMPORTANT:
+- For technologies, extract programming languages, frameworks, libraries, databases, and tools mentioned
+- Keep the description concise and suitable for a card preview
+- Make the aiSummary engaging and professional
+- Only include technologies that are actually mentioned or clearly implied
+- Common technologies to look for: React, Vue, Angular, Next.js, Node.js, Express, TypeScript, JavaScript, Python, Go, Rust, PostgreSQL, MongoDB, Redis, Docker, Kubernetes, AWS, etc.
+
+Respond ONLY with the JSON object. No other text.`;
+
+  const { content: response } = await callAIWithTracking(prompt, 'readme-analysis', {
+    maxTokens: 1000,
+    temperature: 0.3,
+    metadata: { title },
+  });
+
+  try {
+    const jsonMatch = response.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      throw new Error('No JSON object found in response');
+    }
+    const result = JSON.parse(jsonMatch[0]) as ReadmeAnalysisResult;
+
+    return {
+      suggestedTitle: String(result.suggestedTitle || title || '').trim(),
+      suggestedDescription: String(result.suggestedDescription || '').trim().slice(0, 500),
+      detectedTechnologies: Array.isArray(result.detectedTechnologies)
+        ? result.detectedTechnologies.map((t) => String(t).trim()).filter(Boolean)
+        : [],
+      aiSummary: String(result.aiSummary || '').trim(),
+    };
+  } catch (parseError) {
+    console.error('Failed to parse AI response for README analysis:', response);
+    throw new Error('Failed to analyze README. Please try again.');
+  }
+}
+
+interface SkillsSuggestionInput {
+  projects: { title: string; technologies: string; description: string }[];
+  experiences: { title: string; technologies: string; description: string }[];
+  existingSkills?: string[];
+  knowledgeContext?: string;
+}
+
+interface SkillSuggestion {
+  name: string;
+  category: 'frontend' | 'backend' | 'devops' | 'tools' | 'other';
+  level: number;
+  reason: string;
+}
+
+export async function generateSkillsSuggestion(input: SkillsSuggestionInput): Promise<SkillSuggestion[]> {
+  const projectsList = input.projects
+    .map((p) => `- ${p.title}: ${p.description} (Technologies: ${p.technologies})`)
+    .join('\n');
+
+  const experiencesList = input.experiences
+    .map((e) => `- ${e.title}: ${e.description} (Technologies: ${e.technologies})`)
+    .join('\n');
+
+  const existingSkillsText = input.existingSkills?.length
+    ? `\nExisting skills to SKIP (do not suggest these): ${input.existingSkills.join(', ')}`
+    : '';
+
+  const knowledgeText = input.knowledgeContext?.trim()
+    ? `\n\nPRIVATE PROFESSIONAL KNOWLEDGE BASE (verified facts — treat as evidence):\n${input.knowledgeContext.trim()}`
+    : '';
+
+  const prompt = `You are analyzing a developer's portfolio to suggest technical skills.
+
+Based on the projects, work experiences, and verified knowledge below, suggest a list of technical skills with proficiency levels.
+
+PROJECTS:
+${projectsList || 'No projects available'}
+
+WORK EXPERIENCES:
+${experiencesList || 'No experiences available'}${knowledgeText}
+${existingSkillsText}
+
+Use only technologies that appear in the data above. Do not invent skills the developer has not demonstrated. The knowledge base may surface skills not visible in public projects — use it as supporting evidence.
+
+For each skill, provide:
+1. name: The technology/skill name (e.g., "React", "Node.js", "Docker")
+2. category: One of "frontend", "backend", "devops", "tools", or "other"
+3. level: Proficiency from 1-5 based on how frequently it appears and project complexity:
+   - 1: Beginner (mentioned once or twice)
+   - 2: Basic (used in a few projects)
+   - 3: Intermediate (regular use)
+   - 4: Advanced (used extensively)
+   - 5: Expert (primary technology, used in most projects)
+4. reason: Brief justification for the level (1 sentence)
+
+Respond ONLY with a valid JSON array. No other text. Example:
+[{"name":"React","category":"frontend","level":4,"reason":"Used in 5 projects including complex dashboards"},{"name":"Node.js","category":"backend","level":3,"reason":"Backend of 3 projects"}]`;
+
+  const { content: response } = await callAIWithTracking(prompt, 'skills-suggestion', {
+    maxTokens: 2000,
+    temperature: 0.5,
+    metadata: { projectCount: input.projects.length, experienceCount: input.experiences.length },
+  });
+
+  try {
+    // Try to extract JSON from the response
+    const jsonMatch = response.match(/\[[\s\S]*\]/);
+    if (!jsonMatch) {
+      throw new Error('No JSON array found in response');
+    }
+    const suggestions = JSON.parse(jsonMatch[0]) as SkillSuggestion[];
+
+    // Validate and sanitize each suggestion
+    return suggestions.map((s) => ({
+      name: String(s.name || '').trim(),
+      category: ['frontend', 'backend', 'devops', 'tools', 'other'].includes(s.category)
+        ? s.category
+        : 'other',
+      level: Math.min(5, Math.max(1, Number(s.level) || 3)),
+      reason: String(s.reason || '').trim(),
+    }));
+  } catch (parseError) {
+    console.error('Failed to parse AI response:', response);
+    throw new Error('Failed to parse AI suggestions. Please try again.');
+  }
+}
+
+// Resume analysis types
+export interface ResumeAnalysis {
+  personalInfo: {
+    name: string;
+    email: string;
+    phone?: string;
+    address?: string;
+    linkedin?: string;
+    github?: string;
+  };
+  professionalSummary: {
+    pt: string;
+    en: string;
+  };
+  experience: Array<{
+    title: string;
+    company: string;
+    location?: string;
+    startDate: string;
+    endDate?: string;
+    responsibilities: string[];
+  }>;
+  education: Array<{
+    degree: string;
+    institution: string;
+    location?: string;
+    startDate: string;
+    endDate?: string;
+    description?: string;
+  }>;
+  skills: Array<{
+    name: string;
+    level: number;
+    category: 'frontend' | 'backend' | 'devops' | 'tools' | 'mobile' | 'other';
+  }>;
+  certifications: Array<{
+    name: string;
+    issuer: string;
+    date?: string;
+    description?: string;
+  }>;
+  languages: Array<{
+    language: string;
+    level: string;
+    notes?: string;
+  }>;
+}
+
+export async function analyzeResumePDF(pdfText: string): Promise<ResumeAnalysis> {
+  const prompt = `You are an expert resume parser. Analyze the following resume text extracted from a PDF and extract structured information.
+
+RESUME TEXT:
+${pdfText.slice(0, 8000)}
+
+Extract and return a JSON object with the following structure:
+{
+  "personalInfo": {
+    "name": "Full name",
+    "email": "Email address",
+    "phone": "Phone number (optional)",
+    "address": "Address (optional)",
+    "linkedin": "LinkedIn username only (optional)",
+    "github": "GitHub username only (optional)"
+  },
+  "professionalSummary": {
+    "pt": "Professional summary in Portuguese",
+    "en": "Professional summary in English"
+  },
+  "experience": [
+    {
+      "title": "Job title",
+      "company": "Company name",
+      "location": "City, Country (optional)",
+      "startDate": "YYYY-MM format",
+      "endDate": "YYYY-MM format or null if current",
+      "responsibilities": ["Responsibility 1", "Responsibility 2"]
+    }
+  ],
+  "education": [
+    {
+      "degree": "Degree name",
+      "institution": "Institution name",
+      "location": "City, Country (optional)",
+      "startDate": "YYYY-MM format",
+      "endDate": "YYYY-MM format or null if ongoing",
+      "description": "Brief description (optional)"
+    }
+  ],
+  "skills": [
+    {
+      "name": "Skill name",
+      "level": 1-5,
+      "category": "frontend|backend|devops|tools|mobile|other"
+    }
+  ],
+  "certifications": [
+    {
+      "name": "Certification name",
+      "issuer": "Issuing organization",
+      "date": "YYYY-MM format (optional)",
+      "description": "Brief description (optional)"
+    }
+  ],
+  "languages": [
+    {
+      "language": "Language name",
+      "level": "Native|Fluent|Advanced|Intermediate|Basic",
+      "notes": "Additional notes (optional)"
+    }
+  ]
+}
+
+IMPORTANT:
+- For skill levels: 1=Beginner, 2=Basic, 3=Intermediate, 4=Advanced, 5=Expert
+- Categorize skills correctly: React/Vue/Angular=frontend, Node/Python/Java=backend, Docker/K8s/AWS=devops, Git/VSCode=tools, Flutter/React Native=mobile
+- Use YYYY-MM format for dates (e.g., "2024-03")
+- If information is not available, use empty arrays or null
+- Generate BOTH Portuguese and English summaries (translate if only one language is present)
+
+Respond ONLY with the JSON object. No other text.`;
+
+  const { content: response } = await callAIWithTracking(prompt, 'resume-analysis', {
+    maxTokens: 4000,
+    temperature: 0.3,
+  });
+
+  try {
+    // Extract JSON from response
+    const jsonMatch = response.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      throw new Error('No JSON object found in response');
+    }
+    const analysis = JSON.parse(jsonMatch[0]) as ResumeAnalysis;
+
+    // Validate and sanitize
+    return {
+      personalInfo: {
+        name: String(analysis.personalInfo?.name || '').trim(),
+        email: String(analysis.personalInfo?.email || '').trim(),
+        phone: analysis.personalInfo?.phone?.trim(),
+        address: analysis.personalInfo?.address?.trim(),
+        linkedin: analysis.personalInfo?.linkedin?.trim(),
+        github: analysis.personalInfo?.github?.trim(),
+      },
+      professionalSummary: {
+        pt: String(analysis.professionalSummary?.pt || '').trim(),
+        en: String(analysis.professionalSummary?.en || '').trim(),
+      },
+      experience: (analysis.experience || []).map((e) => ({
+        title: String(e.title || '').trim(),
+        company: String(e.company || '').trim(),
+        location: e.location?.trim(),
+        startDate: String(e.startDate || '').trim(),
+        endDate: e.endDate?.trim(),
+        responsibilities: (e.responsibilities || []).map((r) => String(r).trim()),
+      })),
+      education: (analysis.education || []).map((e) => ({
+        degree: String(e.degree || '').trim(),
+        institution: String(e.institution || '').trim(),
+        location: e.location?.trim(),
+        startDate: String(e.startDate || '').trim(),
+        endDate: e.endDate?.trim(),
+        description: e.description?.trim(),
+      })),
+      skills: (analysis.skills || []).map((s) => ({
+        name: String(s.name || '').trim(),
+        level: Math.min(5, Math.max(1, Number(s.level) || 3)),
+        category: ['frontend', 'backend', 'devops', 'tools', 'mobile', 'other'].includes(s.category)
+          ? s.category
+          : 'other',
+      })),
+      certifications: (analysis.certifications || []).map((c) => ({
+        name: String(c.name || '').trim(),
+        issuer: String(c.issuer || '').trim(),
+        date: c.date?.trim(),
+        description: c.description?.trim(),
+      })),
+      languages: (analysis.languages || []).map((l) => ({
+        language: String(l.language || '').trim(),
+        level: String(l.level || '').trim(),
+        notes: l.notes?.trim(),
+      })),
+    };
+  } catch (parseError) {
+    console.error('Failed to parse AI response:', response);
+    throw new Error('Failed to parse resume analysis. Please try again.');
+  }
+}
