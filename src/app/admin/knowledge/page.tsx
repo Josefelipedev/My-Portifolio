@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { fetchWithCSRF } from '@/lib/csrf-client';
+import { apiFetch } from '@/lib/api-fetch';
 import { useToast } from '@/components/ui/Toast';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 
@@ -115,8 +116,8 @@ export default function KnowledgeAdminPage() {
       params.set('pageSize', String(pageSize));
 
       const [itemsResponse, sourcesResponse] = await Promise.all([
-        fetch(`/api/admin/knowledge?${params.toString()}`),
-        fetch('/api/admin/knowledge/sources'),
+        apiFetch(`/api/admin/knowledge?${params.toString()}`),
+        apiFetch('/api/admin/knowledge/sources'),
       ]);
       const itemsData = await itemsResponse.json();
       const sourcesData = await sourcesResponse.json();
