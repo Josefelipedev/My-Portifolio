@@ -21,6 +21,7 @@ import contentImport from './routes/content-import';
 import ai from './routes/ai';
 import resume from './routes/resume';
 import jobsSaved from './routes/jobs-saved';
+import jobsSearch from './routes/jobs-search';
 import jobsApplications from './routes/jobs-applications';
 import jobsMisc from './routes/jobs-misc';
 import jobsAi from './routes/jobs-ai';
@@ -65,6 +66,7 @@ app.route('/api', contentImport); // authenticated books update/delete + books/e
 app.route('/api', ai); // authenticated AI endpoints (skills/suggest, projects/analyze)
 app.route('/api', resume); // authenticated resume PDF analysis
 app.route('/api', jobsSaved); // jobs: saved-jobs CRUD + stats
+app.route('/api', jobsSearch); // jobs: live aggregator search + smart (resume-based) search
 app.route('/api', jobsApplications); // jobs: applications CRUD + bulk ops
 app.route('/api', jobsMisc); // jobs: analytics, search history, alerts (base)
 app.route('/api', jobsAi); // jobs: tailored-CV generation + job-fit analysis
