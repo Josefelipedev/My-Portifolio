@@ -1,35 +1,7 @@
 import { SectionWrapper } from '../ui/SectionWrapper';
 import { GradientText } from '../ui/GradientText';
-import prisma from '@/lib/prisma';
+import { getProjects } from '@/lib/data/content';
 import ProjectCard from './ProjectCard';
-
-interface Project {
-  id: string;
-  title: string;
-  description: string;
-  technologies: string;
-  repoUrl: string | null;
-  demoUrl: string | null;
-  imageUrl: string | null;
-  stars: number | null;
-  featured: boolean;
-  source: string;
-  aiSummary: string | null;
-  rank: number | null;
-  isPrivate: boolean;
-}
-
-async function getProjects(): Promise<Project[]> {
-  const projects = await prisma.project.findMany({
-    orderBy: [
-      { rank: 'asc' },
-      { featured: 'desc' },
-      { stars: 'desc' },
-      { createdAt: 'desc' },
-    ],
-  });
-  return projects;
-}
 
 export async function ProjectsSection() {
   const projects = await getProjects();
