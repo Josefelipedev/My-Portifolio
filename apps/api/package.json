@@ -1,0 +1,23 @@
+{
+  "name": "@portfolio/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Portfolio API service (Node, runs on the VPS). Phase 2 target.",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.19.13",
+    "hono": "^4.12.25",
+    "@portfolio/shared": "*",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^25.0.3",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  }
+}

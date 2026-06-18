@@ -24,6 +24,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
+      '@portfolio/shared': path.resolve(__dirname, './packages/shared/contracts/index.ts'),
     },
   },
 });

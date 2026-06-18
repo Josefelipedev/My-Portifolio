@@ -1,0 +1,15 @@
+{
+  "name": "@portfolio/shared",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./contracts/index.ts",
+  "types": "./contracts/index.ts",
+  "exports": {
+    ".": "./contracts/index.ts",
+    "./contracts": "./contracts/index.ts"
+  },
+  "dependencies": {
+    "zod": "^4.4.3"
+  }
+}
