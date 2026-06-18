@@ -20,6 +20,7 @@ import contentAdmin from './routes/content-admin';
 import ai from './routes/ai';
 import resume from './routes/resume';
 import jobsSaved from './routes/jobs-saved';
+import jobsMisc from './routes/jobs-misc';
 
 const app = new Hono();
 
@@ -56,6 +57,7 @@ app.route('/api', contentAdmin); // authenticated content mutations (POST/PUT/DE
 app.route('/api', ai); // authenticated AI endpoints (skills/suggest, projects/analyze)
 app.route('/api', resume); // authenticated resume PDF analysis
 app.route('/api', jobsSaved); // jobs: saved-jobs CRUD + stats
+app.route('/api', jobsMisc); // jobs: analytics, search history, alerts (base)
 
 // Phase 2 (remaining): jobs (applications, alerts, AI, search/scraping),
 // summarize, and the remaining admin/* domains.
