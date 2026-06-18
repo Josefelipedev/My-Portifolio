@@ -8,6 +8,7 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { apiErrorSchema } from '@portfolio/shared';
 import content from './routes/content';
+import books from './routes/books';
 
 const app = new Hono();
 
@@ -34,8 +35,9 @@ app.get('/health', (c) =>
 
 // Ported domains (Phase 2). Mounted under /api to match the web paths.
 app.route('/api', content);
+app.route('/api', books);
 
-// Phase 2 (remaining): auth, jobs, admin, ai, books, contact, github, wakatime…
+// Phase 2 (remaining): auth, jobs, admin, ai, contact, github, wakatime…
 
 app.notFound((c) =>
   c.json(apiErrorSchema.parse({ error: 'Not found', code: 'NOT_FOUND' }), 404),

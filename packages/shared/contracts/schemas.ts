@@ -81,6 +81,25 @@ export const skillSchema = z.object({
 });
 export type Skill = z.infer<typeof skillSchema>;
 
+export const bookSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  author: z.string(),
+  coverUrl: z.string().nullable(),
+  progress: z.number().int(), // 0-100
+  status: z.string(), // reading | completed | want_to_read | paused
+  startedAt: isoDate.nullable(),
+  finishedAt: isoDate.nullable(),
+  rating: z.number().int().nullable(), // 1-5
+  notes: z.string().nullable(),
+  isbn: z.string().nullable(),
+  totalPages: z.number().int().nullable(),
+  order: z.number().int(),
+  createdAt: isoDate,
+  updatedAt: isoDate,
+});
+export type Book = z.infer<typeof bookSchema>;
+
 /**
  * Public subset of SiteConfig — secrets (wakatimeConfig, jobApiKeys) are
  * intentionally excluded from the web-facing contract.
@@ -116,6 +135,7 @@ export const projectListSchema = z.array(projectSchema);
 export const experienceListSchema = z.array(experienceSchema);
 export const educationListSchema = z.array(educationSchema);
 export const skillListSchema = z.array(skillSchema);
+export const bookListSchema = z.array(bookSchema);
 
 /** Error envelope returned by the API on non-2xx (see api-utils.error). */
 export const apiErrorSchema = z.object({
