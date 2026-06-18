@@ -10,6 +10,7 @@ import { apiErrorSchema } from '@portfolio/shared';
 import content from './routes/content';
 import profile from './routes/profile';
 import contact from './routes/contact';
+import books from './routes/books';
 
 const app = new Hono();
 
@@ -38,8 +39,9 @@ app.get('/health', (c) =>
 app.route('/api', content);
 app.route('/api', profile);
 app.route('/api', contact);
+app.route('/api', books);
 
-// Phase 2 (remaining): auth, jobs, admin, ai, books, contact, github, wakatime…
+// Phase 2 (remaining): auth, jobs, admin, ai, contact, github, wakatime…
 
 app.notFound((c) =>
   c.json(apiErrorSchema.parse({ error: 'Not found', code: 'NOT_FOUND' }), 404),
