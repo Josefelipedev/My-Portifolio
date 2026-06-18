@@ -2,8 +2,10 @@
 
 import type { JobListing, JobSearchParams, JobSourceType } from '../types';
 
-// Now served by multiscraper on port 8001 — job endpoints under /jobs/*
-const PYTHON_SCRAPER_URL = process.env.PYTHON_SCRAPER_URL || 'http://localhost:8001';
+// Optional source: only used when PYTHON_SCRAPER_URL is explicitly configured.
+// No localhost fallback — an unset/empty URL disables this source entirely so it
+// never adds latency to job search.
+const PYTHON_SCRAPER_URL = process.env.PYTHON_SCRAPER_URL || '';
 
 interface PythonJob {
   id: string;
@@ -48,6 +50,9 @@ export async function searchPythonScraper(
     const response = await fetch(url.toString(), {
       method: 'GET',
       headers: { 'Content-Type': 'application/json' },
+      // Fail fast: this optional source must never hang job search if the
+      // scraper is unreachable or misconfigured (PYTHON_SCRAPER_URL).
+      signal: AbortSignal.timeout(4000),
       next: { revalidate: 300 },
     });
 
@@ -104,6 +109,7 @@ export async function searchVagasComBrPython(
  * Check if Python scraper service is available
  */
 export async function isPythonScraperAvailable(): Promise<boolean> {
+  if (!PYTHON_SCRAPER_URL) return false; // not configured -> skip instantly (no fetch)
   try {
     const response = await fetch(`${PYTHON_SCRAPER_URL}/health`, {  // /health is unchanged
       method: 'GET',
