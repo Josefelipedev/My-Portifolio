@@ -1,10 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
+// Public-safe fields only. Never expose secrets (wakatimeConfig, jobApiKeys)
+// through this endpoint — GET is unauthenticated and consumed by the public site.
+const PUBLIC_PROFILE_SELECT = {
+  id: true,
+  name: true,
+  title: true,
+  bio: true,
+  avatarUrl: true,
+  githubUrl: true,
+  linkedinUrl: true,
+  twitterUrl: true,
+  email: true,
+  location: true,
+} as const;
+
 export async function GET() {
   try {
     const siteConfig = await prisma.siteConfig.findUnique({
       where: { id: 'main' },
+      select: PUBLIC_PROFILE_SELECT,
     });
 
     return NextResponse.json({ success: true, data: siteConfig });
@@ -47,6 +63,7 @@ export async function PUT(request: NextRequest) {
         email: email || null,
         location: location || null,
       },
+      select: PUBLIC_PROFILE_SELECT,
     });
 
     return NextResponse.json({ success: true, data: siteConfig });
