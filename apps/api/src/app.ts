@@ -20,6 +20,7 @@ import contentAdmin from './routes/content-admin';
 import contentImport from './routes/content-import';
 import ai from './routes/ai';
 import resume from './routes/resume';
+import resumeAdmin from './routes/resume-admin';
 import jobsSaved from './routes/jobs-saved';
 import jobsApplications from './routes/jobs-applications';
 import jobsMisc from './routes/jobs-misc';
@@ -64,6 +65,7 @@ app.route('/api', contentAdmin); // authenticated content mutations (POST/PUT/DE
 app.route('/api', contentImport); // authenticated books update/delete + books/education bulk imports
 app.route('/api', ai); // authenticated AI endpoints (skills/suggest, projects/analyze)
 app.route('/api', resume); // authenticated resume PDF analysis
+app.route('/api', resumeAdmin); // authenticated resume compare + sync (analysis vs DB)
 app.route('/api', jobsSaved); // jobs: saved-jobs CRUD + stats
 app.route('/api', jobsApplications); // jobs: applications CRUD + bulk ops
 app.route('/api', jobsMisc); // jobs: analytics, search history, alerts (base)
