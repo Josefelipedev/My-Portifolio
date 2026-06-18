@@ -15,6 +15,8 @@ import github from './routes/github';
 import wakatime from './routes/wakatime';
 import admin from './routes/admin';
 import contentAdmin from './routes/content-admin';
+import ai from './routes/ai';
+import resume from './routes/resume';
 
 const app = new Hono();
 
@@ -48,8 +50,10 @@ app.route('/api', github);
 app.route('/api', wakatime);
 app.route('/api', admin); // authenticated demo routes (requireAuth + requireCsrf)
 app.route('/api', contentAdmin); // authenticated content mutations (POST/PUT/DELETE)
+app.route('/api', ai); // authenticated AI endpoints (skills/suggest, projects/analyze)
+app.route('/api', resume); // authenticated resume PDF analysis
 
-// Phase 2 (remaining): jobs, ai, resume, and the remaining admin/* domains.
+// Phase 2 (remaining): jobs, summarize, and the remaining admin/* domains.
 
 app.notFound((c) =>
   c.json(apiErrorSchema.parse({ error: 'Not found', code: 'NOT_FOUND' }), 404),
