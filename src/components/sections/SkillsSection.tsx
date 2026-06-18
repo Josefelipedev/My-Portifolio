@@ -1,7 +1,7 @@
 import { SectionWrapper } from '../ui/SectionWrapper';
 import { GradientText } from '../ui/GradientText';
 import { SkillBadge } from '../ui/SkillBadge';
-import prisma from '@/lib/prisma';
+import { getSkills as fetchSkills } from '@/lib/data/content';
 
 interface SkillGroup {
   category: string;
@@ -11,9 +11,7 @@ interface SkillGroup {
 }
 
 async function getSkills() {
-  const skills = await prisma.skill.findMany({
-    orderBy: [{ category: 'asc' }, { order: 'asc' }],
-  });
+  const skills = await fetchSkills();
 
   // Group skills by category
   const grouped: Record<string, { name: string; level: number }[]> = {};
