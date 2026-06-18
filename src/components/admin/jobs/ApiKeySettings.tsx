@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useToast } from '@/components/ui/Toast';
+import { apiFetch } from '@/lib/api-fetch';
 
 interface KeyStatus {
   masked: string | null;
@@ -35,7 +36,7 @@ export default function ApiKeySettings() {
 
   const fetchKeys = async () => {
     try {
-      const res = await fetch('/api/jobs/api-keys');
+      const res = await apiFetch('/api/jobs/api-keys');
       if (res.ok) setKeys(await res.json());
     } catch {}
   };
@@ -50,7 +51,7 @@ export default function ApiKeySettings() {
       if (edit.joobleApiKey !== '') payload.joobleApiKey = edit.joobleApiKey;
       if (edit.rapidApiKey !== '') payload.rapidApiKey = edit.rapidApiKey;
 
-      const res = await fetch('/api/jobs/api-keys', {
+      const res = await apiFetch('/api/jobs/api-keys', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),

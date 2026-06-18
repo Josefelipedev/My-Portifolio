@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useToast } from '@/components/ui/Toast';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
+import { apiFetch } from '@/lib/api-fetch';
 
 interface JobAlertMatch {
   id: string;
@@ -100,7 +101,7 @@ export default function JobAlerts() {
   const fetchAlerts = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/jobs/alerts');
+      const response = await apiFetch('/api/jobs/alerts');
       const data = await response.json();
 
       if (!response.ok) {
@@ -127,7 +128,7 @@ export default function JobAlerts() {
         ? { id: editingAlert.id, ...formData }
         : formData;
 
-      const response = await fetch('/api/jobs/alerts', {
+      const response = await apiFetch('/api/jobs/alerts', {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -199,7 +200,7 @@ export default function JobAlerts() {
     if (!confirmed) return;
 
     try {
-      const response = await fetch(`/api/jobs/alerts?id=${id}`, { method: 'DELETE' });
+      const response = await apiFetch(`/api/jobs/alerts?id=${id}`, { method: 'DELETE' });
 
       if (!response.ok) {
         throw new Error('Failed to delete alert');
@@ -213,7 +214,7 @@ export default function JobAlerts() {
 
   const handleToggleActive = async (jobAlert: JobAlert) => {
     try {
-      const response = await fetch('/api/jobs/alerts', {
+      const response = await apiFetch('/api/jobs/alerts', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: jobAlert.id, isActive: !jobAlert.isActive }),
@@ -234,7 +235,7 @@ export default function JobAlerts() {
   const handleRunAlert = async (alertId: string) => {
     try {
       setRunningAlert(alertId);
-      const response = await fetch('/api/jobs/alerts/run', {
+      const response = await apiFetch('/api/jobs/alerts/run', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ alertId }),
@@ -268,7 +269,7 @@ export default function JobAlerts() {
   const fetchSuggestions = async () => {
     setLoadingSuggestions(true);
     try {
-      const response = await fetch('/api/jobs/alerts/suggestions');
+      const response = await apiFetch('/api/jobs/alerts/suggestions');
       const data = await response.json();
 
       if (!response.ok) {
