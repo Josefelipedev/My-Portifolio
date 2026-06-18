@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { apiFetch } from '@/lib/api-fetch';
 
 interface ScraperStatusProps {
   defaultExpanded?: boolean;
@@ -95,7 +96,7 @@ export default function ScraperStatus({ defaultExpanded = false }: ScraperStatus
   const fetchStatus = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/admin/scraper-logs');
+      const response = await apiFetch('/api/admin/scraper-logs');
       const data = await response.json();
       setInfo(data);
     } catch (err) {
@@ -109,7 +110,7 @@ export default function ScraperStatus({ defaultExpanded = false }: ScraperStatus
     try {
       setTesting(true);
       const alertParam = sendAlertOnFail ? '&alert=true' : '';
-      const response = await fetch(
+      const response = await apiFetch(
         `/api/admin/scraper-logs?action=test&source=${testSource}&keyword=${encodeURIComponent(testKeyword)}${alertParam}`
       );
       const data = await response.json();
@@ -133,7 +134,7 @@ export default function ScraperStatus({ defaultExpanded = false }: ScraperStatus
         setDebugFileContent(`/api/admin/scraper-logs?action=debug-file&filename=${encodeURIComponent(filename)}`);
       } else {
         // For HTML, fetch content
-        const response = await fetch(
+        const response = await apiFetch(
           `/api/admin/scraper-logs?action=debug-file&filename=${encodeURIComponent(filename)}`
         );
         if (response.ok) {
@@ -150,7 +151,7 @@ export default function ScraperStatus({ defaultExpanded = false }: ScraperStatus
 
   const clearDebugFiles = async () => {
     try {
-      const response = await fetch('/api/admin/scraper-logs?action=clear-debug');
+      const response = await apiFetch('/api/admin/scraper-logs?action=clear-debug');
       if (response.ok) {
         fetchStatus();
         setSelectedDebugFile(null);
@@ -170,7 +171,7 @@ export default function ScraperStatus({ defaultExpanded = false }: ScraperStatus
   const clearScraperLogs = async () => {
     try {
       setClearingLogs(true);
-      const response = await fetch('/api/admin/scraper-logs?action=clear-logs', {
+      const response = await apiFetch('/api/admin/scraper-logs?action=clear-logs', {
         method: 'POST',
       });
       if (response.ok) {

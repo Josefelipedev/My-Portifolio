@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useToast } from '@/components/ui/Toast';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { fetchWithCSRF } from '@/lib/csrf-client';
+import { apiFetch } from '@/lib/api-fetch';
 import AdminLayout from '@/components/admin/AdminLayout';
 
 interface Skill {
@@ -51,7 +52,7 @@ export default function SkillsAdminPage() {
   const fetchSkills = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/skills');
+      const response = await apiFetch('/api/skills');
       const data = await response.json();
       setSkills(data);
     } catch (err) {
