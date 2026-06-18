@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { fetchWithCSRF } from '@/lib/csrf-client';
+import { apiFetch } from '@/lib/api-fetch';
 import AdminLayout from '@/components/admin/AdminLayout';
 
 interface SystemLog {
@@ -81,7 +82,7 @@ export default function LogsPage() {
       if (sourceFilter !== 'all') params.set('source', sourceFilter);
       if (searchQuery) params.set('search', searchQuery);
 
-      const response = await fetch(`/api/admin/logs?${params}`);
+      const response = await apiFetch(`/api/admin/logs?${params}`);
 
       if (!response.ok) {
         throw new Error('Failed to fetch logs');

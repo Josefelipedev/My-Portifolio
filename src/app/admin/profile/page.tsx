@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import AdminLayout from '@/components/admin/AdminLayout';
+import { apiFetch } from '@/lib/api-fetch';
 
 interface SiteConfig {
   id: string;
@@ -55,7 +56,7 @@ export default function ProfilePage() {
 
   const fetchData = async () => {
     try {
-      const res = await fetch('/api/profile/sync');
+      const res = await apiFetch('/api/profile/sync');
       const data = await res.json();
 
       if (data.siteConfig) {
@@ -89,7 +90,7 @@ export default function ProfilePage() {
     setMessage(null);
 
     try {
-      const res = await fetch('/api/profile/sync', { method: 'POST' });
+      const res = await apiFetch('/api/profile/sync', { method: 'POST' });
       const data = await res.json();
 
       if (data.success) {
@@ -111,7 +112,7 @@ export default function ProfilePage() {
     setMessage(null);
 
     try {
-      const res = await fetch('/api/profile', {
+      const res = await apiFetch('/api/profile', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),

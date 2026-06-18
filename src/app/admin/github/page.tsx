@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { fetchWithCSRF } from '@/lib/csrf-client';
+import { apiFetch } from '@/lib/api-fetch';
 import AdminLayout from '@/components/admin/AdminLayout';
 
 interface GitHubRepo {
@@ -50,7 +51,7 @@ export default function GitHubAdminPage() {
   const fetchRepos = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/github/repos');
+      const response = await apiFetch('/api/github/repos');
       const data = await response.json();
 
       if (!response.ok) {
