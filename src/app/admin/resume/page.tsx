@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import AdminLayout from '@/components/admin/AdminLayout';
+import { apiFetch } from '@/lib/api-fetch';
 
 interface Experience {
   title: string;
@@ -137,7 +138,7 @@ export default function ResumeAdminPage() {
   // Load current contact info
   const loadContactInfo = async () => {
     try {
-      const response = await fetch('/api/resume?section=personal');
+      const response = await apiFetch('/api/resume?section=personal');
       const data = await response.json();
       if (data.personalInfo) {
         setContactInfo({
@@ -158,7 +159,7 @@ export default function ResumeAdminPage() {
   const handleSaveContactInfo = async () => {
     try {
       setSavingContactInfo(true);
-      const response = await fetch('/api/resume', {
+      const response = await apiFetch('/api/resume', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ personalInfo: contactInfo }),
@@ -195,12 +196,12 @@ export default function ResumeAdminPage() {
       if (file) {
         const formData = new FormData();
         formData.append('file', file);
-        response = await fetch('/api/resume/analyze', {
+        response = await apiFetch('/api/resume/analyze', {
           method: 'POST',
           body: formData,
         });
       } else {
-        response = await fetch('/api/resume/analyze', {
+        response = await apiFetch('/api/resume/analyze', {
           method: 'POST',
         });
       }
@@ -235,7 +236,7 @@ export default function ResumeAdminPage() {
       setComparing(true);
       setError(null);
 
-      const response = await fetch('/api/resume/compare', {
+      const response = await apiFetch('/api/resume/compare', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ analysis }),
@@ -311,7 +312,7 @@ export default function ResumeAdminPage() {
           })),
       };
 
-      const response = await fetch('/api/resume/sync', {
+      const response = await apiFetch('/api/resume/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

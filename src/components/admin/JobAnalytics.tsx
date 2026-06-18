@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { apiFetch } from '@/lib/api-fetch';
 import {
   BarChart,
   Bar,
@@ -77,7 +78,7 @@ export default function JobAnalytics() {
   const fetchAnalytics = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/jobs/analytics');
+      const response = await apiFetch('/api/jobs/analytics');
       const result = await response.json();
 
       if (!response.ok) {

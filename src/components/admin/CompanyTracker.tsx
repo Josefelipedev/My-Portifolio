@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useToast } from '@/components/ui/Toast';
+import { apiFetch } from '@/lib/api-fetch';
 
 interface CompanyPortal {
   id: string;
@@ -68,7 +69,7 @@ export default function CompanyTracker() {
 
   const fetchPortals = async () => {
     try {
-      const res = await fetch('/api/jobs/portals');
+      const res = await apiFetch('/api/jobs/portals');
       const data = await res.json();
       setPortals(Array.isArray(data) ? data : []);
     } catch {
@@ -90,7 +91,7 @@ export default function CompanyTracker() {
     };
 
     try {
-      const res = await fetch('/api/jobs/portals', {
+      const res = await apiFetch('/api/jobs/portals', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -116,7 +117,7 @@ export default function CompanyTracker() {
 
   const handleToggleActive = async (portal: CompanyPortal) => {
     try {
-      await fetch(`/api/jobs/portals/${portal.id}`, {
+      await apiFetch(`/api/jobs/portals/${portal.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ isActive: !portal.isActive }),
@@ -132,7 +133,7 @@ export default function CompanyTracker() {
   const handleDelete = async (id: string) => {
     if (!confirm('Remover esta empresa do tracker?')) return;
     try {
-      await fetch(`/api/jobs/portals/${id}`, { method: 'DELETE' });
+      await apiFetch(`/api/jobs/portals/${id}`, { method: 'DELETE' });
       setPortals((prev) => prev.filter((p) => p.id !== id));
       showSuccess('Empresa removida');
     } catch {
@@ -144,7 +145,7 @@ export default function CompanyTracker() {
     setScanning(true);
     setScanResults(null);
     try {
-      const res = await fetch('/api/jobs/portals/scan', { method: 'POST' });
+      const res = await apiFetch('/api/jobs/portals/scan', { method: 'POST' });
       const data = await res.json();
 
       if (!res.ok) throw new Error(data.error || 'Scan failed');
@@ -453,7 +454,7 @@ export default function CompanyTracker() {
                   <EditPortalInline
                     portal={portal}
                     onSave={async (updated) => {
-                      await fetch(`/api/jobs/portals/${portal.id}`, {
+                      await apiFetch(`/api/jobs/portals/${portal.id}`, {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(updated),
