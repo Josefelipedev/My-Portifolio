@@ -8,6 +8,8 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { apiErrorSchema } from '@portfolio/shared';
 import content from './routes/content';
+import profile from './routes/profile';
+import contact from './routes/contact';
 
 const app = new Hono();
 
@@ -34,6 +36,8 @@ app.get('/health', (c) =>
 
 // Ported domains (Phase 2). Mounted under /api to match the web paths.
 app.route('/api', content);
+app.route('/api', profile);
+app.route('/api', contact);
 
 // Phase 2 (remaining): auth, jobs, admin, ai, books, contact, github, wakatime…
 
