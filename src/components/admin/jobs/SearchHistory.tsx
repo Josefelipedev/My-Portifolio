@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
+import { apiFetch } from '@/lib/api-fetch';
 
 interface SearchHistoryEntry {
   id: string;
@@ -31,7 +32,7 @@ export default function SearchHistory({ onSelectSearch }: SearchHistoryProps) {
 
   const fetchHistory = async () => {
     try {
-      const response = await fetch('/api/jobs/history?limit=20');
+      const response = await apiFetch('/api/jobs/history?limit=20');
       if (response.ok) {
         setHistory(await response.json());
       }
@@ -51,7 +52,7 @@ export default function SearchHistory({ onSelectSearch }: SearchHistoryProps) {
     });
     if (!confirmed) return;
     try {
-      await fetch('/api/jobs/history', { method: 'DELETE' });
+      await apiFetch('/api/jobs/history', { method: 'DELETE' });
       setHistory([]);
     } catch (err) {
       console.error('Failed to clear history:', err);
@@ -61,7 +62,7 @@ export default function SearchHistory({ onSelectSearch }: SearchHistoryProps) {
   const deleteEntry = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     try {
-      await fetch(`/api/jobs/history?id=${id}`, { method: 'DELETE' });
+      await apiFetch(`/api/jobs/history?id=${id}`, { method: 'DELETE' });
       setHistory((prev) => prev.filter((h) => h.id !== id));
     } catch (err) {
       console.error('Failed to delete entry:', err);
@@ -198,7 +199,7 @@ export async function saveSearchToHistory(
   filters?: object
 ) {
   try {
-    await fetch('/api/jobs/history', {
+    await apiFetch('/api/jobs/history', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ keyword, countries, sources, filters, resultCount }),

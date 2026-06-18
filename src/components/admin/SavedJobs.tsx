@@ -9,6 +9,7 @@ import InterviewPrepModal, { type InterviewPrep } from './jobs/InterviewPrepModa
 import { exportJobsToCSV, exportJobsToPDF, ExportableJob } from '@/lib/export';
 import { useToast } from '@/components/ui/Toast';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
+import { apiFetch } from '@/lib/api-fetch';
 
 interface EnrichedData {
   emails?: string[];
@@ -124,7 +125,7 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
   const fetchSavedJobs = async (pageNum: number = 1) => {
     try {
       pageNum === 1 ? setLoading(true) : setLoadingMore(true);
-      const response = await fetch(`/api/jobs/saved?page=${pageNum}&limit=50`);
+      const response = await apiFetch(`/api/jobs/saved?page=${pageNum}&limit=50`);
       const data = await response.json();
 
       if (!response.ok) {
@@ -160,7 +161,7 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
 
     try {
       setDeleting(id);
-      const response = await fetch(`/api/jobs/saved/${id}`, { method: 'DELETE' });
+      const response = await apiFetch(`/api/jobs/saved/${id}`, { method: 'DELETE' });
 
       if (!response.ok) {
         throw new Error('Failed to delete job');
@@ -178,7 +179,7 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
   const handleApply = async (job: SavedJob) => {
     try {
       setApplying(job.id);
-      const response = await fetch(`/api/jobs/saved/${job.id}/apply`, {
+      const response = await apiFetch(`/api/jobs/saved/${job.id}/apply`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -203,7 +204,7 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
 
   const handleSaveNotes = async (id: string) => {
     try {
-      const response = await fetch(`/api/jobs/saved/${id}`, {
+      const response = await apiFetch(`/api/jobs/saved/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ notes: notesValue }),
@@ -224,7 +225,7 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
 
   const handleSaveContact = async (id: string) => {
     try {
-      const response = await fetch(`/api/jobs/saved/${id}`, {
+      const response = await apiFetch(`/api/jobs/saved/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -259,7 +260,7 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
 
     try {
       setGeneratingEmail(true);
-      const response = await fetch('/api/jobs/generate-email', {
+      const response = await apiFetch('/api/jobs/generate-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -306,7 +307,7 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
 
     try {
       setExtractingJob(true);
-      const response = await fetch('/api/jobs/extract', {
+      const response = await apiFetch('/api/jobs/extract', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: pasteText }),
@@ -347,7 +348,7 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
 
     try {
       setSavingJob(true);
-      const response = await fetch('/api/jobs/saved', {
+      const response = await apiFetch('/api/jobs/saved', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -392,7 +393,7 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
   const handleEnrich = async (job: SavedJob) => {
     try {
       setEnriching(job.id);
-      const response = await fetch(`/api/jobs/saved/${job.id}/enrich`, {
+      const response = await apiFetch(`/api/jobs/saved/${job.id}/enrich`, {
         method: 'POST',
       });
 
@@ -436,7 +437,7 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
   const handleAnalyze = async (job: SavedJob) => {
     try {
       setAnalyzing(job.id);
-      const response = await fetch('/api/jobs/analyze', {
+      const response = await apiFetch('/api/jobs/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ jobId: job.id }),
@@ -492,7 +493,7 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
 
     try {
       setGeneratingPrep(job.id);
-      const response = await fetch(`/api/jobs/saved/${job.id}/interview-prep`, {
+      const response = await apiFetch(`/api/jobs/saved/${job.id}/interview-prep`, {
         method: 'POST',
       });
 
@@ -560,7 +561,7 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
 
     try {
       setBulkDeleting(true);
-      const response = await fetch('/api/jobs/saved/bulk', {
+      const response = await apiFetch('/api/jobs/saved/bulk', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ids: Array.from(selectedIds) }),
@@ -588,7 +589,7 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
 
     try {
       setBatchAnalyzing(true);
-      const response = await fetch('/api/jobs/batch/analyze', {
+      const response = await apiFetch('/api/jobs/batch/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ jobIds: ids }),
@@ -616,7 +617,7 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
 
     try {
       setBatchGenerating(true);
-      const response = await fetch('/api/jobs/batch/generate-cv', {
+      const response = await apiFetch('/api/jobs/batch/generate-cv', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ jobIds: ids }),
