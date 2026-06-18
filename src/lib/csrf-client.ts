@@ -1,10 +1,11 @@
 // Client-side CSRF utilities
+import { apiUrl } from './api-fetch';
 
 /**
- * Fetch CSRF token from the server
+ * Fetch CSRF token from the server (or the standalone API once configured).
  */
 export async function getCSRFToken(): Promise<string> {
-  const res = await fetch('/api/csrf');
+  const res = await fetch(apiUrl('/api/csrf'), { credentials: 'include' });
   if (!res.ok) {
     throw new Error('Failed to get CSRF token');
   }
@@ -13,7 +14,9 @@ export async function getCSRFToken(): Promise<string> {
 }
 
 /**
- * Fetch wrapper that automatically includes CSRF token for state-changing requests
+ * Fetch wrapper that automatically includes CSRF token for state-changing
+ * requests. Routes through the API base URL and sends cookies cross-origin
+ * (no-op against same-origin when NEXT_PUBLIC_API_BASE_URL is unset).
  */
 export async function fetchWithCSRF(
   url: string,
@@ -31,5 +34,5 @@ export async function fetchWithCSRF(
     };
   }
 
-  return fetch(url, options);
+  return fetch(apiUrl(url), { credentials: 'include', ...options });
 }
