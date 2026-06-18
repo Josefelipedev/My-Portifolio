@@ -12,6 +12,44 @@ const CONTACT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
 
 const contactStore = new Map<string, Entry>();
 
+// Login context: 5 attempts / 15 min, then a 30 min block (RateLimitConfigs.login).
+interface LoginEntry {
+  count: number;
+  firstAttempt: number;
+  blockedUntil: number;
+}
+const LOGIN_MAX = 5;
+const LOGIN_WINDOW_MS = 15 * 60 * 1000;
+const LOGIN_BLOCK_MS = 30 * 60 * 1000;
+const loginStore = new Map<string, LoginEntry>();
+
+export function checkLoginRateLimit(ip: string): { allowed: boolean; blockedFor?: number } {
+  const now = Date.now();
+  const entry = loginStore.get(ip);
+  if (!entry) return { allowed: true };
+  if (entry.blockedUntil > now) {
+    return { allowed: false, blockedFor: Math.ceil((entry.blockedUntil - now) / 60000) };
+  }
+  if (now - entry.firstAttempt > LOGIN_WINDOW_MS) return { allowed: true };
+  return { allowed: entry.count < LOGIN_MAX };
+}
+
+export function recordLoginAttempt(ip: string, success = false): void {
+  const now = Date.now();
+  if (success) {
+    loginStore.delete(ip);
+    return;
+  }
+  const entry = loginStore.get(ip);
+  if (!entry || now - entry.firstAttempt > LOGIN_WINDOW_MS) {
+    loginStore.set(ip, { count: 1, firstAttempt: now, blockedUntil: 0 });
+    return;
+  }
+  entry.count += 1;
+  if (entry.count >= LOGIN_MAX) entry.blockedUntil = now + LOGIN_BLOCK_MS;
+  loginStore.set(ip, entry);
+}
+
 export function checkContactRateLimit(ip: string): { allowed: boolean } {
   const now = Date.now();
   const entry = contactStore.get(ip);
