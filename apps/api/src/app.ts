@@ -21,6 +21,7 @@ import ai from './routes/ai';
 import resume from './routes/resume';
 import jobsSaved from './routes/jobs-saved';
 import jobsApplications from './routes/jobs-applications';
+import jobsMisc from './routes/jobs-misc';
 
 const app = new Hono();
 
@@ -58,9 +59,10 @@ app.route('/api', ai); // authenticated AI endpoints (skills/suggest, projects/a
 app.route('/api', resume); // authenticated resume PDF analysis
 app.route('/api', jobsSaved); // jobs: saved-jobs CRUD + stats
 app.route('/api', jobsApplications); // jobs: applications CRUD + bulk ops
+app.route('/api', jobsMisc); // jobs: analytics, search history, alerts (base)
 
-// Phase 2 (remaining): jobs (applications, alerts, AI, search/scraping),
-// summarize, and the remaining admin/* domains.
+// Phase 2 (remaining): jobs (AI, alerts run/scheduled, search/scraping,
+// api-keys), summarize, and the remaining admin/* domains.
 
 app.notFound((c) =>
   c.json(apiErrorSchema.parse({ error: 'Not found', code: 'NOT_FOUND' }), 404),
