@@ -11,8 +11,8 @@ interface Experience {
   challenges: string;
   technologies: string;
   company: string | null;
-  startDate: Date | null;
-  endDate: Date | null;
+  startDate: string | null;
+  endDate: string | null;
   location: string | null;
 }
 
@@ -21,9 +21,9 @@ interface ExperienceCardProps {
   index: number;
 }
 
-function formatDate(date: Date | null): string {
+function formatDate(date: string | null): string {
   if (!date) return 'Present';
-  return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+  return new Date(date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
 }
 
 export function ExperienceCard({ exp, index }: ExperienceCardProps) {
