@@ -16,13 +16,27 @@ COPY apps/api/package.json apps/api/package.json
 COPY prisma ./prisma
 RUN npm ci
 
+# ---- prune: drop web-only + dev-tooling packages the API never imports ----
+FROM deps AS pruned
+WORKDIR /repo/node_modules
+RUN rm -rf \
+      next @next react react-dom react-is scheduler \
+      @react-pdf recharts victory-vendor d3-* \
+      react-markdown remark-gfm jspdf html2pdf.js canvg \
+      isomorphic-dompurify dompurify @marsidev \
+      @anthropic-ai \
+      typescript eslint eslint-config-next @typescript-eslint \
+      vitest @vitest vite vite-node @vitejs jsdom @testing-library \
+      prisma tailwindcss @tailwindcss postcss autoprefixer \
+      .cache .bin/next .bin/eslint .bin/tsc .bin/vitest
+
 # ---- runtime ----
 FROM node:22-slim AS runtime
 WORKDIR /repo
 RUN apt-get update && apt-get install -y --no-install-recommends openssl && rm -rf /var/lib/apt/lists/*
 ENV NODE_ENV=production
 ENV PORT=4000
-COPY --from=deps /repo/node_modules ./node_modules
+COPY --from=pruned /repo/node_modules ./node_modules
 COPY package.json package-lock.json ./
 COPY prisma ./prisma
 COPY packages/shared ./packages/shared
