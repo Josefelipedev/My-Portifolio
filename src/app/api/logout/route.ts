@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { logout } from '@/lib/auth-service';
+import { buildCookieOptions } from '@/lib/cookie-config';
 
 export async function POST() {
   const cookieStore = await cookies();
@@ -11,14 +12,12 @@ export async function POST() {
     await logout(token);
   }
 
-  // Clear cookie
-  cookieStore.set('auth_token', '', {
-    httpOnly: true,
+  // Clear cookie — must match the Domain/SameSite the cookie was set with.
+  cookieStore.set('auth_token', '', buildCookieOptions({
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'strict',
     maxAge: 0,
-    path: '/',
-  });
+  }));
 
   return NextResponse.json({ message: 'Logout realizado com sucesso' });
 }
