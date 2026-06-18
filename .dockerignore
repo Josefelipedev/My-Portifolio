@@ -1,0 +1,17 @@
+# Keep the API build context small/clean.
+node_modules
+**/node_modules
+.next
+.open-next
+.git
+.claude
+.vscode
+coverage
+*.log
+job-scraper
+.env
+.env.*
+!.env.example
+src/__tests__
+**/*.test.ts
+**/*.test.tsx

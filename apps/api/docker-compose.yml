@@ -1,0 +1,24 @@
+# Run the portfolio API as a container. From the repo root:
+#   docker compose -f apps/api/docker-compose.yml up -d --build
+#
+# Notes:
+# - Env comes from the repo-root .env (DATABASE_URL, JWT_SECRET, TOGETHER_API_KEY,
+#   SMTP_*, CONTACT_EMAIL, CORS_ALLOWED_ORIGINS, AUTH_COOKIE_*, …).
+# - DATABASE_URL points at the Postgres on the WireGuard VPN (10.66.66.1). For the
+#   container to reach it, use host networking (below) or attach the wg network.
+services:
+  portfolio-api:
+    build:
+      context: ../..
+      dockerfile: apps/api/Dockerfile
+    image: portfolio-api
+    container_name: portfolio-api
+    restart: unless-stopped
+    env_file:
+      - ../../.env
+    environment:
+      - PORT=4000
+    # Host networking so the container can reach the VPN Postgres (10.66.66.1)
+    # and bind :4000 locally. Drop this + use `ports` if Postgres is reachable
+    # over a bridge network instead.
+    network_mode: host
