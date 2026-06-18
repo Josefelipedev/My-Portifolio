@@ -8,7 +8,12 @@
 
 import prisma from '@/lib/prisma';
 import { getApi, isApiConfigured } from '@/lib/api-client';
-import type { Project, Skill, Experience, Education, Book } from '@portfolio/shared';
+import type { Project, Skill, Experience, Education, Book, PublicSiteConfig } from '@portfolio/shared';
+
+const PUBLIC_SITE_CONFIG_SELECT = {
+  id: true, name: true, title: true, bio: true, avatarUrl: true,
+  githubUrl: true, linkedinUrl: true, twitterUrl: true, email: true, location: true,
+} as const;
 
 const asContract = <T>(rows: unknown): T => JSON.parse(JSON.stringify(rows)) as T;
 
@@ -50,4 +55,13 @@ export async function getBooks(): Promise<Book[]> {
     orderBy: [{ order: 'asc' }, { createdAt: 'desc' }],
   });
   return asContract<Book[]>(rows);
+}
+
+export async function getSiteConfig(): Promise<PublicSiteConfig | null> {
+  if (isApiConfigured()) return getApi().getSiteConfig();
+  const row = await prisma.siteConfig.findUnique({
+    where: { id: 'main' },
+    select: PUBLIC_SITE_CONFIG_SELECT,
+  });
+  return row ? asContract<PublicSiteConfig>(row) : null;
 }
