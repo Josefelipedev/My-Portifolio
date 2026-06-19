@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import JobSearch from './JobSearch';
 import SavedJobs from './SavedJobs';
 import JobApplications from './JobApplications';
+import JobPipelineBoard from './JobPipelineBoard';
 import JobAnalytics from './JobAnalytics';
 import JobAlerts from './JobAlerts';
 import ScraperStatus from './ScraperStatus';
@@ -17,7 +18,7 @@ interface JobsTabsProps {
   initialApplicationsCount: number;
 }
 
-type TabType = 'search' | 'saved' | 'applications' | 'analytics' | 'alerts' | 'companies' | 'scraper' | 'agent-costs' | 'resume';
+type TabType = 'search' | 'saved' | 'applications' | 'pipeline' | 'analytics' | 'alerts' | 'companies' | 'scraper' | 'agent-costs' | 'resume';
 
 export default function JobsTabs({ initialSavedCount, initialApplicationsCount }: JobsTabsProps) {
   const router = useRouter();
@@ -82,6 +83,15 @@ export default function JobsTabs({ initialSavedCount, initialApplicationsCount }
       icon: (
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+        </svg>
+      ),
+    },
+    {
+      id: 'pipeline',
+      label: 'Pipeline',
+      icon: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h4v16H3V4zm7 0h4v10h-4V4zm7 0h4v7h-4V4z" />
         </svg>
       ),
     },
@@ -180,6 +190,7 @@ export default function JobsTabs({ initialSavedCount, initialApplicationsCount }
         {activeTab === 'applications' && (
           <JobApplications onApplicationDeleted={handleApplicationDeleted} />
         )}
+        {activeTab === 'pipeline' && <JobPipelineBoard />}
         {activeTab === 'analytics' && <JobAnalytics />}
         {activeTab === 'alerts' && <JobAlerts />}
         {activeTab === 'companies' && <CompanyTracker />}
