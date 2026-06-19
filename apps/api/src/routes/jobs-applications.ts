@@ -7,6 +7,7 @@ import prisma from '../db';
 import { requireAuth, type AuthEnv } from '../lib/auth';
 import { requireCsrf } from '../lib/csrf';
 import { Errors, validateRequired } from '../lib/api-utils';
+import { sendEmail } from '../lib/email';
 
 const jobsApplications = new Hono<AuthEnv>();
 
@@ -184,6 +185,81 @@ jobsApplications.put('/jobs/applications/:id', requireAuth, requireCsrf, async (
 jobsApplications.delete('/jobs/applications/:id', requireAuth, requireCsrf, async (c) => {
   await prisma.jobApplication.delete({ where: { id: c.req.param('id') } });
   return c.body(null, 204);
+});
+
+// ---- apply: e-mail the tailored CV to the job contact + record the application ----
+// Body: { recipient?, subject?, body?, cvPdfBase64?, cvFilename?, sendApplicationEmail?, appliedAt? }
+// When sendApplicationEmail !== false, sends an email (CV PDF attached when
+// cvPdfBase64 is provided) to recipient || savedJob.contactEmail. Always upserts
+// the JobApplication (one-to-one with the saved job) to status "applied".
+jobsApplications.post('/jobs/saved/:id/apply', requireAuth, requireCsrf, async (c) => {
+  const id = c.req.param('id');
+  const savedJob = await prisma.savedJob.findUnique({ where: { id } });
+  if (!savedJob) throw Errors.NotFound('Saved job not found');
+
+  const body = (await c.req.json().catch(() => ({}))) as {
+    recipient?: string;
+    subject?: string;
+    body?: string;
+    cvPdfBase64?: string;
+    cvFilename?: string;
+    sendApplicationEmail?: boolean;
+    appliedAt?: string;
+  };
+
+  const recipient = (body.recipient || savedJob.contactEmail || '').trim();
+  const wantsEmail = body.sendApplicationEmail !== false;
+
+  let emailed = false;
+  let emailError: string | null = null;
+  if (wantsEmail) {
+    if (!recipient) {
+      return c.json(
+        { error: 'Esta vaga não tem e-mail de contato. Informe um destinatário para enviar a candidatura.' },
+        400
+      );
+    }
+    const text =
+      body.body?.trim() ||
+      `Olá,\n\nGostaria de me candidatar à vaga "${savedJob.title}" na ${savedJob.company}. Segue meu currículo em anexo.\n\nAtenciosamente.`;
+    const attachments = body.cvPdfBase64
+      ? [
+          {
+            filename: body.cvFilename || `cv-${savedJob.company}.pdf`.replace(/\s+/g, '-').toLowerCase(),
+            content: Buffer.from(body.cvPdfBase64, 'base64'),
+            contentType: 'application/pdf',
+          },
+        ]
+      : undefined;
+    emailed = await sendEmail({
+      to: recipient,
+      subject: body.subject?.trim() || `Candidatura — ${savedJob.title}`,
+      html: text.replace(/\n/g, '<br>'),
+      text,
+      attachments,
+    });
+    if (!emailed) emailError = 'Falha ao enviar o e-mail. Verifique a configuração SMTP no servidor.';
+  }
+
+  const appliedAt = body.appliedAt ? new Date(body.appliedAt) : new Date();
+  const note = emailed ? `Candidatura enviada para ${recipient}` : 'Candidatura registrada';
+  const application = await prisma.jobApplication.upsert({
+    where: { savedJobId: savedJob.id },
+    create: {
+      savedJobId: savedJob.id,
+      title: savedJob.title,
+      company: savedJob.company,
+      url: savedJob.url,
+      location: savedJob.location,
+      salary: savedJob.salary,
+      status: 'applied',
+      appliedAt,
+      timeline: JSON.stringify([{ status: 'applied', date: new Date().toISOString(), note }]),
+    },
+    update: { status: 'applied', appliedAt },
+  });
+
+  return c.json({ application, emailed, emailError, recipient: wantsEmail ? recipient : null }, 201);
 });
 
 export default jobsApplications;
