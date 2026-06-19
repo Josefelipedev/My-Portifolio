@@ -1,9 +1,5 @@
 # Deploys on push to main:
-#   1. The standalone API container (apps/api) on the VPS — the live backend.
-#   2. The legacy PM2 web — kept as the rollback for the Cloudflare Worker
-#      cutover (it no longer serves public traffic; the Worker route on
-#      portfolio.josefelipedev.com intercepts first). Drop the PM2 step once the
-#      Worker is trusted and the rollback is retired.
+#   The standalone API container (apps/api) on the VPS — the live backend.
 # The frontend (Worker) deploys from the web/pages-build branch (deploy-web.yml).
 name: Deploy
 
@@ -31,9 +27,7 @@ jobs:
             npm install --production=false
             npx prisma generate
             npx prisma db push
-            npm run build
-            pm2 restart portfolio --update-env
             # Rebuild + restart the standalone API container (Docker layer cache
             # keeps unchanged builds fast).
             docker compose -f apps/api/docker-compose.yml up -d --build
-            echo "Deploy complete (PM2 web + API container)!"
+            echo "Deploy complete (API container)!"
