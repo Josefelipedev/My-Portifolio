@@ -5,6 +5,7 @@ import { useToast } from '@/components/ui/Toast';
 import FilterPanel, { JobFilters, applyJobFilters } from './jobs/FilterPanel';
 import SearchHistory, { saveSearchToHistory } from './jobs/SearchHistory';
 import ApiKeySettings from './jobs/ApiKeySettings';
+import SourceHealthPanel from './jobs/SourceHealthPanel';
 import { MatchScoreWithReason, type MatchReason } from './jobs/MatchScoreBadge';
 import { apiFetch } from '@/lib/api-fetch';
 
@@ -705,6 +706,7 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
             </svg>
           </button>
           <ApiKeySettings />
+          <SourceHealthPanel />
         </div>
 
         {showApiStatus && (
