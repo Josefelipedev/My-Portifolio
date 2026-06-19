@@ -102,6 +102,7 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
   const [emailSubject, setEmailSubject] = useState('');
   const [emailBody, setEmailBody] = useState('');
   const [generatingEmail, setGeneratingEmail] = useState(false);
+  const [generatingCover, setGeneratingCover] = useState(false);
   const [sendingApplication, setSendingApplication] = useState(false);
   const [copied, setCopied] = useState(false);
   // Manual job entry state
@@ -370,6 +371,33 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
       showError(err instanceof Error ? err.message : 'Failed to generate email');
     } finally {
       setGeneratingEmail(false);
+    }
+  };
+
+  const generateCoverLetter = async () => {
+    if (!composingEmail) return;
+
+    try {
+      setGeneratingCover(true);
+      const response = await apiFetch('/api/jobs/cover-letter', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jobTitle: composingEmail.title,
+          company: composingEmail.company,
+          description: composingEmail.description,
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Failed to generate cover letter');
+
+      setEmailBody(data.coverLetter);
+      showSuccess('Carta de apresentação gerada!');
+    } catch (err) {
+      showError(err instanceof Error ? err.message : 'Failed to generate cover letter');
+    } finally {
+      setGeneratingCover(false);
     }
   };
 
@@ -1874,6 +1902,30 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                     </svg>
                     Generate Email with AI (based on resume)
+                  </>
+                )}
+              </button>
+
+              {/* Generate cover letter */}
+              <button
+                onClick={generateCoverLetter}
+                disabled={generatingCover}
+                className="w-full px-4 py-2.5 border border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300 rounded-lg hover:bg-purple-50 dark:hover:bg-purple-900/20 disabled:opacity-50 flex items-center justify-center gap-2 font-medium"
+              >
+                {generatingCover ? (
+                  <>
+                    <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    Gerando carta…
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    Gerar carta de apresentação (mais formal)
                   </>
                 )}
               </button>
