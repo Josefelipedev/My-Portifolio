@@ -5,8 +5,16 @@
 
 import prisma from '../../db';
 import { searchJobs } from './aggregator';
-import type { JobSource } from './types';
+import type { JobSource, JobListing } from './types';
 import { sendEmail } from '../email';
+import { analyzeJob } from './ai-analysis';
+import { generateCustomCV } from './cv-generator';
+
+// Auto-CV: when an alert finds new jobs, save them, AI-grade them, and
+// pre-generate the tailored CV for the strong matches. Bounded per run.
+const AUTO_CV_ENABLED = process.env.AUTO_CV_ENABLED !== 'false';
+const AUTO_CV_PER_RUN = parseInt(process.env.AUTO_CV_PER_RUN || '5', 10);
+const AUTO_CV_GRADES = new Set(['A', 'B']);
 
 /** Next scheduled run from comma-separated hours (0-23) and days (0-6, 0=Sun).
  *  Returns null when scheduling can't be resolved (disables auto-run). */
@@ -56,6 +64,7 @@ export interface AlertRunResult {
   found: number;
   newMatches: number;
   emailed: boolean;
+  cvsGenerated: number;
   error?: string;
 }
 
@@ -94,8 +103,66 @@ function digestHtml(alert: AlertRow, jobs: MatchedJob[]): string {
   </div>`;
 }
 
-/** Run a single alert: search, dedupe, record matches, email, reschedule. */
-export async function runAlert(alert: AlertRow): Promise<AlertRunResult> {
+// Save a found job (if not already saved) so it can be graded and get a CV.
+async function upsertSavedJob(listing: JobListing): Promise<{ id: string; generatedCvAt: Date | null }> {
+  const existing = await prisma.savedJob.findUnique({
+    where: { externalId: listing.id },
+    select: { id: true, generatedCvAt: true },
+  });
+  if (existing) return existing;
+  return prisma.savedJob.create({
+    data: {
+      externalId: listing.id,
+      source: listing.source,
+      title: listing.title,
+      company: listing.company,
+      companyLogo: listing.companyLogo ?? undefined,
+      description: listing.description || '',
+      url: listing.url,
+      location: listing.location ?? undefined,
+      jobType: listing.jobType ?? undefined,
+      salary: listing.salary ?? undefined,
+      tags: listing.tags?.length ? listing.tags.join(',') : null,
+      postedAt: listing.postedAt ?? null,
+    },
+    select: { id: true, generatedCvAt: true },
+  });
+}
+
+// For new jobs: save, AI-grade, and pre-generate the tailored CV for A/B matches.
+// Bounded by a shared per-run budget; skips jobs that already have a CV.
+async function autoGenerateCvs(listings: JobListing[], budget: { remaining: number }): Promise<number> {
+  if (!AUTO_CV_ENABLED) return 0;
+  let generated = 0;
+  for (const listing of listings) {
+    if (budget.remaining <= 0) break;
+    let saved: { id: string; generatedCvAt: Date | null };
+    try {
+      saved = await upsertSavedJob(listing);
+    } catch {
+      continue;
+    }
+    if (saved.generatedCvAt) continue; // already has a tailored CV
+    budget.remaining -= 1;
+    try {
+      const analysis = await analyzeJob(saved.id);
+      if (AUTO_CV_GRADES.has(analysis.grade)) {
+        await generateCustomCV(saved.id);
+        generated += 1;
+      }
+    } catch (e) {
+      console.warn('[auto-cv] failed for', listing.title, '-', e instanceof Error ? e.message : e);
+    }
+  }
+  return generated;
+}
+
+/** Run a single alert: search, dedupe, record matches, email, reschedule, and
+ *  (within the shared budget) pre-generate CVs for strong new matches. */
+export async function runAlert(
+  alert: AlertRow,
+  budget: { remaining: number } = { remaining: AUTO_CV_PER_RUN }
+): Promise<AlertRunResult> {
   try {
     const source: JobSource | JobSource[] =
       alert.sources && alert.sources !== 'all'
@@ -147,6 +214,8 @@ export async function runAlert(alert: AlertRow): Promise<AlertRunResult> {
       }
     }
 
+    const cvsGenerated = await autoGenerateCvs(newMatches, budget);
+
     await prisma.jobAlert.update({
       where: { id: alert.id },
       data: {
@@ -161,6 +230,7 @@ export async function runAlert(alert: AlertRow): Promise<AlertRunResult> {
       found: listings.length,
       newMatches: newMatches.length,
       emailed,
+      cvsGenerated,
     };
   } catch (error) {
     return {
@@ -169,6 +239,7 @@ export async function runAlert(alert: AlertRow): Promise<AlertRunResult> {
       found: 0,
       newMatches: 0,
       emailed: false,
+      cvsGenerated: 0,
       error: error instanceof Error ? error.message : 'Unknown error',
     };
   }
@@ -184,9 +255,11 @@ export async function runDueAlerts(opts: { force?: boolean } = {}): Promise<Aler
     orderBy: { createdAt: 'asc' },
   });
 
+  // Shared auto-CV budget across all alerts in this run (caps paid AI calls).
+  const budget = { remaining: AUTO_CV_PER_RUN };
   const results: AlertRunResult[] = [];
   for (const alert of alerts) {
-    results.push(await runAlert(alert));
+    results.push(await runAlert(alert, budget));
   }
   return results;
 }
