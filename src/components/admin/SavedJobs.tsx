@@ -98,9 +98,11 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
   const [contactPhone, setContactPhone] = useState('');
   // Email composer state
   const [composingEmail, setComposingEmail] = useState<SavedJob | null>(null);
+  const [emailRecipient, setEmailRecipient] = useState('');
   const [emailSubject, setEmailSubject] = useState('');
   const [emailBody, setEmailBody] = useState('');
   const [generatingEmail, setGeneratingEmail] = useState(false);
+  const [sendingApplication, setSendingApplication] = useState(false);
   const [copied, setCopied] = useState(false);
   // Manual job entry state
   const [addingJob, setAddingJob] = useState(false);
@@ -250,9 +252,93 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
 
   const openEmailComposer = (job: SavedJob) => {
     setComposingEmail(job);
+    setEmailRecipient(job.contactEmail || '');
     setEmailSubject(`Application: ${job.title} - ${job.company}`);
     setEmailBody('');
     setCopied(false);
+  };
+
+  // Render the tailored CV (if generated) to a PDF and return it base64-encoded,
+  // so the API can attach it to the application email. Returns null when no CV
+  // has been generated for this job yet.
+  const renderCvPdfBase64 = async (
+    job: SavedJob
+  ): Promise<{ base64: string; filename: string } | null> => {
+    const enriched = getEnrichedData(job);
+    const customCV = (enriched as { customizedCv?: unknown } | null)?.customizedCv;
+    if (!customCV) return null;
+
+    const [{ pdf }, { default: CVDocument }, { default: resumeModule }, React] = await Promise.all([
+      import('@react-pdf/renderer'),
+      import('@/components/admin/jobs/CVDocument'),
+      import('@/data/resume.json'),
+      import('react'),
+    ]);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const doc = React.createElement(CVDocument as any, {
+      cv: customCV,
+      personalInfo: resumeModule.personalInfo,
+      jobTitle: job.title,
+      company: job.company,
+    }) as any;
+    const blob = await pdf(doc).toBlob();
+    const buffer = await blob.arrayBuffer();
+    let binary = '';
+    const bytes = new Uint8Array(buffer);
+    for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+    const base64 = btoa(binary);
+    const filename = `cv-${job.company.toLowerCase().replace(/\s+/g, '-')}-${job.title
+      .toLowerCase()
+      .replace(/\s+/g, '-')}.pdf`;
+    return { base64, filename };
+  };
+
+  // Send the application: email the (tailored) CV to the contact + record it.
+  const sendApplication = async () => {
+    if (!composingEmail) return;
+    const recipient = emailRecipient.trim();
+    if (!recipient) {
+      showError('Informe um e-mail de destino para enviar a candidatura.');
+      return;
+    }
+    const ok = await confirm({
+      title: 'Enviar candidatura?',
+      message: `O e-mail será enviado para ${recipient} com seu CV em anexo (se gerado), e a vaga será marcada como "applied".`,
+      confirmText: 'Enviar',
+    });
+    if (!ok) return;
+
+    try {
+      setSendingApplication(true);
+      const cv = await renderCvPdfBase64(composingEmail).catch(() => null);
+      const response = await apiFetch(`/api/jobs/saved/${composingEmail.id}/apply`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          recipient,
+          subject: emailSubject,
+          body: emailBody,
+          cvPdfBase64: cv?.base64,
+          cvFilename: cv?.filename,
+          appliedAt: new Date().toISOString(),
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Falha ao enviar a candidatura');
+
+      if (data.emailed) {
+        showSuccess(`Candidatura enviada para ${recipient}${cv ? ' (CV anexado)' : ' (sem CV — gere o CV antes para anexar)'}`);
+      } else {
+        showWarning(data.emailError || 'Candidatura registrada, mas o e-mail não foi enviado.');
+      }
+      setComposingEmail(null);
+      await fetchSavedJobs(1);
+      onApplicationCreated();
+    } catch (err) {
+      showError(err instanceof Error ? err.message : 'Falha ao enviar a candidatura');
+    } finally {
+      setSendingApplication(false);
+    }
   };
 
   const generateEmailWithAI = async () => {
@@ -1731,8 +1817,8 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
           <div className="bg-white dark:bg-zinc-800 rounded-xl max-w-2xl w-full overflow-hidden">
             <div className="flex items-center justify-between p-4 border-b border-zinc-200 dark:border-zinc-700">
               <div>
-                <h3 className="font-semibold text-zinc-900 dark:text-zinc-100">Compor Email</h3>
-                <p className="text-sm text-zinc-500">Para: {composingEmail.contactEmail || 'Email nao encontrado'}</p>
+                <h3 className="font-semibold text-zinc-900 dark:text-zinc-100">Enviar candidatura</h3>
+                <p className="text-sm text-zinc-500">{composingEmail.title} @ {composingEmail.company}</p>
               </div>
               <button
                 onClick={() => setComposingEmail(null)}
@@ -1744,6 +1830,30 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
               </button>
             </div>
             <div className="p-4 space-y-4">
+              {/* Recipient (editable; prefilled from the extracted contact email) */}
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                  Para (e-mail)
+                </label>
+                <input
+                  type="email"
+                  value={emailRecipient}
+                  onChange={(e) => setEmailRecipient(e.target.value)}
+                  placeholder="recrutador@empresa.com"
+                  className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100"
+                />
+                {!composingEmail.contactEmail && (
+                  <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                    Nenhum e-mail foi extraído desta vaga — informe o destinatário manualmente.
+                  </p>
+                )}
+                {!composingEmail.generatedCvAt && (
+                  <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                    CV ainda não gerado para esta vaga — gere o CV sob medida antes para anexá-lo.
+                  </p>
+                )}
+              </div>
+
               {/* Generate with AI Button */}
               <button
                 onClick={generateEmailWithAI}
@@ -1829,8 +1939,32 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
                   </a>
                 )}
               </div>
+              <button
+                onClick={sendApplication}
+                disabled={sendingApplication || !emailRecipient.trim() || !emailBody}
+                className="w-full px-4 py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg hover:from-green-600 hover:to-emerald-700 disabled:opacity-50 flex items-center justify-center gap-2 font-medium"
+              >
+                {sendingApplication ? (
+                  <>
+                    <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    Enviando…
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    Enviar candidatura {composingEmail.generatedCvAt ? '(com CV)' : ''}
+                  </>
+                )}
+              </button>
               <p className="text-xs text-zinc-500 text-center">
-                AI generates a suggestion based on your resume. You send it manually.
+                &quot;Enviar candidatura&quot; manda o e-mail (com o CV em anexo, se gerado) para o
+                destinatário e marca a vaga como aplicada. &quot;Copy&quot; / &quot;Open in Email App&quot; deixam
+                você enviar manualmente.
               </p>
             </div>
           </div>
