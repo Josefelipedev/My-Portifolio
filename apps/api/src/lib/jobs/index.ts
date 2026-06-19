@@ -24,7 +24,9 @@ export {
   searchJobsByCountry,
   getApiStatus,
   getLastSourceErrors,
+  getSourceHealth,
   type SourceError,
+  type SourceHealth,
 } from './aggregator';
 
 // Smart Search
