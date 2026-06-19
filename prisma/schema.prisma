@@ -311,6 +311,10 @@ model JobApplication {
   nextStep      String?
   nextStepDate  DateTime?
 
+  // Application email tracking (set when the apply flow emails the recruiter)
+  emailSentAt   DateTime?
+  emailSentTo   String?
+
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 

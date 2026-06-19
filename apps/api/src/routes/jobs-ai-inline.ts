@@ -504,6 +504,109 @@ Return ONLY JSON:
   }
 });
 
+// POST /api/jobs/cover-letter — a fuller, formal cover letter (vs the short email)
+jobsAiInline.post('/jobs/cover-letter', requireAuth, requireCsrf, async (c) => {
+  try {
+    const { jobTitle, company, description } = (await c.req.json().catch(() => ({}))) as {
+      jobTitle?: string;
+      company?: string;
+      description?: string;
+    };
+
+    if (!jobTitle || !company) {
+      return c.json({ error: 'Job title and company are required' }, 400);
+    }
+
+    const quotaCheck = await checkQuotaLimits();
+    if (!quotaCheck.withinLimits) {
+      return c.json({ error: 'AI quota exceeded. Please try again later.' }, 429);
+    }
+
+    const client = getTogetherClient();
+    if (!client) {
+      return c.json({ error: 'AI service not configured' }, 503);
+    }
+
+    const personalInfo = resumeData.personalInfo;
+    const summary = resumeData.professionalSummary?.pt || resumeData.professionalSummary?.en || '';
+    const skills = resumeData.skills?.map((s: { name: string }) => s.name).join(', ') || '';
+    const experience =
+      resumeData.experience
+        ?.map(
+          (e: { company: string; title: string }) => `${e.title} at ${e.company}`
+        )
+        .join('; ') || '';
+
+    const startTime = Date.now();
+    const model = process.env.TOGETHER_MODEL || 'meta-llama/Llama-3.3-70B-Instruct-Turbo';
+    let inputTokens = 0;
+    let outputTokens = 0;
+    let success = true;
+    let errorMessage: string | undefined;
+
+    const descriptionContext = description
+      ? `\nJOB DESCRIPTION (use to tailor):\n${description.substring(0, 1500)}`
+      : '';
+
+    try {
+      const prompt = `Write a professional COVER LETTER ("carta de apresentação") in PORTUGUESE (Brazilian).
+
+CANDIDATE:
+Name: ${personalInfo?.name || 'Jose Felipe'}
+Summary: ${summary}
+Skills: ${skills}
+Recent Experience: ${experience}
+
+JOB:
+Position: ${jobTitle}
+Company: ${company}${descriptionContext}
+
+RULES:
+1. Greeting ("Prezados," or "Prezada equipe de recrutamento da ${company},").
+2. 3 to 4 short paragraphs: (a) intent + which role, (b) most relevant experience/skills mapped to the job, (c) motivation for THIS company, (d) closing with availability.
+3. Formal but warm. Concrete, no generic filler. Only facts from the candidate info — do not invent.
+4. Mirror 2-3 keywords from the job description when present.
+5. End with "Atenciosamente," and the candidate name.
+
+Return ONLY the letter text (no JSON, no markdown).`;
+
+      const aiResponse = await client.chat.completions.create({
+        model,
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: 1200,
+        temperature: 0.7,
+      });
+
+      inputTokens = aiResponse.usage?.prompt_tokens || estimateTokens(prompt);
+      outputTokens = aiResponse.usage?.completion_tokens || 0;
+
+      const coverLetter = aiResponse.choices[0]?.message?.content?.trim() || '';
+      outputTokens = outputTokens || estimateTokens(coverLetter);
+      if (!coverLetter) throw new Error('Empty AI response');
+
+      return c.json({ coverLetter });
+    } catch (error) {
+      success = false;
+      errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      throw error;
+    } finally {
+      trackAIUsage({
+        feature: 'cover-letter',
+        model,
+        inputTokens,
+        outputTokens,
+        latencyMs: Date.now() - startTime,
+        success,
+        error: errorMessage,
+        metadata: { jobTitle, company },
+      }).catch(() => {});
+    }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    return c.json({ error: errorMessage }, 500);
+  }
+});
+
 // POST /api/jobs/extract
 jobsAiInline.post('/jobs/extract', requireAuth, requireCsrf, async (c) => {
   try {

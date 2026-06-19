@@ -27,7 +27,8 @@ export type AIFeature =
   | 'knowledge-ingestion'
   | 'alert-suggestions'
   | 'wakatime-ranking'
-  | 'generate-email';
+  | 'generate-email'
+  | 'cover-letter';
 
 interface TrackingParams {
   feature: AIFeature;
