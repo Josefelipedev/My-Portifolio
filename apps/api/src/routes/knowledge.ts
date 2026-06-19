@@ -207,4 +207,10 @@ knowledge.delete('/admin/knowledge/:id', requireAuth, requireCsrf, async (c) => 
   }
 });
 
+// Clear the entire knowledge base (delete every item).
+knowledge.delete('/admin/knowledge', requireAuth, requireCsrf, async (c) => {
+  const { count } = await prisma.knowledgeItem.deleteMany({});
+  return c.json({ deleted: count });
+});
+
 export default knowledge;
