@@ -31,40 +31,33 @@ export interface SourceError { source: string; error: string }
 let _lastSourceErrors: SourceError[] = [];
 export function getLastSourceErrors(): SourceError[] { return _lastSourceErrors; }
 
-/**
- * Main job search function that aggregates results from multiple sources
- * Accept single source or array of sources, and handle multiple countries
- */
-export async function searchJobs(
-  params: JobSearchParams,
-  source: JobSource | JobSource[] = 'all'
-): Promise<JobListing[]> {
-  const searches: { name: string; promise: Promise<JobListing[]> }[] = [];
+export interface SourceHealth {
+  source: string;
+  ok: boolean;
+  count: number;
+  error?: string;
+  latencyMs: number;
+}
 
-  // Convert to array for easier handling
+// Build the per-source search promises for the given params/source selection.
+// Shared by searchJobs (which merges them) and getSourceHealth (which probes
+// each source's status, count, and latency).
+function buildSourceSearches(
+  params: JobSearchParams,
+  source: JobSource | JobSource[]
+): { name: string; promise: Promise<JobListing[]> }[] {
+  const searches: { name: string; promise: Promise<JobListing[]> }[] = [];
   const sources = Array.isArray(source) ? source : [source];
   const isAllSources = sources.includes('all');
-
-  // Parse countries (comma-separated string or single value)
   const countryParam = params.country || 'all';
   const countries = countryParam.includes(',')
     ? countryParam.split(',').filter(Boolean)
     : [countryParam];
   const isAllCountries = countries.includes('all');
-
-  // Helper to check if a country should be searched
   const shouldSearchCountry = (c: string) => isAllCountries || countries.includes(c);
-
-  // Check cache first
-  const sourcesList = isAllSources ? ['all'] : sources;
-  const cachedResults = getCachedResults(params, sourcesList);
-  if (cachedResults) {
-    return cachedResults;
-  }
-
   const push = (name: string, promise: Promise<JobListing[]>) => searches.push({ name, promise });
 
-  // ── Remote-first sources (always included when 'all' or 'remote' selected) ──
+  // ── Remote-first sources ──
   if (shouldSearchCountry('remote') || isAllCountries) {
     if (isAllSources || sources.includes('remoteok')) push('RemoteOK', searchRemoteOK(params));
     if (isAllSources || sources.includes('remotive')) push('Remotive', searchRemotive(params));
@@ -72,15 +65,13 @@ export async function searchJobs(
     if (isAllSources || sources.includes('weworkremotely')) push('WeWorkRemotely', searchWeWorkRemotely(params));
   }
 
-  // EU sources (Arbeitnow covers PT + remote EU)
   if ((isAllSources || sources.includes('arbeitnow')) && (shouldSearchCountry('pt') || shouldSearchCountry('remote') || isAllCountries)) {
     push('Arbeitnow', searchArbeitnow(params));
   }
 
-  // Country-specific sources (Adzuna, Jooble, JSearch)
   const countriesToSearch = isAllCountries
     ? ['pt', 'br']
-    : countries.filter(c => c !== 'remote' && c !== 'all');
+    : countries.filter((c) => c !== 'remote' && c !== 'all');
 
   for (const country of countriesToSearch) {
     const countryParams = { ...params, country };
@@ -89,55 +80,71 @@ export async function searchJobs(
     if (isAllSources || sources.includes('jsearch')) push(`JSearch (${country})`, searchJSearch(countryParams));
   }
 
-  // Portugal-specific: Net-Empregos
-  if (sources.includes('netempregos') || (isAllSources && shouldSearchCountry('pt'))) {
-    push('Net-Empregos', searchNetEmpregos(params));
-  }
+  if (sources.includes('netempregos') || (isAllSources && shouldSearchCountry('pt'))) push('Net-Empregos', searchNetEmpregos(params));
+  if (sources.includes('itjobs') || (isAllSources && shouldSearchCountry('pt'))) push('ITJobs.pt', searchITJobs(params));
+  if (sources.includes('buscojobs') || (isAllSources && shouldSearchCountry('pt'))) push('BuscoJobs.pt', searchBuscoJobs(params));
+  if (sources.includes('vagascombr') || (isAllSources && shouldSearchCountry('br'))) push('Vagas.com.br', searchVagasComBr(params));
+  if (sources.includes('geekhunter') || (isAllSources && shouldSearchCountry('br'))) push('GeekHunter', searchGeekHunter(params));
 
-  // Portugal-specific: ITJobs.pt
-  if (sources.includes('itjobs') || (isAllSources && shouldSearchCountry('pt'))) {
-    push('ITJobs.pt', searchITJobs(params));
-  }
-
-  // Portugal-specific: BuscoJobs.pt
-  if (sources.includes('buscojobs') || (isAllSources && shouldSearchCountry('pt'))) {
-    push('BuscoJobs.pt', searchBuscoJobs(params));
-  }
-
-  // Brazil-specific: Vagas.com.br
-  if (sources.includes('vagascombr') || (isAllSources && shouldSearchCountry('br'))) {
-    push('Vagas.com.br', searchVagasComBr(params));
-  }
-
-  // Brazil-specific: GeekHunter
-  if (sources.includes('geekhunter') || (isAllSources && shouldSearchCountry('br'))) {
-    push('GeekHunter', searchGeekHunter(params));
-  }
-
-  // LinkedIn Jobs — search each country once (no duplicates)
   if (sources.includes('linkedin') || isAllSources) {
     const linkedinCountries = countriesToSearch.length > 0
-      ? countriesToSearch.filter(c => c === 'br' || c === 'pt')
+      ? countriesToSearch.filter((c) => c === 'br' || c === 'pt')
       : ['br'];
-    for (const country of linkedinCountries) {
-      push(`LinkedIn (${country})`, searchLinkedIn({ ...params, country }));
-    }
+    for (const country of linkedinCountries) push(`LinkedIn (${country})`, searchLinkedIn({ ...params, country }));
   }
 
-  // Brazil-specific: Gupy
-  if (sources.includes('gupy') || (isAllSources && shouldSearchCountry('br'))) {
-    push('Gupy', searchGupy(params));
+  if (sources.includes('gupy') || (isAllSources && shouldSearchCountry('br'))) push('Gupy', searchGupy(params));
+  if (sources.includes('catho') || (isAllSources && shouldSearchCountry('br'))) push('Catho', searchCatho(params));
+  if (sources.includes('programathor') || (isAllSources && shouldSearchCountry('br'))) push('Programathor', searchProgramathor(params));
+
+  return searches;
+}
+
+// Probe every selected source and report status, result count, and latency.
+// Bypasses the cache so it reflects the sources' real current state.
+export async function getSourceHealth(
+  params: JobSearchParams,
+  source: JobSource | JobSource[] = 'all'
+): Promise<SourceHealth[]> {
+  const start = Date.now();
+  const searches = buildSourceSearches(params, source);
+  return Promise.all(
+    searches.map(async (s) => {
+      try {
+        const jobs = await s.promise;
+        return { source: s.name, ok: true, count: jobs.length, latencyMs: Date.now() - start };
+      } catch (e) {
+        return {
+          source: s.name,
+          ok: false,
+          count: 0,
+          error: e instanceof Error ? e.message : String(e),
+          latencyMs: Date.now() - start,
+        };
+      }
+    })
+  );
+}
+
+/**
+ * Main job search function that aggregates results from multiple sources
+ * Accept single source or array of sources, and handle multiple countries
+ */
+export async function searchJobs(
+  params: JobSearchParams,
+  source: JobSource | JobSource[] = 'all'
+): Promise<JobListing[]> {
+  const sources = Array.isArray(source) ? source : [source];
+  const isAllSources = sources.includes('all');
+  const sourcesList = isAllSources ? ['all'] : sources;
+
+  // Check cache first
+  const cachedResults = getCachedResults(params, sourcesList);
+  if (cachedResults) {
+    return cachedResults;
   }
 
-  // Brazil-specific: Catho
-  if (sources.includes('catho') || (isAllSources && shouldSearchCountry('br'))) {
-    push('Catho', searchCatho(params));
-  }
-
-  // Brazil-specific: Programathor
-  if (sources.includes('programathor') || (isAllSources && shouldSearchCountry('br'))) {
-    push('Programathor', searchProgramathor(params));
-  }
+  const searches = buildSourceSearches(params, source);
 
   const settled = await Promise.allSettled(searches.map(s => s.promise));
   _lastSourceErrors = settled

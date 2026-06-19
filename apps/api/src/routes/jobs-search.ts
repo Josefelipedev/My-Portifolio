@@ -13,11 +13,13 @@ import {
   smartJobSearch,
   getApiStatus,
   getLastSourceErrors,
+  getSourceHealth,
   type JobSource,
   type JobSearchParams,
   type JobListing,
   type ResumeData,
 } from '../lib/jobs';
+import { getJobApiKeys } from '../lib/jobs/api-keys';
 
 const jobsSearch = new Hono<AuthEnv>();
 
@@ -202,6 +204,31 @@ jobsSearch.get('/jobs/smart-search', requireAuth, async (c) => {
     skillsUsed: resume.skills?.slice(0, 5).map((s) => s.name) || [],
     params: { country, source, limit, maxAgeDays },
     apis: getApiStatus(),
+  });
+});
+
+// ---- source health: live probe of every job board ----
+// GET /jobs/sources/health?keyword=&country= — runs a probe search and reports
+// each source's status, result count, latency, and error. Also reports which
+// key-gated sources have an API key configured.
+jobsSearch.get('/jobs/sources/health', requireAuth, async (c) => {
+  const keyword = c.req.query('keyword') || 'developer';
+  const country = c.req.query('country') || 'all';
+
+  const [sources, keys] = await Promise.all([
+    getSourceHealth({ keyword, country, limit: 50 }),
+    getJobApiKeys(),
+  ]);
+
+  return c.json({
+    probedAt: new Date().toISOString(),
+    query: { keyword, country },
+    sources: sources.sort((a, b) => Number(b.ok) - Number(a.ok) || a.source.localeCompare(b.source)),
+    apiKeys: {
+      adzuna: Boolean(keys.adzunaAppId && keys.adzunaAppKey),
+      jooble: Boolean(keys.joobleApiKey),
+      jsearch: Boolean(keys.rapidApiKey),
+    },
   });
 });
 
