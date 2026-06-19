@@ -10,6 +10,7 @@ import { requireAuth, type AuthEnv } from '../lib/auth';
 import { requireCsrf } from '../lib/csrf';
 import { Errors } from '../lib/api-utils';
 import { calculateNextRun, runAlert, runDueAlerts } from '../lib/jobs/alerts-runner';
+import { invalidateJobApiKeyCache } from '../lib/jobs/api-keys';
 
 const jobsMisc = new Hono<AuthEnv>();
 
@@ -473,6 +474,61 @@ jobsMisc.delete('/jobs/alerts', requireAuth, requireCsrf, async (c) => {
   await prisma.jobAlert.delete({ where: { id } });
 
   return c.json({ message: 'Alert deleted' });
+});
+
+// ---- job-board API keys (stored in SiteConfig.jobApiKeys, masked on read) ----
+const KEY_ENV: Record<string, string> = {
+  adzunaAppId: 'ADZUNA_APP_ID',
+  adzunaAppKey: 'ADZUNA_APP_KEY',
+  joobleApiKey: 'JOOBLE_API_KEY',
+  rapidApiKey: 'RAPIDAPI_KEY',
+};
+
+function maskKey(val?: string): string | null {
+  if (!val) return null;
+  return val.length <= 8
+    ? '****'
+    : `${val.slice(0, 4)}${'*'.repeat(Math.max(4, val.length - 8))}${val.slice(-4)}`;
+}
+
+jobsMisc.get('/jobs/api-keys', requireAuth, async (c) => {
+  const config = await prisma.siteConfig.findUnique({ where: { id: 'main' } });
+  const dbKeys = config?.jobApiKeys ? (JSON.parse(config.jobApiKeys) as Record<string, string>) : {};
+
+  const status = Object.fromEntries(
+    Object.entries(KEY_ENV).map(([key, env]) => {
+      const dbVal = dbKeys[key];
+      return [
+        key,
+        {
+          masked: maskKey(dbVal || process.env[env]),
+          source: dbVal ? 'db' : process.env[env] ? 'env' : null,
+        },
+      ];
+    })
+  );
+  return c.json(status);
+});
+
+jobsMisc.put('/jobs/api-keys', requireAuth, requireCsrf, async (c) => {
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, string | undefined>;
+  const config = await prisma.siteConfig.findUnique({ where: { id: 'main' } });
+  const updated: Record<string, string> = config?.jobApiKeys ? JSON.parse(config.jobApiKeys) : {};
+
+  for (const key of Object.keys(KEY_ENV)) {
+    const val = body[key];
+    if (val === undefined) continue; // not in request — leave unchanged
+    if (val === '') delete updated[key]; // empty — remove the override
+    else updated[key] = val;
+  }
+
+  await prisma.siteConfig.upsert({
+    where: { id: 'main' },
+    update: { jobApiKeys: JSON.stringify(updated) },
+    create: { id: 'main', jobApiKeys: JSON.stringify(updated) },
+  });
+  invalidateJobApiKeyCache();
+  return c.json({ ok: true });
 });
 
 export default jobsMisc;

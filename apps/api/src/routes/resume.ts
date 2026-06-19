@@ -19,6 +19,15 @@ function resumePdfPath(): string {
   return process.env.RESUME_PDF_PATH || path.join(process.cwd(), 'data', 'resume.pdf');
 }
 
+function resumeJsonPath(): string {
+  return process.env.RESUME_JSON_PATH || path.join(process.cwd(), 'data', 'resume.json');
+}
+
+async function readResumeJson(): Promise<Record<string, unknown>> {
+  const content = await fs.readFile(resumeJsonPath(), 'utf-8');
+  return JSON.parse(content) as Record<string, unknown>;
+}
+
 async function extractTextFromPDF(buffer: Buffer): Promise<string> {
   const { extractText } = await import('unpdf');
   const uint8Array = new Uint8Array(buffer);
@@ -66,6 +75,82 @@ resume.post('/resume/analyze', requireAuth, requireCsrf, async (c) => {
     analysis,
     provider: getCurrentAIProvider().provider,
     extractedTextLength: pdfText.length,
+  });
+});
+
+// GET /resume?section=&lang= — structured resume sections from resume.json.
+// Public (read-only). Ported from the web's src/app/api/resume route.
+resume.get('/resume', async (c) => {
+  const section = c.req.query('section') || 'all';
+  const lang = (c.req.query('lang') || 'en') as 'pt' | 'en';
+
+  let data: Record<string, unknown>;
+  try {
+    data = await readResumeJson();
+  } catch {
+    return c.json({ error: 'Failed to fetch resume data', code: 'INTERNAL' }, 500);
+  }
+
+  let lastUpdated = new Date().toISOString();
+  try {
+    lastUpdated = (await fs.stat(resumePdfPath())).mtime.toISOString();
+  } catch {
+    /* no PDF — keep now() */
+  }
+
+  const summary = data.professionalSummary as Record<string, string> | undefined;
+  const response: Record<string, unknown> = { lastUpdated };
+
+  const sections: Record<string, () => void> = {
+    summary: () => (response.summary = summary?.[lang] || summary?.en),
+    experience: () => (response.experience = data.experience),
+    education: () => (response.education = data.education),
+    skills: () => (response.skills = data.skills),
+    certifications: () => (response.certifications = data.certifications),
+    languages: () => (response.languages = data.languages),
+    personal: () => (response.personalInfo = data.personalInfo),
+  };
+
+  if (section === 'all') {
+    response.personalInfo = data.personalInfo;
+    response.summary = summary?.[lang] || summary?.en;
+    response.experience = data.experience;
+    response.education = data.education;
+    response.skills = data.skills;
+    response.certifications = data.certifications;
+    response.languages = data.languages;
+  } else if (sections[section]) {
+    sections[section]();
+  } else {
+    return c.json(
+      { error: 'Invalid section. Available: summary, experience, education, skills, certifications, languages, personal, all', code: 'BAD_REQUEST' },
+      400,
+    );
+  }
+
+  return c.json(response);
+});
+
+// PUT /resume — update personalInfo in resume.json. NOTE: writes the container
+// file, which resets on redeploy; durable resume edits use PUT /jobs/resume (DB).
+resume.put('/resume', requireAuth, requireCsrf, async (c) => {
+  const updates = (await c.req.json().catch(() => ({}))) as { personalInfo?: Record<string, unknown> };
+  let current: Record<string, unknown>;
+  try {
+    current = await readResumeJson();
+  } catch {
+    return c.json({ error: 'Failed to read resume data', code: 'INTERNAL' }, 500);
+  }
+
+  if (updates.personalInfo) {
+    current.personalInfo = { ...(current.personalInfo as object), ...updates.personalInfo };
+  }
+  await fs.writeFile(resumeJsonPath(), JSON.stringify(current, null, 2));
+
+  return c.json({
+    success: true,
+    message: 'Personal info updated successfully',
+    personalInfo: current.personalInfo,
   });
 });
 
