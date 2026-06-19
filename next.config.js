@@ -28,6 +28,12 @@ const nextConfig = {
 
   // Security headers
   async headers() {
+    // The standalone API lives on its own subdomain post-split, so it is NOT
+    // covered by connect-src 'self'. Allow the same origin the client fetches
+    // (NEXT_PUBLIC_API_BASE_URL, inlined at build time) or the browser blocks
+    // every API call — including login — as "Failed to fetch".
+    const apiOrigin = (process.env.NEXT_PUBLIC_API_BASE_URL || '').replace(/\/+$/, '');
+
     // Content Security Policy
     const cspDirectives = [
       "default-src 'self'",
@@ -35,7 +41,7 @@ const nextConfig = {
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "img-src 'self' data: https: blob:",
       "font-src 'self' https://fonts.gstatic.com",
-      "connect-src 'self' https://api.together.xyz https://challenges.cloudflare.com https://api.github.com",
+      `connect-src 'self' https://api.together.xyz https://challenges.cloudflare.com https://api.github.com${apiOrigin ? ` ${apiOrigin}` : ''}`,
       "frame-src https://challenges.cloudflare.com",
       "object-src 'none'",
       "base-uri 'self'",

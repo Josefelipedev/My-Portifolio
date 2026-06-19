@@ -26,12 +26,6 @@ export default function JobsPageWrapper({
       {error && (
         <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4 mb-6">
           <p className="text-red-600 dark:text-red-400 font-medium">{error}</p>
-          <p className="text-sm text-red-500 dark:text-red-400 mt-1">
-            Run this command on your server:{' '}
-            <code className="bg-red-100 dark:bg-red-900/50 px-2 py-0.5 rounded">
-              npx prisma db push
-            </code>
-          </p>
         </div>
       )}
 

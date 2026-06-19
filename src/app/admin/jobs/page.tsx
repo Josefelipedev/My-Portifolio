@@ -1,5 +1,5 @@
 import JobsPageWrapper from '@/components/admin/JobsPageWrapper';
-import { serverApiFetch } from '@/lib/server-api';
+import { serverApiFetch, ApiError } from '@/lib/server-api';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,8 +19,11 @@ export default async function JobsAdminPage() {
     const { total, ...rest } = s.applications;
     statsMap = rest;
     totalApplications = total;
-  } catch {
-    error = 'Failed to load job stats from the API.';
+  } catch (e) {
+    error =
+      e instanceof ApiError && e.status === 401
+        ? 'Sua sessão expirou. Faça login novamente para ver as estatísticas.'
+        : 'Não foi possível carregar as estatísticas de vagas da API.';
   }
   return (
     <JobsPageWrapper savedJobsCount={savedJobsCount} totalApplications={totalApplications} statsMap={statsMap} error={error} />
