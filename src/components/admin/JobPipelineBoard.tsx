@@ -13,6 +13,7 @@ interface JobApplication {
   appliedAt?: string;
   nextStep?: string;
   nextStepDate?: string;
+  emailSentAt?: string;
   savedJob?: { companyLogo?: string | null } | null;
 }
 
@@ -184,6 +185,14 @@ export default function JobPipelineBoard() {
                         {app.title}
                       </p>
                       <p className="text-xs text-zinc-500 mt-0.5 truncate">{app.company}</p>
+                      {app.emailSentAt && (
+                        <span
+                          className="inline-block mt-1.5 mr-1 text-xs text-green-600 dark:text-green-400"
+                          title={`Candidatura enviada em ${fmtDate(app.emailSentAt)}`}
+                        >
+                          ✉ enviado {fmtDate(app.emailSentAt)}
+                        </span>
+                      )}
                       {app.nextStepDate && state !== 'none' && (
                         <span className={`inline-block mt-1.5 text-xs px-1.5 py-0.5 rounded ${dueBadge[state]}`}>
                           {state === 'overdue' ? '⚠ ' : '📅 '}
