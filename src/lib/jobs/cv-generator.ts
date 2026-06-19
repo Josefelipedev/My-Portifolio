@@ -16,6 +16,17 @@ export interface CustomCVContent {
     location: string;
     bullets: string[];
   }>;
+  projects?: Array<{
+    name: string;
+    description: string;
+    technologies?: string[];
+    link?: string;
+  }>;
+  certifications?: Array<{
+    name: string;
+    issuer?: string;
+    year?: string;
+  }>;
   providedKnowledge?: Array<{
     id: string;
     title: string;
