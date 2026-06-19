@@ -327,8 +327,9 @@ jobsMisc.post('/jobs/alerts/run', requireAuth, requireCsrf, async (c) => {
 
   const found = results.reduce((n, r) => n + r.found, 0);
   const newMatches = results.reduce((n, r) => n + r.newMatches, 0);
+  const cvs = results.reduce((n, r) => n + r.cvsGenerated, 0);
   const emailed = results.some((r) => r.emailed);
-  const message = `${found} vaga(s) encontrada(s), ${newMatches} nova(s)${emailed ? ' — e-mail enviado' : ''}.`;
+  const message = `${found} vaga(s) encontrada(s), ${newMatches} nova(s)${cvs ? `, ${cvs} CV(s) gerado(s)` : ''}${emailed ? ' — e-mail enviado' : ''}.`;
   return c.json({ message, results });
 });
 
