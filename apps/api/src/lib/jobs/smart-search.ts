@@ -12,6 +12,7 @@ import { filterJobsByAge } from './helpers';
 import { deduplicateJobs } from './deduplication';
 import { scoreJobs, calculateMatchPercentage } from './scoring';
 import { searchJobs } from './aggregator';
+import { applySemanticRerank } from './semantic';
 
 // Maps PT/BR variants for common tech roles
 const ROLE_VARIANTS: Record<string, string[]> = {
@@ -152,11 +153,13 @@ export async function smartJobSearch(
   // Deduplicate
   allJobs = deduplicateJobs(allJobs);
 
-  // Score and sort by relevance
+  // Score and sort by keyword relevance, then re-rank semantically (embeddings
+  // vs the resume). Re-rank degrades gracefully to the keyword order on failure.
   const scoredJobs = scoreJobs(allJobs, resume);
+  const rankedJobs = await applySemanticRerank(scoredJobs, resume);
 
   return {
-    jobs: scoredJobs.slice(0, limit),
+    jobs: rankedJobs.slice(0, limit),
     keywords,
   };
 }

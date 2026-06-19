@@ -15,6 +15,7 @@ export interface JobListing {
   postedAt?: Date;
   country?: string;
   relevanceScore?: number; // Added for scoring system
+  semanticScore?: number; // Cosine similarity to the resume (semantic re-rank)
 }
 
 export type JobSourceType =
