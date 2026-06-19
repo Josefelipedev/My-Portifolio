@@ -8,6 +8,7 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import prisma from '../db';
 import { requireAuth, type AuthEnv } from '../lib/auth';
+import { requireCsrf } from '../lib/csrf';
 import {
   searchJobs,
   smartJobSearch,
@@ -230,6 +231,29 @@ jobsSearch.get('/jobs/sources/health', requireAuth, async (c) => {
       jsearch: Boolean(keys.rapidApiKey),
     },
   });
+});
+
+// ---- jobs resume editor (DB-backed ResumeConfig; used by the Resume tab) ----
+jobsSearch.get('/jobs/resume', requireAuth, async (c) => {
+  const resume = await loadResumeData();
+  return c.json({ resume });
+});
+
+jobsSearch.put('/jobs/resume', requireAuth, requireCsrf, async (c) => {
+  const body = (await c.req.json().catch(() => null)) as ResumeData | null;
+  if (!body || typeof body !== 'object') {
+    return c.json({ error: 'Invalid resume data', code: 'BAD_REQUEST' }, 400);
+  }
+  if (!Array.isArray(body.skills)) {
+    return c.json({ error: 'skills must be an array', code: 'BAD_REQUEST' }, 400);
+  }
+  const data = JSON.stringify(body);
+  await prisma.resumeConfig.upsert({
+    where: { id: 'main' },
+    create: { id: 'main', data },
+    update: { data },
+  });
+  return c.json({ success: true, resume: body });
 });
 
 export default jobsSearch;
