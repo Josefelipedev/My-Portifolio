@@ -49,7 +49,7 @@ const DEFAULT_TYPES = [
 ];
 
 export default function KnowledgeAdminPage() {
-  const { showError } = useToast();
+  const { showError, showSuccess } = useToast();
   const { confirm } = useConfirm();
   const [items, setItems] = useState<KnowledgeItem[]>([]);
   const [sources, setSources] = useState<KnowledgeSource[]>([]);
@@ -283,13 +283,47 @@ export default function KnowledgeAdminPage() {
     }
   }
 
+  async function clearAll() {
+    const confirmed = await confirm({
+      title: 'Clear knowledge base',
+      message: `Delete ALL ${total} knowledge item(s)? This cannot be undone.`,
+      type: 'danger',
+      confirmText: 'Delete all',
+    });
+    if (!confirmed) return;
+
+    try {
+      setSaving('__all__');
+      const response = await fetchWithCSRF('/api/admin/knowledge', { method: 'DELETE' });
+      if (!response.ok) throw new Error('Failed to clear knowledge base');
+      const data = (await response.json().catch(() => ({}))) as { deleted?: number };
+      showSuccess(`Knowledge base cleared (${data.deleted ?? 0} item(s) removed).`);
+      await loadData();
+    } catch (err) {
+      showError(err instanceof Error ? err.message : 'Failed to clear knowledge base');
+    } finally {
+      setSaving(null);
+    }
+  }
+
   const actions = (
-    <button
-      onClick={startCreate}
-      className="px-4 py-2 bg-red-500 text-white font-medium rounded-lg hover:bg-red-600 transition-colors"
-    >
-      Add item
-    </button>
+    <div className="flex gap-2">
+      {total > 0 && (
+        <button
+          onClick={clearAll}
+          disabled={saving === '__all__'}
+          className="px-4 py-2 bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-200 font-medium rounded-lg hover:bg-zinc-300 dark:hover:bg-zinc-600 transition-colors disabled:opacity-50"
+        >
+          {saving === '__all__' ? 'Clearing…' : 'Clear all'}
+        </button>
+      )}
+      <button
+        onClick={startCreate}
+        className="px-4 py-2 bg-red-500 text-white font-medium rounded-lg hover:bg-red-600 transition-colors"
+      >
+        Add item
+      </button>
+    </div>
   );
 
   return (

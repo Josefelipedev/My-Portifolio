@@ -210,6 +210,37 @@ export default function CVDocument({ cv, personalInfo, jobTitle, company }: CVDo
             </View>
           ))}
         </View>
+
+        {/* Projects */}
+        {cv.projects && cv.projects.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Projects</Text>
+            {cv.projects.map((p, i) => (
+              <View key={i} style={styles.expEntry}>
+                <Text style={styles.expTitle}>{p.name}</Text>
+                <Text style={styles.bulletText}>{p.description}</Text>
+                {p.technologies && p.technologies.length > 0 && (
+                  <Text style={styles.expCompany}>{p.technologies.join(' · ')}</Text>
+                )}
+              </View>
+            ))}
+          </View>
+        )}
+
+        {/* Certifications */}
+        {cv.certifications && cv.certifications.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Certifications</Text>
+            {cv.certifications.map((cert, i) => (
+              <View key={i} style={styles.bulletRow}>
+                <Text style={styles.bullet}>•</Text>
+                <Text style={styles.bulletText}>
+                  {cert.name}{cert.issuer ? ` — ${cert.issuer}` : ''}{cert.year ? ` (${cert.year})` : ''}
+                </Text>
+              </View>
+            ))}
+          </View>
+        )}
       </Page>
     </Document>
   );
