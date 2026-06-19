@@ -16,6 +16,17 @@ export interface CustomCVContent {
     location: string;
     bullets: string[];
   }>;
+  projects?: Array<{
+    name: string;
+    description: string;
+    technologies?: string[];
+    link?: string;
+  }>;
+  certifications?: Array<{
+    name: string;
+    issuer?: string;
+    year?: string;
+  }>;
   providedKnowledge?: Array<{
     id: string;
     title: string;
@@ -126,7 +137,20 @@ export async function generateCustomCV(savedJobId: string): Promise<CustomCVCont
     savedJob.jobType || '',
   ].join('\n');
   const selectedKnowledgeItems = rankKnowledgeItems(jobText, activeKnowledgeItems);
-  const privateKnowledge = buildKnowledgeContext(selectedKnowledgeItems);
+  // Always surface project/certification/course knowledge to the model so the CV
+  // can include them, even when they don't token-match the job description.
+  const projectCertItems = activeKnowledgeItems
+    .filter((i) => ['project', 'certification', 'course'].includes(i.type))
+    .slice(0, 8);
+  const knowledgeForContext = [
+    ...selectedKnowledgeItems,
+    ...projectCertItems.filter((i) => !selectedKnowledgeItems.some((s) => s.id === i.id)),
+  ];
+  const privateKnowledge = buildKnowledgeContext(knowledgeForContext);
+
+  const certSummary = (resume.certifications || [])
+    .map((c) => `${c.name}${c.issuer ? ` — ${c.issuer}` : ''}${c.date ? ` (${c.date})` : ''}`)
+    .join('\n');
 
   const model = process.env.TOGETHER_MODEL || 'meta-llama/Llama-3.3-70B-Instruct-Turbo';
   const startTime = Date.now();
@@ -152,6 +176,9 @@ Skills: ${allSkills}
 Experience:
 ${expSummary}
 
+Certifications (from CV):
+${certSummary || 'None listed'}
+
 PRIVATE PROFESSIONAL KNOWLEDGE BASE:
 ${privateKnowledge}
 
@@ -162,12 +189,15 @@ YOUR TASK:
    - Use action verbs
    - Include metrics where possible (keep original metrics)
    - Mirror keywords from the job description
+4. Select up to 4 of the most relevant PROJECTS (from the knowledge base or CV) for this job — a name, a one-line impact-focused description, and the key technologies used.
+5. List the CERTIFICATIONS relevant to this job (from the CV and the knowledge base) — name, issuer, and year.
 
 STRICT FACT RULES:
 - Use only facts from the current CV and private knowledge base.
 - Do not invent companies, dates, degrees, certifications, metrics, technologies, or achievements.
 - If the knowledge base supports a requirement but it is not in the public CV, you may use it as supporting detail.
 - If a job requirement is not supported by the CV or knowledge base, do not claim it.
+- Only include projects and certifications that exist in the CV or the knowledge base; return an empty array ([]) when there are none.
 
 Return ONLY a JSON object (no markdown, no explanation):
 {
@@ -182,6 +212,12 @@ Return ONLY a JSON object (no markdown, no explanation):
       "location": "location from CV",
       "bullets": ["Rewritten bullet 1 with job keywords", "Rewritten bullet 2", ...]
     }
+  ],
+  "projects": [
+    { "name": "Project name", "description": "One-line, impact-focused description", "technologies": ["Tech1", "Tech2"], "link": "url or empty string" }
+  ],
+  "certifications": [
+    { "name": "Certification name", "issuer": "Issuer or empty string", "year": "YYYY" }
   ]
 }
 
