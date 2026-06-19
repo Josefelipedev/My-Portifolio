@@ -243,6 +243,8 @@ jobsApplications.post('/jobs/saved/:id/apply', requireAuth, requireCsrf, async (
 
   const appliedAt = body.appliedAt ? new Date(body.appliedAt) : new Date();
   const note = emailed ? `Candidatura enviada para ${recipient}` : 'Candidatura registrada';
+  const emailSentAt = emailed ? new Date() : null;
+  const emailSentTo = emailed ? recipient : null;
   const application = await prisma.jobApplication.upsert({
     where: { savedJobId: savedJob.id },
     create: {
@@ -254,9 +256,11 @@ jobsApplications.post('/jobs/saved/:id/apply', requireAuth, requireCsrf, async (
       salary: savedJob.salary,
       status: 'applied',
       appliedAt,
+      emailSentAt,
+      emailSentTo,
       timeline: JSON.stringify([{ status: 'applied', date: new Date().toISOString(), note }]),
     },
-    update: { status: 'applied', appliedAt },
+    update: { status: 'applied', appliedAt, ...(emailed ? { emailSentAt, emailSentTo } : {}) },
   });
 
   return c.json({ application, emailed, emailError, recipient: wantsEmail ? recipient : null }, 201);
