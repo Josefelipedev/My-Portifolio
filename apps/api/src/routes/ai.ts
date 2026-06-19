@@ -10,10 +10,54 @@ import {
   generateSkillsSuggestion,
   analyzeReadmeForProject,
   getCurrentAIProvider,
+  generateProjectSummary,
 } from '../lib/claude';
 import { buildKnowledgeContext } from '../lib/knowledge';
+import { extractOwnerAndRepo, fetchRepoReadme, fetchRepoLanguages } from '../lib/github';
 
 const ai = new Hono<AuthEnv>();
+
+// POST /api/summarize — AI summary for a project from its GitHub README +
+// languages (cached 30 days on the Project). Ported from src/app/api/summarize.
+ai.post('/summarize', requireAuth, requireCsrf, async (c) => {
+  const { projectId } = (await c.req.json().catch(() => ({}))) as { projectId?: string };
+  if (!projectId) return c.json({ error: 'projectId is required', code: 'BAD_REQUEST' }, 400);
+
+  const project = await prisma.project.findUnique({ where: { id: projectId } });
+  if (!project) return c.json({ error: 'Project not found', code: 'NOT_FOUND' }, 404);
+
+  // Reuse a recent summary (< 30 days).
+  if (project.aiSummarizedAt) {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    if (project.aiSummarizedAt > thirtyDaysAgo) {
+      return c.json({ success: true, summary: project.aiSummary, cached: true });
+    }
+  }
+
+  const repoInfo = project.repoUrl ? extractOwnerAndRepo(project.repoUrl) : null;
+  let readme: string | null = null;
+  let languages: string[] = [];
+  if (repoInfo) {
+    readme = await fetchRepoReadme(repoInfo.owner, repoInfo.repo);
+    languages = Object.keys(await fetchRepoLanguages(repoInfo.owner, repoInfo.repo));
+  }
+
+  const aiSummary = await generateProjectSummary({
+    repoName: project.title,
+    description: project.description,
+    readme,
+    languages,
+    topics: project.technologies.split(',').map((t) => t.trim()),
+  });
+
+  const updated = await prisma.project.update({
+    where: { id: projectId },
+    data: { aiSummary, aiSummarizedAt: new Date() },
+  });
+
+  return c.json({ success: true, summary: aiSummary, cached: false, project: updated });
+});
 
 // POST /api/skills/suggest — suggest skills from projects/experiences + the
 // private knowledge base. Ported from src/app/api/skills/suggest/route.ts.

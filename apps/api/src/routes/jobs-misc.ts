@@ -11,6 +11,7 @@ import { requireCsrf } from '../lib/csrf';
 import { Errors } from '../lib/api-utils';
 import { calculateNextRun, runAlert, runDueAlerts } from '../lib/jobs/alerts-runner';
 import { invalidateJobApiKeyCache } from '../lib/jobs/api-keys';
+import { generateAlertSuggestions } from '../lib/jobs/alert-suggestions';
 
 const jobsMisc = new Hono<AuthEnv>();
 
@@ -329,6 +330,13 @@ jobsMisc.post('/jobs/alerts/run', requireAuth, requireCsrf, async (c) => {
   const emailed = results.some((r) => r.emailed);
   const message = `${found} vaga(s) encontrada(s), ${newMatches} nova(s)${emailed ? ' — e-mail enviado' : ''}.`;
   return c.json({ message, results });
+});
+
+// GET /jobs/alerts/suggestions — AI-suggested alerts from the resume. Static
+// path, registered before the generic /jobs/alerts handlers.
+jobsMisc.get('/jobs/alerts/suggestions', requireAuth, async (c) => {
+  const suggestions = await generateAlertSuggestions();
+  return c.json({ suggestions, generatedAt: new Date().toISOString() });
 });
 
 // GET - Fetch all alerts with recent matches

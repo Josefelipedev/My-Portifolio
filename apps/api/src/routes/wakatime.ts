@@ -27,6 +27,7 @@ import {
   getWakaTimeStatsForYear,
   type WakaTimeStats,
 } from '../lib/wakatime';
+import { extractRankingFromUrl, extractRankingsFromUrls } from '../lib/wakatime-ranking';
 
 const wakatime = new Hono<AuthEnv>();
 
@@ -267,6 +268,71 @@ wakatime.put('/wakatime/settings', requireAuth, requireCsrf, async (c) => {
   });
 
   return c.json(newConfig);
+});
+
+// GET /wakatime/preview — admin preview of the live last-7-days stats.
+wakatime.get('/wakatime/preview', requireAuth, async (c) => {
+  const stats = await getWakaTimeStats();
+  if (!stats) return c.json({ error: 'Failed to fetch WakaTime data' }, 500);
+  return c.json({
+    totalHours: stats.totalHours,
+    dailyAverage: stats.dailyAverage,
+    bestDay: stats.bestDay,
+    languages: stats.languages,
+    projects: stats.projects,
+  });
+});
+
+// POST /wakatime/fetch-rankings — scrape the configured "Year in Review" URLs and
+// persist the extracted per-year rankings into SiteConfig.wakatimeConfig.
+wakatime.post('/wakatime/fetch-rankings', requireAuth, requireCsrf, async (c) => {
+  const body = (await c.req.json().catch(() => ({}))) as { year?: number; url?: string };
+
+  // Single year+url: extract and return (no persistence).
+  if (body.year && body.url) {
+    const ranking = await extractRankingFromUrl(body.url, body.year);
+    if (!ranking) return c.json({ error: `Could not extract ranking for ${body.year}` }, 400);
+    return c.json({ success: true, ranking });
+  }
+
+  const cfg = await prisma.siteConfig.findUnique({
+    where: { id: 'main' },
+    select: { wakatimeConfig: true },
+  });
+  if (!cfg?.wakatimeConfig) return c.json({ error: 'No WakaTime configuration found' }, 400);
+
+  const config = JSON.parse(cfg.wakatimeConfig) as {
+    yearlyReportLinks?: Record<number, string>;
+    yearlyRankings?: Record<number, { percentile: number; totalDevs: string }>;
+    [k: string]: unknown;
+  };
+  const links = config.yearlyReportLinks || {};
+  if (Object.keys(links).length === 0) {
+    return c.json({ error: 'No Year in Review URLs configured. Add URLs in the admin panel first.' }, 400);
+  }
+
+  const rankings = await extractRankingsFromUrls(links);
+  if (Object.keys(rankings).length === 0) {
+    return c.json({ error: 'Could not extract rankings from any URL' }, 400);
+  }
+
+  const yearlyRankings: Record<number, { percentile: number; totalDevs: string }> = {};
+  for (const [yearStr, r] of Object.entries(rankings)) {
+    yearlyRankings[parseInt(yearStr, 10)] = { percentile: r.percentile, totalDevs: r.totalDevs };
+  }
+
+  const merged = { ...config, yearlyRankings: { ...config.yearlyRankings, ...yearlyRankings } };
+  await prisma.siteConfig.update({
+    where: { id: 'main' },
+    data: { wakatimeConfig: JSON.stringify(merged) },
+  });
+
+  return c.json({
+    success: true,
+    message: `Successfully extracted rankings for ${Object.keys(rankings).length} year(s)`,
+    rankings: yearlyRankings,
+    details: rankings,
+  });
 });
 
 export default wakatime;
