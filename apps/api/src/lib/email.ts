@@ -22,14 +22,21 @@ function createTransporter() {
 
 const transporter = createTransporter();
 
+export interface EmailAttachment {
+  filename: string;
+  content: Buffer | string;
+  contentType?: string;
+}
+
 interface SendEmailOptions {
   to: string;
   subject: string;
   html: string;
   text?: string;
+  attachments?: EmailAttachment[];
 }
 
-export async function sendEmail({ to, subject, html, text }: SendEmailOptions): Promise<boolean> {
+export async function sendEmail({ to, subject, html, text, attachments }: SendEmailOptions): Promise<boolean> {
   try {
     if (!transporter) {
       // Log to console in development
@@ -37,6 +44,9 @@ export async function sendEmail({ to, subject, html, text }: SendEmailOptions): 
       console.log(`To: ${to}`);
       console.log(`Subject: ${subject}`);
       console.log(`Content: ${text || html}`);
+      if (attachments?.length) {
+        console.log(`Attachments: ${attachments.map((a) => a.filename).join(', ')}`);
+      }
       console.log('===========================\n');
       return true;
     }
@@ -47,6 +57,7 @@ export async function sendEmail({ to, subject, html, text }: SendEmailOptions): 
       subject,
       html,
       text,
+      attachments,
     });
 
     return true;
