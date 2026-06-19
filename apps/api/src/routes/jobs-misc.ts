@@ -9,6 +9,7 @@ import prisma from '../db';
 import { requireAuth, type AuthEnv } from '../lib/auth';
 import { requireCsrf } from '../lib/csrf';
 import { Errors } from '../lib/api-utils';
+import { calculateNextRun, runAlert, runDueAlerts } from '../lib/jobs/alerts-runner';
 
 const jobsMisc = new Hono<AuthEnv>();
 
@@ -305,48 +306,29 @@ jobsMisc.delete('/jobs/history', requireAuth, requireCsrf, async (c) => {
 // Job alerts — GET / POST / PUT / DELETE /jobs/alerts (BASE route only)
 // ============================================================================
 
-// Calculate the next run time based on schedule settings
-function calculateNextRun(scheduleHours: string, scheduleDays: string): Date | null {
-  if (!scheduleHours) return null;
+// calculateNextRun lives in lib/jobs/alerts-runner (shared with the runner).
 
-  const hours = scheduleHours
-    .split(',')
-    .map((h) => parseInt(h.trim(), 10))
-    .filter((h) => !isNaN(h) && h >= 0 && h <= 23);
-  const days = scheduleDays
-    ? scheduleDays
-        .split(',')
-        .map((d) => parseInt(d.trim(), 10))
-        .filter((d) => !isNaN(d) && d >= 0 && d <= 6)
-    : [0, 1, 2, 3, 4, 5, 6];
+// POST - Run alerts now: a specific alert by id, or every active alert (force).
+// Used by the "Run now" button; the VPS cron uses the alerts:run script instead.
+jobsMisc.post('/jobs/alerts/run', requireAuth, requireCsrf, async (c) => {
+  const body = (await c.req.json().catch(() => ({}))) as { alertId?: string; id?: string };
+  const id = body.alertId || body.id;
 
-  if (hours.length === 0) return null;
-
-  const now = new Date();
-  const currentHour = now.getHours();
-  const currentDay = now.getDay();
-
-  // Find the next valid hour today
-  const nextHourToday = hours.find((h) => h > currentHour);
-  if (nextHourToday !== undefined && days.includes(currentDay)) {
-    const next = new Date(now);
-    next.setHours(nextHourToday, 0, 0, 0);
-    return next;
+  let results;
+  if (id) {
+    const alert = await prisma.jobAlert.findUnique({ where: { id } });
+    if (!alert) throw Errors.NotFound('Alert not found');
+    results = [await runAlert(alert)];
+  } else {
+    results = await runDueAlerts({ force: true });
   }
 
-  // Find the next valid day
-  for (let i = 1; i <= 7; i++) {
-    const checkDay = (currentDay + i) % 7;
-    if (days.includes(checkDay)) {
-      const next = new Date(now);
-      next.setDate(now.getDate() + i);
-      next.setHours(hours[0], 0, 0, 0);
-      return next;
-    }
-  }
-
-  return null;
-}
+  const found = results.reduce((n, r) => n + r.found, 0);
+  const newMatches = results.reduce((n, r) => n + r.newMatches, 0);
+  const emailed = results.some((r) => r.emailed);
+  const message = `${found} vaga(s) encontrada(s), ${newMatches} nova(s)${emailed ? ' — e-mail enviado' : ''}.`;
+  return c.json({ message, results });
+});
 
 // GET - Fetch all alerts with recent matches
 jobsMisc.get('/jobs/alerts', requireAuth, async (c) => {
