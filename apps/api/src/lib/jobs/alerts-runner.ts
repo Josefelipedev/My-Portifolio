@@ -11,12 +11,18 @@ import { analyzeJob } from './ai-analysis';
 import { generateCustomCV } from './cv-generator';
 
 // Auto-CV: when an alert finds new jobs, save them, AI-grade them, and
-// pre-generate the tailored CV for the strong matches. Bounded per run.
+// pre-generate the tailored CV for the strong matches. The per-run budget caps
+// the number of jobs *processed* (AI-graded) per run — i.e. the number of paid
+// AI calls — not the number of CVs actually generated (only A/B grades get one).
 const AUTO_CV_ENABLED = process.env.AUTO_CV_ENABLED !== 'false';
 const AUTO_CV_PER_RUN = parseInt(process.env.AUTO_CV_PER_RUN || '5', 10);
+// Lower budget for manual "Run now" triggers, to keep the request fast and cheap.
+export const AUTO_CV_PER_MANUAL_RUN = parseInt(process.env.AUTO_CV_PER_MANUAL_RUN || '2', 10);
 const AUTO_CV_GRADES = new Set(['A', 'B']);
 
 /** Next scheduled run from comma-separated hours (0-23) and days (0-6, 0=Sun).
+ *  Hours/days are interpreted in the process timezone — which is UTC in the
+ *  container — so configure schedule hours already converted to UTC.
  *  Returns null when scheduling can't be resolved (disables auto-run). */
 export function calculateNextRun(scheduleHours: string, scheduleDays: string): Date | null {
   if (!scheduleHours) return null;
@@ -24,7 +30,8 @@ export function calculateNextRun(scheduleHours: string, scheduleDays: string): D
   const hours = scheduleHours
     .split(',')
     .map((h) => parseInt(h.trim(), 10))
-    .filter((h) => !isNaN(h) && h >= 0 && h <= 23);
+    .filter((h) => !isNaN(h) && h >= 0 && h <= 23)
+    .sort((a, b) => a - b);
   const days = scheduleDays
     ? scheduleDays
         .split(',')
@@ -245,8 +252,12 @@ export async function runAlert(
   }
 }
 
-/** Run all alerts that are due (or every active alert when force=true). */
-export async function runDueAlerts(opts: { force?: boolean } = {}): Promise<AlertRunResult[]> {
+/** Run all alerts that are due (or every active alert when force=true).
+ *  Pass `budget` to override the shared auto-CV budget (e.g. a lower cap for
+ *  manual "Run now" triggers); defaults to the full per-run budget for cron. */
+export async function runDueAlerts(
+  opts: { force?: boolean; budget?: { remaining: number } } = {}
+): Promise<AlertRunResult[]> {
   const now = new Date();
   const alerts = await prisma.jobAlert.findMany({
     where: opts.force
@@ -256,7 +267,7 @@ export async function runDueAlerts(opts: { force?: boolean } = {}): Promise<Aler
   });
 
   // Shared auto-CV budget across all alerts in this run (caps paid AI calls).
-  const budget = { remaining: AUTO_CV_PER_RUN };
+  const budget = opts.budget ?? { remaining: AUTO_CV_PER_RUN };
   const results: AlertRunResult[] = [];
   for (const alert of alerts) {
     results.push(await runAlert(alert, budget));

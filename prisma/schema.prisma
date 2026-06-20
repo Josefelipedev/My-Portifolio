@@ -340,8 +340,24 @@ model CompanyPortal {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
+  seenJobs        PortalSeenJob[]
+
   @@index([isActive])
   @@index([lastScannedAt])
+}
+
+// Jobs already surfaced by a portal scan, so subsequent scans only report new
+// listings (delta) instead of re-flagging the same jobs every run.
+model PortalSeenJob {
+  id          String        @id @default(cuid())
+  portalId    String
+  portal      CompanyPortal @relation(fields: [portalId], references: [id], onDelete: Cascade)
+  url         String
+  title       String
+  firstSeenAt DateTime      @default(now())
+
+  @@unique([portalId, url])
+  @@index([portalId])
 }
 
 // ==========================================
