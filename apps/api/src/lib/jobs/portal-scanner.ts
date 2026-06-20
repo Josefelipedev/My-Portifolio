@@ -86,7 +86,7 @@ async function fetchGreenhouseJobs(
 
   const jobs: JobListing[] = data.jobs.map((j) => ({
     id: String(j.id),
-    source: 'linkedin' as const, // closest generic source
+    source: 'ats' as const,
     title: j.title,
     company,
     description: j.content || '',
@@ -128,7 +128,7 @@ async function fetchAshbyJobs(
 
   const jobs: JobListing[] = (data.results || []).map((j) => ({
     id: j.id,
-    source: 'linkedin' as const,
+    source: 'ats' as const,
     title: j.title,
     company,
     description: j.descriptionHtml || '',
@@ -165,7 +165,7 @@ async function fetchLeverJobs(
 
   const jobs: JobListing[] = data.map((j) => ({
     id: j.id,
-    source: 'linkedin' as const,
+    source: 'ats' as const,
     title: j.text,
     company,
     description: j.descriptionBody || '',
@@ -180,17 +180,29 @@ async function fetchLeverJobs(
 
 // ─── Deduplication ───────────────────────────────────────────────────────────
 
-async function deduplicateAgainstDB(jobs: JobListing[]): Promise<JobListing[]> {
+// Returns the jobs not yet seen in a previous scan of this portal (delta since
+// last scan), and records them so the next scan won't re-report them. The first
+// scan of a portal reports everything as new once (baseline).
+async function deduplicateAndRecord(portalId: string, jobs: JobListing[]): Promise<JobListing[]> {
   if (jobs.length === 0) return [];
 
   const urls = jobs.map((j) => j.url);
-  const existing = await prisma.savedJob.findMany({
-    where: { url: { in: urls } },
+  const seen = await prisma.portalSeenJob.findMany({
+    where: { portalId, url: { in: urls } },
     select: { url: true },
   });
 
-  const existingUrls = new Set(existing.map((j) => j.url));
-  return jobs.filter((j) => !existingUrls.has(j.url));
+  const seenUrls = new Set(seen.map((j) => j.url));
+  const newJobs = jobs.filter((j) => !seenUrls.has(j.url));
+
+  if (newJobs.length > 0) {
+    await prisma.portalSeenJob.createMany({
+      data: newJobs.map((j) => ({ portalId, url: j.url, title: j.title })),
+      skipDuplicates: true,
+    });
+  }
+
+  return newJobs;
 }
 
 // ─── Scan All Portals ─────────────────────────────────────────────────────────
@@ -228,7 +240,7 @@ export async function scanAllPortals(): Promise<PortalScanResult[]> {
       }
 
       const totalFound = jobs.length;
-      const newJobs = await deduplicateAgainstDB(jobs);
+      const newJobs = await deduplicateAndRecord(portal.id, jobs);
 
       await prisma.companyPortal.update({
         where: { id: portal.id },

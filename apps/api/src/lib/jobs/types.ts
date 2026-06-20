@@ -35,7 +35,8 @@ export type JobSourceType =
   | 'programathor'
   | 'jobicy'
   | 'weworkremotely'
-  | 'buscojobs';
+  | 'buscojobs'
+  | 'ats'; // company ATS portals (Greenhouse/Ashby/Lever) — not an aggregator source
 
 export type JobSource = 'all' | JobSourceType;
 

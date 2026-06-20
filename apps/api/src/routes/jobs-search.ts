@@ -194,8 +194,9 @@ jobsSearch.get('/jobs/smart-search', requireAuth, async (c) => {
 
   const result = await smartJobSearch(resume, { country, source, limit, maxAgeDays });
 
-  // Cache for 5 minutes (matches the web route's withCacheHeaders(300, 600)).
-  c.header('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
+  // Cache for 5 minutes. `private` (not `public`) because the response is
+  // personalized to the resume and behind auth — a shared CDN must not store it.
+  c.header('Cache-Control', 'private, max-age=300, stale-while-revalidate=600');
 
   return c.json({
     jobs: result.jobs,

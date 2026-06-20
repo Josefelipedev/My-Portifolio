@@ -9,7 +9,12 @@ import prisma from '../db';
 import { requireAuth, type AuthEnv } from '../lib/auth';
 import { requireCsrf } from '../lib/csrf';
 import { Errors } from '../lib/api-utils';
-import { calculateNextRun, runAlert, runDueAlerts } from '../lib/jobs/alerts-runner';
+import {
+  calculateNextRun,
+  runAlert,
+  runDueAlerts,
+  AUTO_CV_PER_MANUAL_RUN,
+} from '../lib/jobs/alerts-runner';
 import { invalidateJobApiKeyCache } from '../lib/jobs/api-keys';
 import { generateAlertSuggestions } from '../lib/jobs/alert-suggestions';
 
@@ -316,13 +321,15 @@ jobsMisc.post('/jobs/alerts/run', requireAuth, requireCsrf, async (c) => {
   const body = (await c.req.json().catch(() => ({}))) as { alertId?: string; id?: string };
   const id = body.alertId || body.id;
 
+  // Lower auto-CV budget for manual triggers, so "Run now" stays fast and cheap.
+  const budget = { remaining: AUTO_CV_PER_MANUAL_RUN };
   let results;
   if (id) {
     const alert = await prisma.jobAlert.findUnique({ where: { id } });
     if (!alert) throw Errors.NotFound('Alert not found');
-    results = [await runAlert(alert)];
+    results = [await runAlert(alert, budget)];
   } else {
-    results = await runDueAlerts({ force: true });
+    results = await runDueAlerts({ force: true, budget });
   }
 
   const found = results.reduce((n, r) => n + r.found, 0);
@@ -447,26 +454,22 @@ jobsMisc.put('/jobs/alerts', requireAuth, requireCsrf, async (c) => {
   if (scheduleDays !== undefined) updateData.scheduleDays = scheduleDays || null;
   if (emailOnMatch !== undefined) updateData.emailOnMatch = emailOnMatch;
 
-  // Recalculate next run if scheduling settings changed
+  // Recalculate next run if scheduling settings changed. Fetch the current alert
+  // once (only when some schedule field is missing from the request) instead of
+  // per-field, then fill the gaps.
   if (scheduleEnabled !== undefined || scheduleHours !== undefined || scheduleDays !== undefined) {
-    const finalScheduleEnabled =
-      scheduleEnabled !== undefined
-        ? scheduleEnabled
-        : (await prisma.jobAlert.findUnique({ where: { id } }))?.scheduleEnabled;
-    const finalScheduleHours =
-      scheduleHours !== undefined
-        ? scheduleHours
-        : (await prisma.jobAlert.findUnique({ where: { id } }))?.scheduleHours;
-    const finalScheduleDays =
-      scheduleDays !== undefined
-        ? scheduleDays
-        : (await prisma.jobAlert.findUnique({ where: { id } }))?.scheduleDays;
+    const needsCurrent =
+      scheduleEnabled === undefined || scheduleHours === undefined || scheduleDays === undefined;
+    const current = needsCurrent ? await prisma.jobAlert.findUnique({ where: { id } }) : null;
 
-    if (finalScheduleEnabled && finalScheduleHours) {
-      updateData.nextRun = calculateNextRun(finalScheduleHours, finalScheduleDays || '');
-    } else {
-      updateData.nextRun = null;
-    }
+    const finalScheduleEnabled = scheduleEnabled ?? current?.scheduleEnabled;
+    const finalScheduleHours = scheduleHours ?? current?.scheduleHours;
+    const finalScheduleDays = scheduleDays ?? current?.scheduleDays;
+
+    updateData.nextRun =
+      finalScheduleEnabled && finalScheduleHours
+        ? calculateNextRun(finalScheduleHours, finalScheduleDays || '')
+        : null;
   }
 
   const alert = await prisma.jobAlert.update({ where: { id }, data: updateData });
