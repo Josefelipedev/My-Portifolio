@@ -1,7 +1,7 @@
 'use client';
 
 import { Document, Page, View, Text, StyleSheet, Link } from '@react-pdf/renderer';
-import { type CustomCVContent } from '@/lib/jobs/cv-generator';
+import { type CustomCVContent } from '@/types/jobs';
 
 interface PersonalInfo {
   name: string;

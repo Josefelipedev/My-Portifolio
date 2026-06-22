@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { type CustomCVContent } from '@/lib/jobs/cv-generator';
+import { type CustomCVContent } from '@/types/jobs';
 import { apiFetch } from '@/lib/api-fetch';
 import resumeData from '@/data/resume.json';
 
