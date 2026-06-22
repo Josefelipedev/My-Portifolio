@@ -7,6 +7,8 @@ import prisma from '../db';
 import { requireAuth, type AuthEnv } from '../lib/auth';
 import { requireCsrf } from '../lib/csrf';
 import { detectPortalType, scanAllPortals } from '../lib/jobs/portal-scanner';
+import { parseBody } from '../lib/api-utils';
+import { portalCreateSchema, portalUpdateSchema } from '../schemas/jobs';
 
 const jobsPortals = new Hono<AuthEnv>();
 
@@ -20,16 +22,7 @@ jobsPortals.get('/jobs/portals', requireAuth, async (c) => {
 
 // ---- create ----
 jobsPortals.post('/jobs/portals', requireAuth, requireCsrf, async (c) => {
-  const body = (await c.req.json().catch(() => ({}))) as {
-    company?: string;
-    careersUrl?: string;
-    portalType?: string;
-    portalSlug?: string;
-    titleFilters?: unknown;
-  };
-  if (!body.company || !body.careersUrl) {
-    return c.json({ error: 'company and careersUrl are required', code: 'BAD_REQUEST' }, 400);
-  }
+  const body = await parseBody(c, portalCreateSchema);
 
   const detected = detectPortalType(body.careersUrl);
   const portal = await prisma.companyPortal.create({
@@ -79,14 +72,7 @@ jobsPortals.get('/jobs/portals/:id', requireAuth, async (c) => {
 
 // ---- update ----
 jobsPortals.put('/jobs/portals/:id', requireAuth, requireCsrf, async (c) => {
-  const body = (await c.req.json().catch(() => ({}))) as {
-    company?: string;
-    careersUrl?: string;
-    isActive?: boolean;
-    titleFilters?: unknown;
-    portalType?: string;
-    portalSlug?: string;
-  };
+  const body = await parseBody(c, portalUpdateSchema);
 
   const updateData: Record<string, unknown> = {};
   if (body.company !== undefined) updateData.company = body.company;

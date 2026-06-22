@@ -6,12 +6,17 @@ import { Hono } from 'hono';
 import prisma from '../db';
 import { requireAuth, type AuthEnv } from '../lib/auth';
 import { requireCsrf } from '../lib/csrf';
-import { Errors, validateRequired } from '../lib/api-utils';
+import { Errors, parseBody } from '../lib/api-utils';
 import { sendEmail } from '../lib/email';
+import {
+  applicationCreateSchema,
+  applicationUpdateSchema,
+  applicationsBulkUpdateSchema,
+  applySchema,
+  idsSchema,
+} from '../schemas/jobs';
 
 const jobsApplications = new Hono<AuthEnv>();
-
-const VALID_STATUSES = ['saved', 'applied', 'interview', 'offer', 'rejected'];
 
 // ---- list (optional status filter) ----
 jobsApplications.get('/jobs/applications', requireAuth, async (c) => {
@@ -33,20 +38,19 @@ jobsApplications.get('/jobs/applications', requireAuth, async (c) => {
 
 // ---- create (manual application, without saved job) ----
 jobsApplications.post('/jobs/applications', requireAuth, requireCsrf, async (c) => {
-  const data = (await c.req.json()) as Record<string, unknown>;
-  validateRequired(data, ['title', 'company']);
+  const data = await parseBody(c, applicationCreateSchema);
 
-  const status = (data.status as string) || 'saved';
+  const status = data.status || 'saved';
   const application = await prisma.jobApplication.create({
     data: {
-      title: data.title as string,
-      company: data.company as string,
-      url: data.url as string | undefined,
-      location: data.location as string | undefined,
-      salary: data.salary as string | undefined,
+      title: data.title,
+      company: data.company,
+      url: data.url ?? undefined,
+      location: data.location ?? undefined,
+      salary: data.salary ?? undefined,
       status,
-      appliedAt: data.appliedAt ? new Date(data.appliedAt as string) : null,
-      notes: data.notes as string | undefined,
+      appliedAt: data.appliedAt ? new Date(data.appliedAt) : null,
+      notes: data.notes ?? undefined,
       timeline: JSON.stringify([
         {
           status,
@@ -54,8 +58,8 @@ jobsApplications.post('/jobs/applications', requireAuth, requireCsrf, async (c) 
           note: 'Application created manually',
         },
       ]),
-      nextStep: data.nextStep as string | undefined,
-      nextStepDate: data.nextStepDate ? new Date(data.nextStepDate as string) : null,
+      nextStep: data.nextStep ?? undefined,
+      nextStepDate: data.nextStepDate ? new Date(data.nextStepDate) : null,
     },
   });
 
@@ -64,13 +68,10 @@ jobsApplications.post('/jobs/applications', requireAuth, requireCsrf, async (c) 
 
 // ---- bulk delete (must be registered before /jobs/applications/:id) ----
 jobsApplications.delete('/jobs/applications/bulk', requireAuth, requireCsrf, async (c) => {
-  const { ids } = (await c.req.json()) as { ids?: unknown };
-  if (!ids || !Array.isArray(ids) || ids.length === 0) {
-    throw Errors.BadRequest('IDs array is required');
-  }
+  const { ids } = await parseBody(c, idsSchema);
 
   const result = await prisma.jobApplication.deleteMany({
-    where: { id: { in: ids as string[] } },
+    where: { id: { in: ids } },
   });
 
   return c.json({
@@ -81,20 +82,11 @@ jobsApplications.delete('/jobs/applications/bulk', requireAuth, requireCsrf, asy
 
 // ---- bulk update status (must be registered before /jobs/applications/:id) ----
 jobsApplications.put('/jobs/applications/bulk', requireAuth, requireCsrf, async (c) => {
-  const { ids, status } = (await c.req.json()) as { ids?: unknown; status?: unknown };
-  if (!ids || !Array.isArray(ids) || ids.length === 0) {
-    throw Errors.BadRequest('IDs array is required');
-  }
-  if (!status) {
-    throw Errors.BadRequest('Status is required');
-  }
-  if (!VALID_STATUSES.includes(status as string)) {
-    throw Errors.BadRequest('Invalid status');
-  }
+  const { ids, status } = await parseBody(c, applicationsBulkUpdateSchema);
 
   // Get current applications to update their timelines.
   const applications = await prisma.jobApplication.findMany({
-    where: { id: { in: ids as string[] } },
+    where: { id: { in: ids } },
     select: { id: true, timeline: true },
   });
 
@@ -123,8 +115,8 @@ jobsApplications.put('/jobs/applications/bulk', requireAuth, requireCsrf, async 
   await Promise.all(updates);
 
   return c.json({
-    message: `${(ids as string[]).length} applications updated to ${status}`,
-    count: (ids as string[]).length,
+    message: `${ids.length} applications updated to ${status}`,
+    count: ids.length,
   });
 });
 
@@ -141,7 +133,7 @@ jobsApplications.get('/jobs/applications/:id', requireAuth, async (c) => {
 // ---- update ----
 jobsApplications.put('/jobs/applications/:id', requireAuth, requireCsrf, async (c) => {
   const id = c.req.param('id');
-  const data = (await c.req.json()) as Record<string, unknown>;
+  const data = await parseBody(c, applicationUpdateSchema);
 
   const current = await prisma.jobApplication.findUnique({ where: { id } });
   if (!current) throw Errors.NotFound('Application not found');
@@ -197,15 +189,7 @@ jobsApplications.post('/jobs/saved/:id/apply', requireAuth, requireCsrf, async (
   const savedJob = await prisma.savedJob.findUnique({ where: { id } });
   if (!savedJob) throw Errors.NotFound('Saved job not found');
 
-  const body = (await c.req.json().catch(() => ({}))) as {
-    recipient?: string;
-    subject?: string;
-    body?: string;
-    cvPdfBase64?: string;
-    cvFilename?: string;
-    sendApplicationEmail?: boolean;
-    appliedAt?: string;
-  };
+  const body = await parseBody(c, applySchema);
 
   const recipient = (body.recipient || savedJob.contactEmail || '').trim();
   const wantsEmail = body.sendApplicationEmail !== false;

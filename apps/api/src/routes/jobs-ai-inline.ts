@@ -18,6 +18,8 @@ import { trackAIUsage, estimateTokens, checkQuotaLimits } from '../lib/ai-tracki
 import { logger } from '../lib/logger';
 import prisma from '../db';
 import resumeData from '../../data/resume.json';
+import { parseBody } from '../lib/api-utils';
+import { aiJobInfoSchema, aiExtractSchema } from '../schemas/jobs';
 
 const jobsAiInline = new Hono<AuthEnv>();
 
@@ -370,18 +372,8 @@ Requirements:
 
 // POST /api/jobs/generate-email
 jobsAiInline.post('/jobs/generate-email', requireAuth, requireCsrf, async (c) => {
+  const { jobTitle, company, description } = await parseBody(c, aiJobInfoSchema);
   try {
-    const { jobTitle, company, description } = (await c.req.json().catch(() => ({}))) as {
-      jobTitle?: string;
-      company?: string;
-      description?: string;
-      jobUrl?: string;
-    };
-
-    if (!jobTitle || !company) {
-      return c.json({ error: 'Job title and company are required' }, 400);
-    }
-
     // Check quota
     const quotaCheck = await checkQuotaLimits();
     if (!quotaCheck.withinLimits) {
@@ -506,17 +498,8 @@ Return ONLY JSON:
 
 // POST /api/jobs/cover-letter — a fuller, formal cover letter (vs the short email)
 jobsAiInline.post('/jobs/cover-letter', requireAuth, requireCsrf, async (c) => {
+  const { jobTitle, company, description } = await parseBody(c, aiJobInfoSchema);
   try {
-    const { jobTitle, company, description } = (await c.req.json().catch(() => ({}))) as {
-      jobTitle?: string;
-      company?: string;
-      description?: string;
-    };
-
-    if (!jobTitle || !company) {
-      return c.json({ error: 'Job title and company are required' }, 400);
-    }
-
     const quotaCheck = await checkQuotaLimits();
     if (!quotaCheck.withinLimits) {
       return c.json({ error: 'AI quota exceeded. Please try again later.' }, 429);
@@ -609,13 +592,8 @@ Return ONLY the letter text (no JSON, no markdown).`;
 
 // POST /api/jobs/extract
 jobsAiInline.post('/jobs/extract', requireAuth, requireCsrf, async (c) => {
+  const { text } = await parseBody(c, aiExtractSchema);
   try {
-    const { text } = (await c.req.json().catch(() => ({}))) as { text?: string };
-
-    if (!text || text.trim().length < 20) {
-      return c.json({ error: 'Please provide job information text (minimum 20 characters)' }, 400);
-    }
-
     // Check quota
     const quotaCheck = await checkQuotaLimits();
     if (!quotaCheck.withinLimits) {
