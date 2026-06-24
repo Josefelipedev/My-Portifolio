@@ -6,7 +6,8 @@ import { Hono } from 'hono';
 import prisma from '../db';
 import { requireAuth, type AuthEnv } from '../lib/auth';
 import { requireCsrf } from '../lib/csrf';
-import { Errors, validateRequired } from '../lib/api-utils';
+import { Errors, parseBody } from '../lib/api-utils';
+import { savedJobCreateSchema, savedJobUpdateSchema, idsSchema } from '../schemas/jobs';
 
 const jobs = new Hono<AuthEnv>();
 
@@ -38,28 +39,27 @@ jobs.get('/jobs/saved', requireAuth, async (c) => {
 
 // ---- create ----
 jobs.post('/jobs/saved', requireAuth, requireCsrf, async (c) => {
-  const data = (await c.req.json()) as Record<string, unknown>;
-  validateRequired(data, ['externalId', 'source', 'title', 'company', 'url']);
+  const data = await parseBody(c, savedJobCreateSchema);
 
-  const existing = await prisma.savedJob.findUnique({ where: { externalId: String(data.externalId) } });
+  const existing = await prisma.savedJob.findUnique({ where: { externalId: data.externalId } });
   if (existing) throw Errors.BadRequest('Job already saved');
 
-  const tags = data.tags ? (Array.isArray(data.tags) ? data.tags.join(',') : String(data.tags)) : null;
+  const tags = data.tags ? (Array.isArray(data.tags) ? data.tags.join(',') : data.tags) : null;
   const savedJob = await prisma.savedJob.create({
     data: {
-      externalId: String(data.externalId),
-      source: String(data.source),
-      title: String(data.title),
-      company: String(data.company),
-      companyLogo: (data.companyLogo as string) ?? undefined,
-      description: (data.description as string) || '',
-      url: String(data.url),
-      location: (data.location as string) ?? undefined,
-      jobType: (data.jobType as string) ?? undefined,
-      salary: (data.salary as string) ?? undefined,
+      externalId: data.externalId,
+      source: data.source,
+      title: data.title,
+      company: data.company,
+      companyLogo: data.companyLogo ?? undefined,
+      description: data.description || '',
+      url: data.url,
+      location: data.location ?? undefined,
+      jobType: data.jobType ?? undefined,
+      salary: data.salary ?? undefined,
       tags,
-      postedAt: data.postedAt ? new Date(data.postedAt as string) : null,
-      notes: (data.notes as string) ?? undefined,
+      postedAt: data.postedAt ? new Date(data.postedAt) : null,
+      notes: data.notes ?? undefined,
     },
   });
   return c.json(savedJob, 201);
@@ -67,12 +67,9 @@ jobs.post('/jobs/saved', requireAuth, requireCsrf, async (c) => {
 
 // ---- bulk delete (must be registered before /jobs/saved/:id) ----
 jobs.delete('/jobs/saved/bulk', requireAuth, requireCsrf, async (c) => {
-  const { ids } = (await c.req.json()) as { ids?: unknown };
-  if (!ids || !Array.isArray(ids) || ids.length === 0) {
-    throw Errors.BadRequest('IDs array is required');
-  }
-  await prisma.jobApplication.deleteMany({ where: { savedJobId: { in: ids as string[] } } });
-  const result = await prisma.savedJob.deleteMany({ where: { id: { in: ids as string[] } } });
+  const { ids } = await parseBody(c, idsSchema);
+  await prisma.jobApplication.deleteMany({ where: { savedJobId: { in: ids } } });
+  const result = await prisma.savedJob.deleteMany({ where: { id: { in: ids } } });
   return c.json({ message: `${result.count} jobs deleted`, count: result.count });
 });
 
@@ -88,11 +85,11 @@ jobs.get('/jobs/saved/:id', requireAuth, async (c) => {
 
 // ---- update (partial: notes/contact only) ----
 jobs.put('/jobs/saved/:id', requireAuth, requireCsrf, async (c) => {
-  const data = (await c.req.json()) as Record<string, unknown>;
+  const data = await parseBody(c, savedJobUpdateSchema);
   const updateData: { notes?: string; contactEmail?: string | null; contactPhone?: string | null } = {};
-  if (data.notes !== undefined) updateData.notes = data.notes as string;
-  if (data.contactEmail !== undefined) updateData.contactEmail = (data.contactEmail as string) || null;
-  if (data.contactPhone !== undefined) updateData.contactPhone = (data.contactPhone as string) || null;
+  if (data.notes !== undefined) updateData.notes = data.notes;
+  if (data.contactEmail !== undefined) updateData.contactEmail = data.contactEmail || null;
+  if (data.contactPhone !== undefined) updateData.contactPhone = data.contactPhone || null;
 
   try {
     const savedJob = await prisma.savedJob.update({ where: { id: c.req.param('id') }, data: updateData });

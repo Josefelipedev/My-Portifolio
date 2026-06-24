@@ -10,6 +10,8 @@ import { requireAuth, type AuthEnv } from '../lib/auth';
 import { requireCsrf } from '../lib/csrf';
 import { generateCustomCV } from '../lib/jobs/cv-generator';
 import { analyzeJob } from '../lib/jobs/ai-analysis';
+import { parseBody } from '../lib/api-utils';
+import { analyzeSchema, batchCvSchema, batchAnalyzeSchema } from '../schemas/jobs';
 
 const jobsAi = new Hono<AuthEnv>();
 
@@ -34,15 +36,9 @@ jobsAi.post('/jobs/saved/:id/generate-cv', requireAuth, requireCsrf, async (c) =
 
 // POST /api/jobs/batch/generate-cv
 jobsAi.post('/jobs/batch/generate-cv', requireAuth, requireCsrf, async (c) => {
-  const { jobIds } = (await c.req.json().catch(() => ({}))) as { jobIds?: unknown };
-  if (!Array.isArray(jobIds) || jobIds.length === 0) {
-    return c.json({ error: 'jobIds array is required', code: 'BAD_REQUEST' }, 400);
-  }
-  if (jobIds.length > 10) {
-    return c.json({ error: 'Maximum 10 jobs per batch CV generation', code: 'BAD_REQUEST' }, 400);
-  }
+  const { jobIds } = await parseBody(c, batchCvSchema);
 
-  const results = await Promise.allSettled((jobIds as string[]).map((id) => generateCustomCV(id)));
+  const results = await Promise.allSettled(jobIds.map((id) => generateCustomCV(id)));
   const succeeded = results.filter((r) => r.status === 'fulfilled').length;
   const failed = results.filter((r) => r.status === 'rejected').length;
   const errors = results
@@ -60,8 +56,7 @@ jobsAi.post('/jobs/batch/generate-cv', requireAuth, requireCsrf, async (c) => {
 
 // POST /api/jobs/analyze
 jobsAi.post('/jobs/analyze', requireAuth, requireCsrf, async (c) => {
-  const { jobId } = (await c.req.json().catch(() => ({}))) as { jobId?: string };
-  if (!jobId) return c.json({ error: 'jobId is required', code: 'BAD_REQUEST' }, 400);
+  const { jobId } = await parseBody(c, analyzeSchema);
   try {
     const analyzedAt = new Date().toISOString();
     const analysis = await analyzeJob(jobId);
@@ -73,15 +68,9 @@ jobsAi.post('/jobs/analyze', requireAuth, requireCsrf, async (c) => {
 
 // POST /api/jobs/batch/analyze
 jobsAi.post('/jobs/batch/analyze', requireAuth, requireCsrf, async (c) => {
-  const { jobIds } = (await c.req.json().catch(() => ({}))) as { jobIds?: unknown };
-  if (!Array.isArray(jobIds) || jobIds.length === 0) {
-    return c.json({ error: 'jobIds array is required', code: 'BAD_REQUEST' }, 400);
-  }
-  if (jobIds.length > 20) {
-    return c.json({ error: 'Maximum 20 jobs per batch', code: 'BAD_REQUEST' }, 400);
-  }
+  const { jobIds } = await parseBody(c, batchAnalyzeSchema);
 
-  const results = await Promise.allSettled((jobIds as string[]).map((id) => analyzeJob(id)));
+  const results = await Promise.allSettled(jobIds.map((id) => analyzeJob(id)));
   const succeeded = results.filter((r) => r.status === 'fulfilled').length;
   const failed = results.filter((r) => r.status === 'rejected').length;
   const errors = results

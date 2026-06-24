@@ -2,6 +2,9 @@
 // throw these and the app's onError handler maps them to the right status +
 // the shared { error, code } envelope.
 
+import type { Context } from 'hono';
+import type { ZodType } from 'zod';
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -22,12 +25,18 @@ export const Errors = {
   Internal: (message = 'Internal server error') => new ApiError(message, 500, 'INTERNAL_ERROR'),
 };
 
-/** Throws Errors.BadRequest for any missing/empty required field. */
-export function validateRequired(fields: Record<string, unknown>, required: string[]): void {
-  for (const field of required) {
-    const value = fields[field];
-    if (value === undefined || value === null || value === '') {
-      throw Errors.BadRequest(`${field} is required`);
-    }
+/**
+ * Parse + validate a JSON request body against a Zod schema. On failure throws
+ * Errors.BadRequest carrying the first issue's message, which the app's onError
+ * maps to a 400 { error, code: 'BAD_REQUEST' } envelope. A missing/malformed
+ * body is treated as `{}` so object schemas surface field-level messages
+ * (e.g. "name is required") instead of a generic "expected object".
+ */
+export async function parseBody<T>(c: Context, schema: ZodType<T>): Promise<T> {
+  const raw = await c.req.json().catch(() => ({}));
+  const result = schema.safeParse(raw);
+  if (!result.success) {
+    throw Errors.BadRequest(result.error.issues[0]?.message ?? 'Invalid request body');
   }
+  return result.data;
 }

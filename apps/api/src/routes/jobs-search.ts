@@ -21,6 +21,8 @@ import {
   type ResumeData,
 } from '../lib/jobs';
 import { getJobApiKeys } from '../lib/jobs/api-keys';
+import { parseBody } from '../lib/api-utils';
+import { resumeUpdateSchema } from '../schemas/jobs';
 
 const jobsSearch = new Hono<AuthEnv>();
 
@@ -241,13 +243,7 @@ jobsSearch.get('/jobs/resume', requireAuth, async (c) => {
 });
 
 jobsSearch.put('/jobs/resume', requireAuth, requireCsrf, async (c) => {
-  const body = (await c.req.json().catch(() => null)) as ResumeData | null;
-  if (!body || typeof body !== 'object') {
-    return c.json({ error: 'Invalid resume data', code: 'BAD_REQUEST' }, 400);
-  }
-  if (!Array.isArray(body.skills)) {
-    return c.json({ error: 'skills must be an array', code: 'BAD_REQUEST' }, 400);
-  }
+  const body = (await parseBody(c, resumeUpdateSchema)) as unknown as ResumeData;
   const data = JSON.stringify(body);
   await prisma.resumeConfig.upsert({
     where: { id: 'main' },

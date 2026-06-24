@@ -8,7 +8,7 @@ import { Hono } from 'hono';
 import prisma from '../db';
 import { requireAuth, type AuthEnv } from '../lib/auth';
 import { requireCsrf } from '../lib/csrf';
-import { Errors } from '../lib/api-utils';
+import { Errors, parseBody } from '../lib/api-utils';
 import {
   calculateNextRun,
   runAlert,
@@ -17,6 +17,13 @@ import {
 } from '../lib/jobs/alerts-runner';
 import { invalidateJobApiKeyCache } from '../lib/jobs/api-keys';
 import { generateAlertSuggestions } from '../lib/jobs/alert-suggestions';
+import {
+  historyCreateSchema,
+  alertRunSchema,
+  alertCreateSchema,
+  alertUpdateSchema,
+  apiKeysSchema,
+} from '../schemas/jobs';
 
 const jobsMisc = new Hono<AuthEnv>();
 
@@ -254,16 +261,10 @@ jobsMisc.get('/jobs/history', requireAuth, async (c) => {
 
 // POST - Save a new search to history (legacy — now handled by search route)
 jobsMisc.post('/jobs/history', requireAuth, requireCsrf, async (c) => {
-  const body = (await c.req.json()) as {
-    keyword?: string;
-    countries?: string;
-    sources?: string;
-    filters?: unknown;
-    resultCount?: number;
-  };
-  const { keyword, countries, sources, filters, resultCount } = body;
-
-  if (!keyword) throw Errors.BadRequest('Keyword is required');
+  const { keyword, countries, sources, filters, resultCount } = await parseBody(
+    c,
+    historyCreateSchema,
+  );
 
   const recentSearch = await prisma.jobSearchHistory.findFirst({
     where: {
@@ -318,7 +319,7 @@ jobsMisc.delete('/jobs/history', requireAuth, requireCsrf, async (c) => {
 // POST - Run alerts now: a specific alert by id, or every active alert (force).
 // Used by the "Run now" button; the VPS cron uses the alerts:run script instead.
 jobsMisc.post('/jobs/alerts/run', requireAuth, requireCsrf, async (c) => {
-  const body = (await c.req.json().catch(() => ({}))) as { alertId?: string; id?: string };
+  const body = await parseBody(c, alertRunSchema);
   const id = body.alertId || body.id;
 
   // Lower auto-CV budget for manual triggers, so "Run now" stays fast and cheap.
@@ -362,17 +363,6 @@ jobsMisc.get('/jobs/alerts', requireAuth, async (c) => {
 
 // POST - Create a new alert
 jobsMisc.post('/jobs/alerts', requireAuth, requireCsrf, async (c) => {
-  const body = (await c.req.json()) as {
-    name?: string;
-    keyword?: string;
-    countries?: string;
-    sources?: string;
-    filters?: unknown;
-    scheduleEnabled?: boolean;
-    scheduleHours?: string;
-    scheduleDays?: string;
-    emailOnMatch?: boolean;
-  };
   const {
     name,
     keyword,
@@ -383,9 +373,7 @@ jobsMisc.post('/jobs/alerts', requireAuth, requireCsrf, async (c) => {
     scheduleHours,
     scheduleDays,
     emailOnMatch,
-  } = body;
-
-  if (!name || !keyword) throw Errors.BadRequest('Name and keyword are required');
+  } = await parseBody(c, alertCreateSchema);
 
   // Calculate next run if scheduling is enabled
   let nextRun: Date | null = null;
@@ -413,19 +401,6 @@ jobsMisc.post('/jobs/alerts', requireAuth, requireCsrf, async (c) => {
 
 // PUT - Update an alert
 jobsMisc.put('/jobs/alerts', requireAuth, requireCsrf, async (c) => {
-  const body = (await c.req.json()) as {
-    id?: string;
-    name?: string;
-    keyword?: string;
-    countries?: string;
-    sources?: string;
-    filters?: unknown;
-    isActive?: boolean;
-    scheduleEnabled?: boolean;
-    scheduleHours?: string;
-    scheduleDays?: string;
-    emailOnMatch?: boolean;
-  };
   const {
     id,
     name,
@@ -438,9 +413,7 @@ jobsMisc.put('/jobs/alerts', requireAuth, requireCsrf, async (c) => {
     scheduleHours,
     scheduleDays,
     emailOnMatch,
-  } = body;
-
-  if (!id) throw Errors.BadRequest('Alert ID is required');
+  } = await parseBody(c, alertUpdateSchema);
 
   const updateData: Record<string, unknown> = {};
   if (name !== undefined) updateData.name = name;
@@ -523,7 +496,7 @@ jobsMisc.get('/jobs/api-keys', requireAuth, async (c) => {
 });
 
 jobsMisc.put('/jobs/api-keys', requireAuth, requireCsrf, async (c) => {
-  const body = (await c.req.json().catch(() => ({}))) as Record<string, string | undefined>;
+  const body = await parseBody(c, apiKeysSchema);
   const config = await prisma.siteConfig.findUnique({ where: { id: 'main' } });
   const updated: Record<string, string> = config?.jobApiKeys ? JSON.parse(config.jobApiKeys) : {};
 
