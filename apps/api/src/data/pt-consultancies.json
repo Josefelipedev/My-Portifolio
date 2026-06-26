@@ -86,12 +86,14 @@
       "note": "SmartRecruiters, country=pt; Porto fintech engineering"
     },
     {
-      "company": "Bee Engineering",
-      "careersUrl": "https://bee-engineering.com/careers/",
-      "portalType": "custom",
-      "portalSlug": null,
+      "company": "Anchorage Digital",
+      "careersUrl": "https://jobs.lever.co/anchorage",
+      "portalType": "lever",
+      "portalSlug": "anchorage",
+      "location": ["portugal", "porto", "lisbon", "lisboa"],
       "active": true,
-      "verifiedAtSeed": false
+      "verifiedAtSeed": true,
+      "note": "Lever (global board); location-filtered to PT (Porto crypto-fintech eng)"
     }
   ]
 }
