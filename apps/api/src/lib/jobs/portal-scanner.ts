@@ -24,6 +24,10 @@ type PortalType = 'greenhouse' | 'ashby' | 'lever' | 'smartrecruiters' | 'recrui
 export interface TitleFilters {
   include: string[];
   exclude: string[];
+  // Optional location allow-list (substring match on the job's location). Use for
+  // country-blind ATSs (Greenhouse/Lever/Ashby) to keep only PT-relevant jobs;
+  // SmartRecruiters already filters by country=pt so it can omit this.
+  location?: string[];
 }
 
 export interface PortalScanResult {
@@ -90,6 +94,18 @@ function applyTitleFilters(jobs: JobListing[], filters: TitleFilters): JobListin
     }
 
     return true;
+  });
+}
+
+// Keep only jobs whose location matches one of the allow-listed terms. No-op when
+// the allow-list is empty/undefined. Jobs without a location are dropped when an
+// allow-list is set (we can't confirm they're in scope).
+function applyLocationFilter(jobs: JobListing[], location?: string[]): JobListing[] {
+  if (!location || location.length === 0) return jobs;
+  const terms = location.map((l) => l.toLowerCase());
+  return jobs.filter((job) => {
+    const loc = (job.location || '').toLowerCase();
+    return loc.length > 0 && terms.some((t) => loc.includes(t));
   });
 }
 
@@ -403,22 +419,30 @@ export async function fetchPortalJobs(
   filters: TitleFilters = { include: [], exclude: [] }
 ): Promise<JobListing[]> {
   const slug = portal.portalSlug || detectPortalType(portal.careersUrl).slug || '';
+  let jobs: JobListing[];
   switch (portal.portalType) {
     case 'greenhouse':
-      return fetchGreenhouseJobs(slug, portal.company, filters);
+      jobs = await fetchGreenhouseJobs(slug, portal.company, filters);
+      break;
     case 'ashby':
-      return fetchAshbyJobs(slug, portal.company, filters);
+      jobs = await fetchAshbyJobs(slug, portal.company, filters);
+      break;
     case 'lever':
-      return fetchLeverJobs(slug, portal.company, filters);
+      jobs = await fetchLeverJobs(slug, portal.company, filters);
+      break;
     case 'smartrecruiters':
-      return fetchSmartRecruitersJobs(slug, portal.company, filters, portal.careersUrl);
+      jobs = await fetchSmartRecruitersJobs(slug, portal.company, filters, portal.careersUrl);
+      break;
     case 'recruitee':
-      return fetchRecruiteeJobs(slug, portal.company, filters);
+      jobs = await fetchRecruiteeJobs(slug, portal.company, filters);
+      break;
     case 'custom':
-      return fetchCustomJobs(portal.careersUrl, portal.company, filters);
+      jobs = await fetchCustomJobs(portal.careersUrl, portal.company, filters);
+      break;
     default:
       throw new Error(`Portal type "${portal.portalType}" not supported`);
   }
+  return applyLocationFilter(jobs, filters.location);
 }
 
 export async function scanAllPortals(): Promise<PortalScanResult[]> {
