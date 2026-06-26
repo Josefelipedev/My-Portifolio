@@ -28,6 +28,7 @@ import jobsMisc from './routes/jobs-misc';
 import jobsAi from './routes/jobs-ai';
 import jobsAiInline from './routes/jobs-ai-inline';
 import jobsPortals from './routes/jobs-portals';
+import jobsCompanies from './routes/jobs-companies';
 import adminScraper from './routes/admin-scraper';
 import knowledge from './routes/knowledge';
 import adminObservability from './routes/admin-observability';
@@ -77,6 +78,7 @@ app.route('/api', jobsMisc); // jobs: analytics, search history, alerts (base)
 app.route('/api', jobsAi); // jobs: tailored-CV generation + job-fit analysis
 app.route('/api', jobsAiInline); // jobs: inline AI (enrich, interview-prep, generate-email, extract)
 app.route('/api', jobsPortals); // jobs: company ATS portals (Greenhouse/Ashby/Lever) CRUD + scan
+app.route('/api', jobsCompanies); // jobs: company-first view (companies + a company's ranked jobs)
 app.route('/api', adminScraper); // admin: Python job-scraper proxy (status/logs/debug/test)
 app.route('/api', knowledge); // knowledge-base admin: items CRUD + sources + AI processing
 app.route('/api', adminObservability); // admin observability: logs, ai-usage, agent-tracking, analytics, visits
