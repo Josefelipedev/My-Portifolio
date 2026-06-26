@@ -382,6 +382,68 @@ function slugify(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40);
 }
 
+// ─── Description Enrichment ──────────────────────────────────────────────────
+// The SmartRecruiters list endpoint returns only labels (no job-ad text), which
+// starves skill-matching and AI grading. Fetch the per-posting detail to fill in
+// the real description. Greenhouse/Lever/Recruitee already include full text.
+
+const ENRICH_CONCURRENCY = 6;
+
+function stripHtml(s: string): string {
+  return s
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&[a-z]+;/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+async function fetchSmartRecruitersDescription(url: string): Promise<string | null> {
+  const m = url.match(/jobs\.smartrecruiters\.com\/([^/]+)\/([^/?#]+)/);
+  if (!m) return null;
+  const [, slug, id] = m;
+  try {
+    const res = await fetch(`https://api.smartrecruiters.com/v1/companies/${slug}/postings/${id}`, {
+      signal: AbortSignal.timeout(15000),
+    });
+    if (!res.ok) return null;
+    const d = (await res.json()) as { jobAd?: { sections?: Record<string, { text?: string }> } };
+    const s = d.jobAd?.sections || {};
+    const text = [s.jobDescription?.text, s.qualifications?.text].filter(Boolean).join('\n\n');
+    const clean = stripHtml(text);
+    return clean.length > 0 ? clean.slice(0, 4000) : null;
+  } catch {
+    return null;
+  }
+}
+
+// Enrich thin job descriptions in place (currently SmartRecruiters). Bounded by
+// `max` to cap calls on large deltas; returns how many were enriched and whether
+// the cap truncated the work.
+export async function enrichDescriptions(
+  jobs: JobListing[],
+  max = 80
+): Promise<{ enriched: number; truncated: number }> {
+  const candidates = jobs.filter(
+    (j) => /jobs\.smartrecruiters\.com\//.test(j.url) && (j.description || '').length < 200
+  );
+  const targets = candidates.slice(0, max);
+  let enriched = 0;
+  for (let i = 0; i < targets.length; i += ENRICH_CONCURRENCY) {
+    const chunk = targets.slice(i, i + ENRICH_CONCURRENCY);
+    await Promise.all(
+      chunk.map(async (job) => {
+        const desc = await fetchSmartRecruitersDescription(job.url);
+        if (desc) {
+          job.description = desc;
+          enriched++;
+        }
+      })
+    );
+  }
+  return { enriched, truncated: Math.max(0, candidates.length - targets.length) };
+}
+
 // ─── Deduplication ───────────────────────────────────────────────────────────
 
 // Returns the jobs not yet seen in a previous scan of this portal (delta since
