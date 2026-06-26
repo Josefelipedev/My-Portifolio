@@ -64,13 +64,19 @@ function parseCandidates(text: string): Candidate[] {
   }
 }
 
-async function proposeCandidates(client: Together, count: number): Promise<Candidate[]> {
+async function proposeCandidates(client: Together, count: number, exclude: string[] = []): Promise<Candidate[]> {
   const model = process.env.TOGETHER_MODEL || 'meta-llama/Llama-3.3-70B-Instruct-Turbo';
-  const prompt = `List up to ${count} IT consultancies and software/tech-services companies that hire software engineers in Portugal (Lisboa, Porto, Coimbra, Braga or remote-PT).
+  const excludeLine = exclude.length
+    ? `\n- Do NOT propose any of these already-known companies: ${exclude.join(', ')}.`
+    : '';
+  const prompt = `You are helping a software engineer in Portugal find employers. List up to ${count} DISTINCT small/mid-sized software-development companies, IT outsourcing / nearshore consultancies, or tech scale-ups with an engineering office in Portugal (Lisboa, Porto, Coimbra, Braga, Aveiro) or that hire remote-Portugal.
 
-Prefer companies whose careers/jobs page is hosted on a known ATS: Greenhouse (boards.greenhouse.io/<slug>), Lever (jobs.lever.co/<slug>), Ashby (jobs.ashbyhq.com/<slug>), SmartRecruiters (jobs.smartrecruiters.com/<Company>) or Recruitee (<slug>.recruitee.com). If you don't know the ATS, give the company's own careers page URL.
+RULES:
+- Each company's jobs MUST be on a public ATS. Give the exact URL with the real slug: Greenhouse (boards.greenhouse.io/<slug>), Lever (jobs.lever.co/<slug>), Ashby (jobs.ashbyhq.com/<slug>), SmartRecruiters (jobs.smartrecruiters.com/<Company>) or Recruitee (<slug>.recruitee.com).
+- AVOID the Big-4 and global system integrators / mega-enterprises (Accenture, Deloitte, Capgemini, IBM, Microsoft, SAP, Oracle, KPMG, EY, PwC, NTT, Cognizant, Wipro, Infosys, TCS, Ericsson, Siemens) — they use Workday and are NOT reachable, do not include them.
+- Favour Portuguese software houses, nearshore consultancies and scale-ups (the kind of company like Talkdesk, Feedzai, Pixelmatters, Devexperts, Pipedrive — but propose DIFFERENT, less obvious ones).${excludeLine}
 
-Return ONLY a JSON array, no prose, each item: {"company": string, "careersUrl": string}. Use the real ATS slug when you know it.`;
+Return ONLY a JSON array, no prose: [{"company": string, "careersUrl": string}]. Only include companies you are fairly confident have both an engineering presence in Portugal and a real public ATS URL.`;
 
   const start = Date.now();
   let success = true;
@@ -80,7 +86,7 @@ Return ONLY a JSON array, no prose, each item: {"company": string, "careersUrl":
     const resp = await client.chat.completions.create({
       model,
       messages: [{ role: 'user', content: prompt }],
-      temperature: 0.4,
+      temperature: 0.8,
       max_tokens: 2048,
     });
     outputText = resp.choices?.[0]?.message?.content || '';
@@ -144,17 +150,18 @@ export async function discoverConsultancies(
     return result;
   }
 
-  const candidates = await proposeCandidates(client, opts.count ?? 20);
+  // Existing portals — used both to steer the prompt away from dups and to skip
+  // them after (by URL or company name, case-insensitive).
+  const existing = await prisma.companyPortal.findMany({ select: { careersUrl: true, company: true } });
+  const seenUrls = new Set(existing.map((e) => e.careersUrl.toLowerCase()));
+  const seenCompanies = new Set(existing.map((e) => e.company.toLowerCase()));
+
+  const candidates = await proposeCandidates(client, opts.count ?? 20, existing.map((e) => e.company));
   result.proposed = candidates.length;
   if (candidates.length === 0) {
     result.error = 'no candidates proposed';
     return result;
   }
-
-  // Existing portals — skip dups by URL or company name (case-insensitive).
-  const existing = await prisma.companyPortal.findMany({ select: { careersUrl: true, company: true } });
-  const seenUrls = new Set(existing.map((e) => e.careersUrl.toLowerCase()));
-  const seenCompanies = new Set(existing.map((e) => e.company.toLowerCase()));
 
   for (const c of candidates) {
     if (seenUrls.has(c.careersUrl.toLowerCase()) || seenCompanies.has(c.company.toLowerCase())) {
