@@ -110,8 +110,12 @@ async function validate(c: Candidate): Promise<{ portalType: string; slug: strin
   }
 }
 
-/** Discover and persist (as inactive) new PT IT consultancy portals. */
-export async function discoverConsultancies(opts: { count?: number } = {}): Promise<DiscoveryResult> {
+/** Discover and persist new PT IT consultancy portals. Validated candidates are
+ *  added inactive by default (for review); pass activate:true to add them active
+ *  so the scan starts tracking their jobs immediately. */
+export async function discoverConsultancies(
+  opts: { count?: number; activate?: boolean } = {}
+): Promise<DiscoveryResult> {
   const result: DiscoveryResult = { proposed: 0, added: [], skipped: [] };
 
   const client = getClient();
@@ -157,7 +161,7 @@ export async function discoverConsultancies(opts: { count?: number } = {}): Prom
         portalType: valid.portalType,
         portalSlug: valid.slug,
         titleFilters: JSON.stringify(DEFAULT_FILTERS),
-        isActive: false, // pending operator review
+        isActive: opts.activate ?? false, // default: pending operator review
       },
     });
     // Avoid re-adding within the same run if the LLM repeats a firm.

@@ -9,7 +9,7 @@ import JobAnalytics from './JobAnalytics';
 import JobAlerts from './JobAlerts';
 import ScraperStatus from './ScraperStatus';
 import AgentCostTracker from './AgentCostTracker';
-import CompanyTracker from './CompanyTracker';
+import CompaniesBoard from './CompaniesBoard';
 import ResumeEditor from './jobs/ResumeEditor';
 
 interface JobsTabsProps {
@@ -182,7 +182,7 @@ export default function JobsTabs({ initialSavedCount, initialApplicationsCount }
         )}
         {activeTab === 'analytics' && <JobAnalytics />}
         {activeTab === 'alerts' && <JobAlerts />}
-        {activeTab === 'companies' && <CompanyTracker />}
+        {activeTab === 'companies' && <CompaniesBoard />}
         {activeTab === 'scraper' && <ScraperStatus defaultExpanded={true} />}
         {activeTab === 'agent-costs' && <AgentCostTracker />}
         {activeTab === 'resume' && <ResumeEditor />}
