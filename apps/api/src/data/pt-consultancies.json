@@ -14,7 +14,9 @@
     "exclude": [
       "recursos humanos", "human resources", "recruiter", "talent acquisition",
       "marketing", "contabilidade", "accounting", "financeiro", "comercial",
-      "vendas", "sales", "account manager", "administrativo", "receptionist"
+      "vendas", "sales", "account manager", "administrativo", "receptionist",
+      "credit risk", "liquidity", "counterparty", "transaction screening",
+      "financial analyst", "actuary", "actuarial"
     ]
   },
   "portals": [
