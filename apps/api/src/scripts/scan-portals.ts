@@ -13,10 +13,14 @@
 
 import prisma from '../db';
 import { scanAllPortals, type PortalScanResult } from '../lib/jobs/portal-scanner';
-import type { JobListing } from '../lib/jobs/types';
+import type { JobListing, ResumeData } from '../lib/jobs/types';
+import { scoreJobs, calculateMatchPercentage } from '../lib/jobs/scoring';
 import { sendEmail } from '../lib/email';
 import { analyzeJob } from '../lib/jobs/ai-analysis';
 import { generateCustomCV } from '../lib/jobs/cv-generator';
+import resumeJson from '../../data/resume.json';
+
+const resume = resumeJson as unknown as ResumeData;
 
 const AUTO_CV_ENABLED = process.env.AUTO_CV_ENABLED !== 'false';
 // Caps paid AI calls (grading) per run, shared across all portals.
@@ -53,9 +57,14 @@ async function saveJob(listing: JobListing): Promise<{ id: string; generatedCvAt
 }
 
 // Save all, then AI-grade + pre-generate CVs for A/B matches within the budget.
-async function persistAndGrade(jobs: JobListing[]): Promise<{ saved: number; cvs: number }> {
+// `jobs` must already be ranked best-first so the limited AI budget is spent on
+// the strongest profile matches. Returns the AI grade per job url (for the email).
+async function persistAndGrade(
+  jobs: JobListing[]
+): Promise<{ saved: number; cvs: number; grades: Map<string, string> }> {
   let saved = 0;
   let cvs = 0;
+  const grades = new Map<string, string>();
   const budget = { remaining: PORTAL_CV_PER_RUN };
 
   for (const job of jobs) {
@@ -70,6 +79,7 @@ async function persistAndGrade(jobs: JobListing[]): Promise<{ saved: number; cvs
     budget.remaining -= 1;
     try {
       const analysis = await analyzeJob(row.id);
+      grades.set(job.url, analysis.grade);
       if (AUTO_CV_GRADES.has(analysis.grade)) {
         await generateCustomCV(row.id);
         cvs++;
@@ -78,41 +88,53 @@ async function persistAndGrade(jobs: JobListing[]): Promise<{ saved: number; cvs
       console.warn('[portals:scan] grade/cv failed for', job.title, '-', e instanceof Error ? e.message : e);
     }
   }
-  return { saved, cvs };
+  return { saved, cvs, grades };
 }
 
-function digestHtml(jobsByCompany: Map<string, JobListing[]>, total: number): string {
-  let shown = 0;
-  const blocks: string[] = [];
-  for (const [company, jobs] of jobsByCompany) {
-    if (shown >= DIGEST_MAX) break;
-    const items = jobs
-      .slice(0, DIGEST_MAX - shown)
-      .map(
-        (j) =>
-          `<li style="margin-bottom:8px"><a href="${j.url}" style="color:#dc2626;font-weight:600;text-decoration:none">${j.title}</a>${j.location ? ` <span style="color:#64748b">— ${j.location}</span>` : ''}</li>`
-      );
-    shown += items.length;
-    blocks.push(
-      `<h3 style="margin:16px 0 4px;color:#0f172a">${company} <span style="color:#94a3b8;font-weight:400">(${jobs.length})</span></h3><ul style="padding-left:18px;margin:0">${items.join('')}</ul>`
-    );
-  }
-  const more = total > shown ? `<p style="color:#64748b;margin-top:16px">+${total - shown} mais em <strong>/admin/jobs</strong>.</p>` : '';
+// A digest row: the job plus its resume-match % and (if graded) AI grade.
+interface DigestRow {
+  job: JobListing;
+  pct: number;
+  grade?: string;
+}
+
+const GRADE_COLOR: Record<string, string> = {
+  A: '#16a34a', B: '#65a30d', C: '#ca8a04', D: '#ea580c', F: '#dc2626',
+};
+
+function pctColor(pct: number): string {
+  return pct >= 60 ? '#16a34a' : pct >= 35 ? '#ca8a04' : '#94a3b8';
+}
+
+function digestHtml(rows: DigestRow[], total: number): string {
+  const items = rows
+    .slice(0, DIGEST_MAX)
+    .map(({ job, pct, grade }) => {
+      const gradeBadge = grade
+        ? ` <span style="background:${GRADE_COLOR[grade] || '#64748b'};color:#fff;border-radius:4px;padding:1px 6px;font-size:12px;font-weight:700">${grade}</span>`
+        : '';
+      const pctBadge = `<span style="color:${pctColor(pct)};font-weight:700">${pct}%</span>`;
+      return `<li style="margin-bottom:10px">
+        ${pctBadge}${gradeBadge}
+        <a href="${job.url}" style="color:#dc2626;font-weight:600;text-decoration:none">${job.title}</a>
+        <span style="color:#64748b">— ${job.company}${job.location ? ` · ${job.location}` : ''}</span>
+      </li>`;
+    })
+    .join('');
+  const more = total > DIGEST_MAX ? `<p style="color:#64748b;margin-top:16px">+${total - DIGEST_MAX} mais em <strong>/admin/jobs</strong>.</p>` : '';
   return `<div style="font-family:system-ui,sans-serif;color:#0f172a">
-    <h2 style="margin:0 0 4px">🏢 ${total} nova(s) vaga(s) IT em consultorias PT</h2>
-    <p style="color:#64748b;margin:0">Varrimento de portais de carreiras</p>
-    ${blocks.join('')}${more}
+    <h2 style="margin:0 0 4px">🎯 ${total} nova(s) vaga(s) IT — melhores matches para o teu perfil</h2>
+    <p style="color:#64748b;margin:0 0 12px">Ordenadas por afinidade ao teu CV · <strong>%</strong> = match de skills · letra = nota IA</p>
+    <ul style="padding-left:18px;margin:0;list-style:none">${items}</ul>${more}
   </div>`;
 }
 
-function digestText(jobsByCompany: Map<string, JobListing[]>, total: number): string {
-  const lines: string[] = [`${total} nova(s) vaga(s) IT em consultorias PT:\n`];
-  for (const [company, jobs] of jobsByCompany) {
-    lines.push(`\n${company} (${jobs.length}):`);
-    for (const j of jobs.slice(0, DIGEST_MAX)) {
-      lines.push(`  - ${j.title}${j.location ? ` — ${j.location}` : ''}\n    ${j.url}`);
-    }
+function digestText(rows: DigestRow[], total: number): string {
+  const lines: string[] = [`${total} nova(s) vaga(s) IT — melhores matches para o teu perfil:\n`];
+  for (const { job, pct, grade } of rows.slice(0, DIGEST_MAX)) {
+    lines.push(`  [${pct}%${grade ? ` ${grade}` : ''}] ${job.title} — ${job.company}${job.location ? ` · ${job.location}` : ''}\n    ${job.url}`);
   }
+  if (total > DIGEST_MAX) lines.push(`\n+${total - DIGEST_MAX} mais em /admin/jobs.`);
   return lines.join('\n');
 }
 
@@ -135,24 +157,26 @@ function digestText(jobsByCompany: Map<string, JobListing[]>, total: number): st
     process.exit(0);
   }
 
-  const { saved, cvs } = await persistAndGrade(newJobs);
+  // Rank by fit to the resume (best first): primary key is the skill-match % to
+  // the CV, tie-broken by the richer relevance score (freshness/completeness).
+  // This way the limited AI budget grades the strongest matches and the email
+  // leads with the most relevant jobs.
+  const scored = scoreJobs(newJobs, resume); // sets relevanceScore
+  const rows: DigestRow[] = scored
+    .map((job) => ({ job, pct: calculateMatchPercentage(job, resume), grade: undefined as string | undefined }))
+    .sort((a, b) => b.pct - a.pct || (b.job.relevanceScore || 0) - (a.job.relevanceScore || 0));
 
-  // Group for the digest (preserve scan order).
-  const byCompany = new Map<string, JobListing[]>();
-  for (const j of newJobs) {
-    const list = byCompany.get(j.company) ?? [];
-    list.push(j);
-    byCompany.set(j.company, list);
-  }
+  const { saved, cvs, grades } = await persistAndGrade(rows.map((r) => r.job));
+  for (const r of rows) r.grade = grades.get(r.job.url);
 
   let emailed = false;
   const to = process.env.CONTACT_EMAIL || process.env.SMTP_USER;
   if (to) {
     emailed = await sendEmail({
       to,
-      subject: `🏢 ${newJobs.length} nova(s) vaga(s) IT — consultorias PT`,
-      html: digestHtml(byCompany, newJobs.length),
-      text: digestText(byCompany, newJobs.length),
+      subject: `🎯 ${newJobs.length} nova(s) vaga(s) IT — melhores matches para ti`,
+      html: digestHtml(rows, newJobs.length),
+      text: digestText(rows, newJobs.length),
     });
   }
 
