@@ -170,7 +170,14 @@ async function fetchAshbyJobs(
     signal: AbortSignal.timeout(15000),
   });
 
-  if (!response.ok) throw new Error(`Ashby API error: ${response.status}`);
+  // Some Ashby orgs don't enable the public posting API (401/403). Fall back to
+  // the public job-board GraphQL endpoint the hosted board itself uses.
+  if (!response.ok) {
+    if (response.status === 401 || response.status === 403 || response.status === 404) {
+      return fetchAshbyJobsViaGraphql(slug, company, filters);
+    }
+    throw new Error(`Ashby API error: ${response.status}`);
+  }
 
   const data = (await response.json()) as { results: AshbyPosting[] };
 
@@ -183,6 +190,49 @@ async function fetchAshbyJobs(
     url: j.jobUrl,
     location: j.locationName,
     postedAt: j.publishedDate ? new Date(j.publishedDate) : undefined,
+  }));
+
+  return applyTitleFilters(jobs, filters);
+}
+
+// Public GraphQL fallback for Ashby boards without the posting API enabled.
+// Returns only brief fields (id/title/location); the job URL is reconstructed
+// and description left empty (no per-posting text in the brief query).
+async function fetchAshbyJobsViaGraphql(
+  slug: string,
+  company: string,
+  filters: TitleFilters
+): Promise<JobListing[]> {
+  const query =
+    'query ApiJobBoardWithTeams($organizationHostedJobsPageName: String!) { ' +
+    'jobBoard: jobBoardWithTeams(organizationHostedJobsPageName: $organizationHostedJobsPageName) { ' +
+    'jobPostings { id title locationName employmentType } } }';
+  const res = await fetch('https://jobs.ashbyhq.com/api/non-user-graphql?op=ApiJobBoardWithTeams', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      operationName: 'ApiJobBoardWithTeams',
+      variables: { organizationHostedJobsPageName: slug },
+      query,
+    }),
+    signal: AbortSignal.timeout(15000),
+  });
+  if (!res.ok) throw new Error(`Ashby GraphQL error: ${res.status}`);
+
+  const data = (await res.json()) as {
+    data?: { jobBoard?: { jobPostings?: Array<{ id: string; title: string; locationName?: string; employmentType?: string }> } };
+  };
+  const postings = data.data?.jobBoard?.jobPostings || [];
+
+  const jobs: JobListing[] = postings.map((j) => ({
+    id: j.id,
+    source: 'ats' as const,
+    title: j.title,
+    company,
+    description: '',
+    url: `https://jobs.ashbyhq.com/${slug}/${j.id}`,
+    location: j.locationName,
+    jobType: j.employmentType,
   }));
 
   return applyTitleFilters(jobs, filters);

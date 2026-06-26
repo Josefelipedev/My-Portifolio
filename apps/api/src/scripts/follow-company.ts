@@ -22,7 +22,7 @@ function flag(name: string): string | undefined {
   const [company, careersUrl] = positional;
 
   if (!company || !careersUrl) {
-    console.error('Usage: npm run follow:company -- "<Company>" "<careersUrl>" [--location=pt,porto] [--slug=x] [--type=greenhouse]');
+    console.error('Usage: npm run follow:company -- "<Company>" "<careersUrl>" [--location=pt,porto] [--slug=x] [--type=greenhouse] [--force]');
     process.exit(1);
   }
 
@@ -33,10 +33,12 @@ function flag(name: string): string | undefined {
     location,
     portalType: flag('type'),
     portalSlug: flag('slug'),
+    force: process.argv.includes('--force'),
   });
 
   if (r.ok) {
-    console.log(`✅ Following ${r.company} [${r.portalType}] — ${r.action}, ${r.jobs} matching job(s). It will be scanned from now on.`);
+    const future = r.jobs === 0 ? ' (0 IT jobs now — tracking for future postings)' : '';
+    console.log(`✅ Following ${r.company} [${r.portalType}] — ${r.action}, ${r.jobs} matching job(s)${future}. It will be scanned from now on.`);
   } else {
     console.error(`❌ Could not follow ${r.company} [${r.portalType ?? '?'}]: ${r.reason}`);
     process.exit(1);
