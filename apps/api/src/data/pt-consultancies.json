@@ -16,7 +16,7 @@
       "marketing", "contabilidade", "accounting", "financeiro", "comercial",
       "vendas", "sales", "account manager", "administrativo", "receptionist",
       "credit risk", "liquidity", "counterparty", "transaction screening",
-      "financial analyst", "actuary", "actuarial"
+      "financial analyst", "actuary", "actuarial", "kyc", "anti-money", "compliance officer"
     ]
   },
   "portals": [
@@ -66,24 +66,26 @@
       "note": "Custom career page; AI extraction best-effort"
     },
     {
-      "company": "Innowave",
-      "careersUrl": "https://innowave.tech/careers/",
-      "portalType": "custom",
-      "portalSlug": null,
+      "company": "Inetum Portugal",
+      "careersUrl": "https://jobs.smartrecruiters.com/Inetum2",
+      "portalType": "smartrecruiters",
+      "portalSlug": "Inetum2",
       "active": true,
-      "verifiedAtSeed": false
+      "verifiedAtSeed": true,
+      "note": "SmartRecruiters, country=pt (~400 PT openings, Lisboa/Porto)"
+    },
+    {
+      "company": "Devexperts",
+      "careersUrl": "https://jobs.smartrecruiters.com/Devexperts",
+      "portalType": "smartrecruiters",
+      "portalSlug": "Devexperts",
+      "active": true,
+      "verifiedAtSeed": true,
+      "note": "SmartRecruiters, country=pt; Porto fintech engineering"
     },
     {
       "company": "Bee Engineering",
       "careersUrl": "https://bee-engineering.com/careers/",
-      "portalType": "custom",
-      "portalSlug": null,
-      "active": true,
-      "verifiedAtSeed": false
-    },
-    {
-      "company": "Multivision",
-      "careersUrl": "https://multivision.pt/carreiras/",
       "portalType": "custom",
       "portalSlug": null,
       "active": true,
