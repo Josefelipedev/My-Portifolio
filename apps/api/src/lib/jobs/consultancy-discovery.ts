@@ -18,8 +18,18 @@ import seed from '../../data/pt-consultancies.json';
 interface TitleFilters {
   include: string[];
   exclude: string[];
+  location?: string[];
 }
 const DEFAULT_FILTERS = seed.defaultTitleFilters as TitleFilters;
+
+// PT location allow-list applied to country-blind ATSs (Greenhouse/Lever/Ashby/
+// Recruitee/custom) so the agent only counts/keeps Portugal-based jobs. The
+// SmartRecruiters adapter already filters by country=pt, so it needs no list.
+const PT_LOCATIONS = ['portugal', 'lisbon', 'lisboa', 'porto', 'braga', 'coimbra', 'aveiro'];
+
+function filtersForType(type: string): TitleFilters {
+  return type === 'smartrecruiters' ? DEFAULT_FILTERS : { ...DEFAULT_FILTERS, location: PT_LOCATIONS };
+}
 
 interface Candidate {
   company: string;
@@ -92,19 +102,23 @@ Return ONLY a JSON array, no prose, each item: {"company": string, "careersUrl":
   }
 }
 
-// Validate a candidate against its real ATS; return matched jobs (or null).
-async function validate(c: Candidate): Promise<{ portalType: string; slug: string | null; jobs: number } | null> {
+// Validate a candidate against its real ATS (PT-location-filtered for global
+// boards); return matched jobs + the filters to persist (or null).
+async function validate(
+  c: Candidate
+): Promise<{ portalType: string; slug: string | null; jobs: number; filters: TitleFilters } | null> {
   const { type, slug } = detectPortalType(c.careersUrl);
   // Custom (AI-scraped) candidates need a Together key and are noisier — only
   // accept them when AI extraction is available.
   if (type === 'custom' && !isAIExtractionAvailable()) return null;
+  const filters = filtersForType(type);
   try {
     const jobs = await fetchPortalJobs(
       { portalType: type, portalSlug: slug, careersUrl: c.careersUrl, company: c.company },
-      DEFAULT_FILTERS
+      filters
     );
     if (jobs.length === 0) return null;
-    return { portalType: type, slug, jobs: jobs.length };
+    return { portalType: type, slug, jobs: jobs.length, filters };
   } catch {
     return null;
   }
@@ -160,7 +174,7 @@ export async function discoverConsultancies(
         careersUrl: c.careersUrl,
         portalType: valid.portalType,
         portalSlug: valid.slug,
-        titleFilters: JSON.stringify(DEFAULT_FILTERS),
+        titleFilters: JSON.stringify(valid.filters),
         isActive: opts.activate ?? false, // default: pending operator review
       },
     });
