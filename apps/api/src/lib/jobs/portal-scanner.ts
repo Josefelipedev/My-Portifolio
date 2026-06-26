@@ -1,9 +1,25 @@
-// ATS Portal Scanner — Greenhouse, Ashby, Lever
+// ATS Portal Scanner — Greenhouse, Ashby, Lever, SmartRecruiters, Recruitee, custom
 // Fetches job listings directly from ATS public APIs. Ported from the web app's
 // src/lib/jobs/portal-scanner.ts (prisma import path adjusted for the API).
+//
+// SmartRecruiters/Recruitee cover the ATSs most Portuguese IT consultancies use;
+// the "custom" type falls back to fetching the careers page HTML and extracting
+// listings with the AI extractor — so a consultancy with its own career page
+// (no structured ATS) is still scannable.
 
 import prisma from '../../db';
 import type { JobListing } from './types';
+import { extractJobsWithAI, isAIExtractionAvailable } from './ai-extraction';
+
+// Browser-ish UA for the custom HTML fallback (some career pages 403 default UAs).
+const BROWSER_UA =
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+
+// Default country filter for country-aware ATSs (SmartRecruiters). This feature
+// targets jobs in Portugal; override per-portal with `?country=xx` in careersUrl.
+const DEFAULT_PORTAL_COUNTRY = 'pt';
+
+type PortalType = 'greenhouse' | 'ashby' | 'lever' | 'smartrecruiters' | 'recruitee' | 'custom';
 
 export interface TitleFilters {
   include: string[];
@@ -21,7 +37,7 @@ export interface PortalScanResult {
 // ─── Portal Type Detection ───────────────────────────────────────────────────
 
 export function detectPortalType(careersUrl: string): {
-  type: 'greenhouse' | 'ashby' | 'lever' | 'custom';
+  type: PortalType;
   slug: string | null;
 } {
   const url = careersUrl.toLowerCase();
@@ -38,7 +54,23 @@ export function detectPortalType(careersUrl: string): {
   const lever = url.match(/jobs\.lever\.co\/([^/?#]+)/);
   if (lever) return { type: 'lever', slug: lever[1] };
 
+  // SmartRecruiters: jobs.smartrecruiters.com/{Company} or the API host.
+  const smart =
+    url.match(/jobs\.smartrecruiters\.com\/([^/?#]+)/) ||
+    url.match(/api\.smartrecruiters\.com\/v1\/companies\/([^/?#]+)/);
+  if (smart) return { type: 'smartrecruiters', slug: smart[1] };
+
+  // Recruitee: {slug}.recruitee.com
+  const recruitee = url.match(/https?:\/\/([^.]+)\.recruitee\.com/);
+  if (recruitee) return { type: 'recruitee', slug: recruitee[1] };
+
   return { type: 'custom', slug: null };
+}
+
+// Parse an optional ?country= override out of a careers URL (defaults to PT).
+function countryFor(careersUrl: string): string {
+  const m = careersUrl.match(/[?&]country=([a-zA-Z]{2})\b/);
+  return m ? m[1].toLowerCase() : DEFAULT_PORTAL_COUNTRY;
 }
 
 // ─── Title Filtering ─────────────────────────────────────────────────────────
@@ -178,6 +210,162 @@ async function fetchLeverJobs(
   return applyTitleFilters(jobs, filters);
 }
 
+// ─── SmartRecruiters ───────────────────────────────────────────────────────────
+// Public postings API (no key). Country-filtered (PT by default) because the big
+// consultancies on SmartRecruiters (Devoteam, Bosch, Natixis) are multi-country.
+
+interface SmartRecruitersPosting {
+  id: string;
+  name: string;
+  releasedDate?: string;
+  location?: { city?: string; country?: string; fullLocation?: string; remote?: boolean; hybrid?: boolean };
+  function?: { label?: string };
+  department?: { label?: string };
+  typeOfEmployment?: { label?: string };
+}
+
+// Cap on postings pulled per SmartRecruiters portal per scan (big consultancies
+// have hundreds; paginate up to this many, then stop). 100 per page.
+const SR_MAX_POSTINGS = 300;
+
+async function fetchSmartRecruitersJobs(
+  slug: string,
+  company: string,
+  filters: TitleFilters,
+  careersUrl: string
+): Promise<JobListing[]> {
+  const country = countryFor(careersUrl);
+  const postings: SmartRecruitersPosting[] = [];
+
+  for (let offset = 0; offset < SR_MAX_POSTINGS; offset += 100) {
+    const url = `https://api.smartrecruiters.com/v1/companies/${slug}/postings?limit=100&offset=${offset}&country=${country}`;
+    const response = await fetch(url, { signal: AbortSignal.timeout(15000) });
+    if (!response.ok) {
+      if (offset === 0) throw new Error(`SmartRecruiters API error: ${response.status}`);
+      break; // partial page failure — keep what we have
+    }
+    const data = (await response.json()) as { content?: SmartRecruitersPosting[]; totalFound?: number };
+    const page = data.content || [];
+    postings.push(...page);
+    if (page.length < 100 || postings.length >= (data.totalFound ?? 0)) break;
+  }
+
+  const jobs: JobListing[] = postings.map((j) => {
+    const jobType = j.location?.remote ? 'Remote' : j.location?.hybrid ? 'Hybrid' : 'On-site';
+    return {
+      id: `sr-${slug}-${j.id}`,
+      source: 'ats' as const,
+      title: j.name,
+      company,
+      description: [j.function?.label, j.department?.label, j.typeOfEmployment?.label]
+        .filter(Boolean)
+        .join(' · '),
+      url: `https://jobs.smartrecruiters.com/${slug}/${j.id}`,
+      location: j.location?.fullLocation || j.location?.city,
+      jobType,
+      postedAt: j.releasedDate ? new Date(j.releasedDate) : undefined,
+      country,
+    };
+  });
+
+  return applyTitleFilters(jobs, filters);
+}
+
+// ─── Recruitee ──────────────────────────────────────────────────────────────────
+
+interface RecruiteeOffer {
+  id: number;
+  title: string;
+  careers_url?: string;
+  careers_apply_url?: string;
+  location?: string;
+  city?: string;
+  country_code?: string;
+  description?: string;
+  published_at?: string;
+}
+
+async function fetchRecruiteeJobs(
+  slug: string,
+  company: string,
+  filters: TitleFilters
+): Promise<JobListing[]> {
+  const url = `https://${slug}.recruitee.com/api/offers/`;
+  const response = await fetch(url, { signal: AbortSignal.timeout(15000) });
+
+  if (!response.ok) throw new Error(`Recruitee API error: ${response.status}`);
+
+  const data = (await response.json()) as { offers?: RecruiteeOffer[] };
+
+  const jobs: JobListing[] = (data.offers || []).map((j) => ({
+    id: `recruitee-${slug}-${j.id}`,
+    source: 'ats' as const,
+    title: j.title,
+    company,
+    description: j.description || '',
+    url: j.careers_url || j.careers_apply_url || `https://${slug}.recruitee.com/o/${j.id}`,
+    location: j.location || j.city,
+    postedAt: j.published_at ? new Date(j.published_at) : undefined,
+    country: j.country_code ? j.country_code.toLowerCase() : undefined,
+  }));
+
+  return applyTitleFilters(jobs, filters);
+}
+
+// ─── Custom (AI fallback) ────────────────────────────────────────────────────────
+// For consultancies whose careers page is not a recognised ATS: fetch the HTML and
+// let the AI extractor pull out listings. Requires a Together API key.
+
+function absolutizeUrl(href: string, base: string): string {
+  if (/^https?:\/\//i.test(href)) return href;
+  try {
+    return new URL(href, base).toString();
+  } catch {
+    return href;
+  }
+}
+
+async function fetchCustomJobs(
+  careersUrl: string,
+  company: string,
+  filters: TitleFilters
+): Promise<JobListing[]> {
+  if (!isAIExtractionAvailable()) {
+    throw new Error('custom portal needs TOGETHER_API_KEY for AI extraction');
+  }
+
+  const response = await fetch(careersUrl, {
+    headers: {
+      'User-Agent': BROWSER_UA,
+      Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      'Accept-Language': 'pt-PT,pt;q=0.9,en;q=0.8',
+    },
+    signal: AbortSignal.timeout(20000),
+  });
+
+  if (!response.ok) throw new Error(`custom fetch error: ${response.status}`);
+
+  const html = await response.text();
+  const extracted = await extractJobsWithAI(html, company, careersUrl);
+
+  const jobs: JobListing[] = extracted.map((j, i) => ({
+    id: `custom-${slugify(company)}-${i}-${slugify(j.title)}`,
+    source: 'ats' as const,
+    title: j.title,
+    company,
+    description: j.description || '',
+    url: j.url ? absolutizeUrl(j.url, careersUrl) : careersUrl,
+    location: j.location,
+    country: DEFAULT_PORTAL_COUNTRY,
+  }));
+
+  return applyTitleFilters(jobs, filters);
+}
+
+function slugify(s: string): string {
+  return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40);
+}
+
 // ─── Deduplication ───────────────────────────────────────────────────────────
 
 // Returns the jobs not yet seen in a previous scan of this portal (delta since
@@ -207,6 +395,32 @@ async function deduplicateAndRecord(portalId: string, jobs: JobListing[]): Promi
 
 // ─── Scan All Portals ─────────────────────────────────────────────────────────
 
+// Fetch (and title-filter) the current jobs for a single portal, dispatching on
+// its ATS type. Throws on unsupported types or fetch failures. Exported so the
+// discovery agent can validate a candidate portal before persisting it.
+export async function fetchPortalJobs(
+  portal: { portalType: string; portalSlug: string | null; careersUrl: string; company: string },
+  filters: TitleFilters = { include: [], exclude: [] }
+): Promise<JobListing[]> {
+  const slug = portal.portalSlug || detectPortalType(portal.careersUrl).slug || '';
+  switch (portal.portalType) {
+    case 'greenhouse':
+      return fetchGreenhouseJobs(slug, portal.company, filters);
+    case 'ashby':
+      return fetchAshbyJobs(slug, portal.company, filters);
+    case 'lever':
+      return fetchLeverJobs(slug, portal.company, filters);
+    case 'smartrecruiters':
+      return fetchSmartRecruitersJobs(slug, portal.company, filters, portal.careersUrl);
+    case 'recruitee':
+      return fetchRecruiteeJobs(slug, portal.company, filters);
+    case 'custom':
+      return fetchCustomJobs(portal.careersUrl, portal.company, filters);
+    default:
+      throw new Error(`Portal type "${portal.portalType}" not supported`);
+  }
+}
+
 export async function scanAllPortals(): Promise<PortalScanResult[]> {
   const portals = await prisma.companyPortal.findMany({
     where: { isActive: true },
@@ -221,20 +435,11 @@ export async function scanAllPortals(): Promise<PortalScanResult[]> {
         ? (JSON.parse(portal.titleFilters) as TitleFilters)
         : { include: [], exclude: [] };
 
-      const slug = portal.portalSlug || detectPortalType(portal.careersUrl).slug || '';
       const errors: string[] = [];
       let jobs: JobListing[] = [];
 
       try {
-        if (portal.portalType === 'greenhouse') {
-          jobs = await fetchGreenhouseJobs(slug, portal.company, filters);
-        } else if (portal.portalType === 'ashby') {
-          jobs = await fetchAshbyJobs(slug, portal.company, filters);
-        } else if (portal.portalType === 'lever') {
-          jobs = await fetchLeverJobs(slug, portal.company, filters);
-        } else {
-          errors.push(`Portal type "${portal.portalType}" not supported`);
-        }
+        jobs = await fetchPortalJobs(portal, filters);
       } catch (err) {
         errors.push(err instanceof Error ? err.message : 'Unknown fetch error');
       }

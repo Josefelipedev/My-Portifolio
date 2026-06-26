@@ -9,6 +9,9 @@
     "start": "tsx src/index.ts",
     "alerts:run": "tsx src/scripts/run-alerts.ts",
     "followups:run": "tsx src/scripts/run-followups.ts",
+    "seed:consultancies": "tsx src/scripts/seed-consultancies.ts",
+    "portals:scan": "tsx src/scripts/scan-portals.ts",
+    "consultancies:discover": "tsx src/scripts/discover-consultancies.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
