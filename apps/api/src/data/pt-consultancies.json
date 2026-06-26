@@ -1,0 +1,91 @@
+{
+  "$comment": "Curated seed of Portuguese IT consultancies / tech employers for the portal scanner. Loaded by scripts/seed-consultancies.ts into the CompanyPortal table. 'structured' entries hit a keyless ATS API (reliable); 'custom' entries are scraped + AI-extracted (best effort, may yield nothing for JS-rendered pages). Entries verified to return PT IT jobs at seed time are marked active:true. Grow this list manually or via scripts/discover-consultancies.ts.",
+  "defaultTitleFilters": {
+    "include": [
+      "developer", "engineer", "engenheiro", "programador", "software", "devops",
+      "sre", "qa", "tester", "data", "analyst", "analista", "cloud", "backend",
+      "frontend", "front-end", "fullstack", "full-stack", "full stack", "architect",
+      "arquiteto", "scrum", "product owner", "security", "cyber", "mobile", "android",
+      "ios", "java", "python", "javascript", "typescript", "react", "angular", "node",
+      ".net", "php", "sql", "machine learning", " ai ", "ml ", "consultant", "consultor",
+      "sap", "salesforce", "support engineer", "system", "sistema", "network", "redes",
+      "infrastructure", "infraestrutura", "automation"
+    ],
+    "exclude": [
+      "recursos humanos", "human resources", "recruiter", "talent acquisition",
+      "marketing", "contabilidade", "accounting", "financeiro", "comercial",
+      "vendas", "sales", "account manager", "administrativo", "receptionist"
+    ]
+  },
+  "portals": [
+    {
+      "company": "Devoteam Portugal",
+      "careersUrl": "https://jobs.smartrecruiters.com/Devoteam",
+      "portalType": "smartrecruiters",
+      "portalSlug": "Devoteam",
+      "active": true,
+      "verifiedAtSeed": true,
+      "note": "SmartRecruiters, country=pt filtered in scanner (~300 PT openings)"
+    },
+    {
+      "company": "Natixis in Portugal",
+      "careersUrl": "https://jobs.smartrecruiters.com/NatixisinPortugal",
+      "portalType": "smartrecruiters",
+      "portalSlug": "NatixisinPortugal",
+      "active": true,
+      "verifiedAtSeed": true,
+      "note": "SmartRecruiters, Porto tech center"
+    },
+    {
+      "company": "Bosch Portugal",
+      "careersUrl": "https://jobs.smartrecruiters.com/BoschGroup",
+      "portalType": "smartrecruiters",
+      "portalSlug": "BoschGroup",
+      "active": true,
+      "verifiedAtSeed": true,
+      "note": "SmartRecruiters, country=pt filtered (Braga/Lisboa engineering)"
+    },
+    {
+      "company": "Feedzai",
+      "careersUrl": "https://boards.greenhouse.io/feedzai",
+      "portalType": "greenhouse",
+      "portalSlug": "feedzai",
+      "active": true,
+      "verifiedAtSeed": true,
+      "note": "Greenhouse; Coimbra/Lisboa AI fraud-detection scale-up"
+    },
+    {
+      "company": "Critical Software",
+      "careersUrl": "https://careers.criticalsoftware.com/",
+      "portalType": "custom",
+      "portalSlug": null,
+      "active": true,
+      "verifiedAtSeed": false,
+      "note": "Custom career page; AI extraction best-effort"
+    },
+    {
+      "company": "Innowave",
+      "careersUrl": "https://innowave.tech/careers/",
+      "portalType": "custom",
+      "portalSlug": null,
+      "active": true,
+      "verifiedAtSeed": false
+    },
+    {
+      "company": "Bee Engineering",
+      "careersUrl": "https://bee-engineering.com/careers/",
+      "portalType": "custom",
+      "portalSlug": null,
+      "active": true,
+      "verifiedAtSeed": false
+    },
+    {
+      "company": "Multivision",
+      "careersUrl": "https://multivision.pt/carreiras/",
+      "portalType": "custom",
+      "portalSlug": null,
+      "active": true,
+      "verifiedAtSeed": false
+    }
+  ]
+}
