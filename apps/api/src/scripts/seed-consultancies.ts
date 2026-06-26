@@ -12,6 +12,7 @@ import seed from '../data/pt-consultancies.json';
 interface TitleFilters {
   include: string[];
   exclude: string[];
+  location?: string[];
 }
 
 interface SeedPortal {
@@ -21,6 +22,9 @@ interface SeedPortal {
   portalSlug: string | null;
   active?: boolean;
   titleFilters?: TitleFilters;
+  // Per-entry location allow-list merged onto the default filters (for
+  // country-blind ATSs like Greenhouse/Lever that need PT-only filtering).
+  location?: string[];
 }
 
 (async () => {
@@ -31,7 +35,8 @@ interface SeedPortal {
   let updated = 0;
 
   for (const p of portals) {
-    const filters = JSON.stringify(p.titleFilters ?? defaultFilters);
+    const base = p.titleFilters ?? defaultFilters;
+    const filters = JSON.stringify(p.location ? { ...base, location: p.location } : base);
     const existing = await prisma.companyPortal.findFirst({
       where: { careersUrl: p.careersUrl },
       select: { id: true },
