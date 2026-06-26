@@ -12,6 +12,7 @@
     "seed:consultancies": "tsx src/scripts/seed-consultancies.ts",
     "portals:scan": "tsx src/scripts/scan-portals.ts",
     "consultancies:discover": "tsx src/scripts/discover-consultancies.ts",
+    "follow:company": "tsx src/scripts/follow-company.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
