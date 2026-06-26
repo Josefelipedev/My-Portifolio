@@ -16,7 +16,8 @@
       "marketing", "contabilidade", "accounting", "financeiro", "comercial",
       "vendas", "sales", "account manager", "administrativo", "receptionist",
       "credit risk", "liquidity", "counterparty", "transaction screening",
-      "financial analyst", "actuary", "actuarial", "kyc", "anti-money", "compliance officer"
+      "financial analyst", "actuary", "actuarial", "kyc", "anti-money", "compliance officer",
+      "fp&a", "fp & a"
     ]
   },
   "portals": [
@@ -57,13 +58,14 @@
       "note": "Greenhouse; Coimbra/Lisboa AI fraud-detection scale-up"
     },
     {
-      "company": "Critical Software",
-      "careersUrl": "https://careers.criticalsoftware.com/",
-      "portalType": "custom",
-      "portalSlug": null,
+      "company": "Talkdesk",
+      "careersUrl": "https://boards.greenhouse.io/talkdesk2",
+      "portalType": "greenhouse",
+      "portalSlug": "talkdesk2",
+      "location": ["portugal", "lisbon", "lisboa", "porto"],
       "active": true,
-      "verifiedAtSeed": false,
-      "note": "Custom career page; AI extraction best-effort"
+      "verifiedAtSeed": true,
+      "note": "Greenhouse (global board); location-filtered to PT (~14 Lisboa/Porto roles)"
     },
     {
       "company": "Inetum Portugal",
