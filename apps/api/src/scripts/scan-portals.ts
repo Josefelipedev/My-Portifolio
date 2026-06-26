@@ -12,7 +12,7 @@
 // reports its whole board as "new" once (baseline) — hence the digest cap below.
 
 import prisma from '../db';
-import { scanAllPortals, type PortalScanResult } from '../lib/jobs/portal-scanner';
+import { scanAllPortals, enrichDescriptions, type PortalScanResult } from '../lib/jobs/portal-scanner';
 import type { JobListing, ResumeData } from '../lib/jobs/types';
 import { scoreJobs, calculateMatchPercentage } from '../lib/jobs/scoring';
 import { sendEmail } from '../lib/email';
@@ -28,6 +28,8 @@ const PORTAL_CV_PER_RUN = parseInt(process.env.PORTAL_CV_PER_RUN || '5', 10);
 const AUTO_CV_GRADES = new Set(['A', 'B']);
 // Max jobs listed in the digest email (the rest are in /admin/jobs).
 const DIGEST_MAX = parseInt(process.env.PORTAL_DIGEST_MAX || '30', 10);
+// Max description-enrichment fetches per run (SmartRecruiters detail lookups).
+const ENRICH_MAX = parseInt(process.env.PORTAL_ENRICH_MAX || '80', 10);
 
 // Save a portal job keyed by URL (ATS native ids can collide across companies,
 // URLs cannot). Returns the row id + whether it already has a tailored CV.
@@ -156,6 +158,14 @@ function digestText(rows: DigestRow[], total: number): string {
     if (errors.length) console.warn('[portals:scan] errors:', errors.join(' | '));
     process.exit(0);
   }
+
+  // Enrich thin descriptions (SmartRecruiters) before ranking/grading so skill
+  // matching, AI grades and the saved jobs all use the real job-ad text.
+  const { enriched, truncated } = await enrichDescriptions(newJobs, ENRICH_MAX);
+  console.log(
+    `[portals:scan] enriched ${enriched} description(s)` +
+      (truncated ? `, ${truncated} left thin (enrich cap ${ENRICH_MAX})` : '')
+  );
 
   // Rank by fit to the resume (best first): primary key is the skill-match % to
   // the CV, tie-broken by the richer relevance score (freshness/completeness).
