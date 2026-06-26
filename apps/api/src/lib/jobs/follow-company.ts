@@ -27,6 +27,9 @@ export async function followCompany(opts: {
   location?: string[];
   portalType?: string;
   portalSlug?: string;
+  // Add the portal even if the ATS currently returns 0 matching jobs, as long as
+  // it is reachable (fetch succeeds). Use to track a company for future postings.
+  force?: boolean;
 }): Promise<FollowResult> {
   const { company, careersUrl } = opts;
   const detected = detectPortalType(careersUrl);
@@ -49,8 +52,13 @@ export async function followCompany(opts: {
   } catch (e) {
     return { ok: false, company, portalType, reason: e instanceof Error ? e.message : 'fetch failed' };
   }
-  if (jobs === 0) {
-    return { ok: false, company, portalType, reason: 'ATS returned 0 matching jobs (check URL/slug/location)' };
+  if (jobs === 0 && !opts.force) {
+    return {
+      ok: false,
+      company,
+      portalType,
+      reason: 'ATS reachable but 0 matching jobs now — re-run with force to track for future postings',
+    };
   }
 
   const titleFilters = JSON.stringify(filters);
