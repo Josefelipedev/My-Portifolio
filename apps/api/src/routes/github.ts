@@ -18,6 +18,7 @@ import prisma from '../db';
 import { requireAuth, type AuthEnv } from '../lib/auth';
 import { requireCsrf } from '../lib/csrf';
 import {
+  fetchUserRepos,
   fetchUserOrgs,
   fetchOrgRepos,
   fetchRepoByFullName,
@@ -42,6 +43,60 @@ github.get('/github/repos', async (c) => {
 });
 
 // ---- LIVE GitHub (authenticated) ----
+
+// GET /github/user/repos — LIVE fetch of the authenticated user's repos, marked
+// with import status + cached. Mirrors the org repos handler below; used by the
+// admin "GitHub Import" page (the public /github/repos route above only reads
+// the cache and returns a bare array).
+github.get('/github/user/repos', requireAuth, async (c) => {
+  const page = parseInt(c.req.query('page') || '1', 10);
+  const perPage = parseInt(c.req.query('per_page') || '30', 10);
+
+  const repos = await fetchUserRepos(page, perPage);
+
+  const imported = await prisma.project.findMany({
+    where: { githubId: { not: null } },
+    select: { githubId: true },
+  });
+  const importedIds = new Set(imported.map((p) => p.githubId));
+
+  for (const repo of repos) {
+    const cache = {
+      name: repo.name,
+      fullName: repo.full_name,
+      description: repo.description,
+      htmlUrl: repo.html_url,
+      homepage: repo.homepage,
+      language: repo.language,
+      topics: (repo.topics || []).join(','),
+      stargazers: repo.stargazers_count,
+      forksCount: repo.forks_count,
+      updatedAt: new Date(repo.updated_at),
+    };
+    await prisma.gitHubRepoCache.upsert({
+      where: { id: repo.id },
+      create: { id: repo.id, ...cache },
+      update: { ...cache, cachedAt: new Date() },
+    });
+  }
+
+  return c.json({
+    repos: repos.map((repo) => ({
+      id: repo.id,
+      name: repo.name,
+      full_name: repo.full_name,
+      description: repo.description,
+      html_url: repo.html_url,
+      homepage: repo.homepage,
+      language: repo.language,
+      topics: repo.topics || [],
+      stargazers_count: repo.stargazers_count,
+      forks_count: repo.forks_count,
+      updated_at: repo.updated_at,
+      isImported: importedIds.has(repo.id),
+    })),
+  });
+});
 
 // GET /github/orgs — the authenticated user's organizations.
 github.get('/github/orgs', requireAuth, async (c) => {
