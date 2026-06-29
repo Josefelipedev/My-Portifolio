@@ -51,14 +51,14 @@ export default function GitHubAdminPage() {
   const fetchRepos = async () => {
     try {
       setLoading(true);
-      const response = await apiFetch('/api/github/repos');
+      const response = await apiFetch('/api/github/user/repos');
       const data = await response.json();
 
       if (!response.ok) {
         throw new Error(data.error || 'Failed to fetch repositories');
       }
 
-      setRepos(data.repos);
+      setRepos(Array.isArray(data.repos) ? data.repos : []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong');
     } finally {
