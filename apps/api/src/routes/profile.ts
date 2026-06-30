@@ -6,9 +6,35 @@ import { Hono } from 'hono';
 import prisma from '../db';
 import { requireAuth, type AuthEnv } from '../lib/auth';
 import { requireCsrf } from '../lib/csrf';
-import { getGitHubProfileReadme } from '../lib/github-profile';
+import { getGitHubProfileReadme, type GitHubProfile } from '../lib/github-profile';
+import { getGitHubStats, type GitHubStats } from '../lib/github-stats';
 
 const profile = new Hono<AuthEnv>();
+
+// In-memory cache for the public GitHub profile bundle. The homepage hits this
+// on every (dynamic) render; GitHub data changes slowly and the aggregation
+// fans out to many GitHub calls, so cache it for an hour. Stale data is served
+// while a refresh fails, so a transient GitHub error never blanks the section.
+const GITHUB_CACHE_TTL_MS = 60 * 60 * 1000;
+let githubProfileCache: { at: number; data: GitHubProfileBundle } | null = null;
+
+interface GitHubProfileBundle {
+  user: GitHubProfile['user'] | null;
+  readme: string;
+  stats: GitHubStats | null;
+}
+
+async function loadGitHubProfileBundle(): Promise<GitHubProfileBundle> {
+  const [profileData, stats] = await Promise.all([
+    getGitHubProfileReadme(),
+    getGitHubStats(),
+  ]);
+  return {
+    user: profileData?.user ?? null,
+    readme: profileData?.content ?? '',
+    stats,
+  };
+}
 
 // Public-safe fields only — never expose secrets (wakatimeConfig, jobApiKeys).
 const PUBLIC_PROFILE_SELECT = {
@@ -29,6 +55,29 @@ profile.get('/profile', async (c) => {
     where: { id: 'main' },
     select: PUBLIC_PROFILE_SELECT,
   });
+  return c.json({ success: true, data });
+});
+
+// GET /profile/github — public bundle of the live GitHub profile (README + user)
+// and aggregated stats, for the homepage About + GitHub Stats sections. Served
+// from here (not the Cloudflare edge) so the GitHub calls use the VPS token and
+// IP instead of hitting the unauthenticated edge rate limit. Cached in memory.
+profile.get('/profile/github', async (c) => {
+  const now = Date.now();
+  if (githubProfileCache && now - githubProfileCache.at < GITHUB_CACHE_TTL_MS) {
+    return c.json({ success: true, data: githubProfileCache.data });
+  }
+
+  const data = await loadGitHubProfileBundle();
+  // Only cache a successful fetch; on failure fall back to the last good bundle
+  // so a transient GitHub hiccup doesn't blank the homepage.
+  if (data.user || data.stats) {
+    githubProfileCache = { at: now, data };
+    return c.json({ success: true, data });
+  }
+  if (githubProfileCache) {
+    return c.json({ success: true, data: githubProfileCache.data });
+  }
   return c.json({ success: true, data });
 });
 
