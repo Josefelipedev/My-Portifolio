@@ -33,7 +33,7 @@ interface ContributionDay {
   level: number; // 0-4
 }
 
-interface GitHubStats {
+export interface GitHubStats {
   user: {
     name: string;
     login: string;
