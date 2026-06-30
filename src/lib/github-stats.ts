@@ -115,14 +115,10 @@ async function githubFetch<T>(endpoint: string): Promise<T | null> {
 }
 
 export async function getGitHubStats(username?: string): Promise<GitHubStats | null> {
-  // Get authenticated user if no username provided
-  let user: GitHubUser | null;
-
-  if (username) {
-    user = await githubFetch<GitHubUser>(`/users/${username}`);
-  } else {
-    user = await githubFetch<GitHubUser>('/user');
-  }
+  // Resolve the target user from the public endpoint so this works without a
+  // token (e.g. on the Cloudflare Worker). Falls back to GITHUB_USERNAME / login.
+  const login0 = username || process.env.GITHUB_USERNAME || 'Josefelipedev';
+  const user = await githubFetch<GitHubUser>(`/users/${login0}`);
 
   if (!user) return null;
 
@@ -135,8 +131,8 @@ export async function getGitHubStats(username?: string): Promise<GitHubStats | n
 
   if (!userRepos) return null;
 
-  // Fetch organizations
-  const orgs = await githubFetch<Array<{ login: string }>>('/user/orgs');
+  // Fetch organizations (public endpoint so it works without a token)
+  const orgs = await githubFetch<Array<{ login: string }>>(`/users/${login}/orgs`);
 
   // Fetch repos from organizations
   let orgRepos: GitHubRepo[] = [];
@@ -324,7 +320,8 @@ export async function getBasicGitHubStats(): Promise<{
   followers: number;
   contributions: number;
 } | null> {
-  const user = await githubFetch<GitHubUser>('/user');
+  const login = process.env.GITHUB_USERNAME || 'Josefelipedev';
+  const user = await githubFetch<GitHubUser>(`/users/${login}`);
   if (!user) return null;
 
   const repos = await githubFetch<GitHubRepo[]>(
@@ -357,6 +354,9 @@ export async function getGitHubProfileReadme(): Promise<{
   };
 } | null> {
   const token = process.env.GITHUB_TOKEN;
+  // Use the public /users/<username> endpoint so the About section still works
+  // without a token (e.g. on the Cloudflare Worker). Falls back to a fixed login.
+  const username = process.env.GITHUB_USERNAME || 'Josefelipedev';
 
   // Get user info first
   const user = await githubFetch<GitHubUser & {
@@ -364,7 +364,7 @@ export async function getGitHubProfileReadme(): Promise<{
     email: string | null;
     company: string | null;
     blog: string | null;
-  }>('/user');
+  }>(`/users/${username}`);
 
   if (!user) return null;
 

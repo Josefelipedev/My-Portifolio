@@ -23,20 +23,20 @@ interface AboutClientProps {
 export function AboutClient({ readme, user }: AboutClientProps) {
   const { t, language } = useLanguage();
 
-  // Clean up README - remove images, badges, and stats cards that don't render well
+  // Clean up README - strip badges/images/stats cards that don't render well,
+  // but UNWRAP layout tags (div/p/span/center/headings) so their text survives.
+  // ReactMarkdown doesn't render raw HTML anyway, so leaving the text as markdown
+  // is what makes the bio actually show up.
   const cleanReadme = readme
-    .replace(/!\[.*?\]\(.*?\)/g, '') // Remove images
-    .replace(/<img[^>]*>/g, '') // Remove img tags
-    .replace(/<picture>[\s\S]*?<\/picture>/g, '') // Remove picture tags
-    .replace(/<a[^>]*>[\s\S]*?<\/a>/g, (match) => {
-      // Keep text links but remove image links
-      if (match.includes('<img')) return '';
-      return match;
-    })
-    .replace(/\[!\[.*?\]\(.*?\)\]\(.*?\)/g, '') // Remove badge links
     .replace(/<!--[\s\S]*?-->/g, '') // Remove HTML comments
-    .replace(/<div[^>]*>[\s\S]*?<\/div>/g, '') // Remove div blocks
-    .replace(/<p[^>]*align[^>]*>[\s\S]*?<\/p>/g, '') // Remove aligned paragraphs (usually badges)
+    .replace(/<picture>[\s\S]*?<\/picture>/gi, '') // Remove <picture> blocks (banners/logos)
+    .replace(/\[!\[.*?\]\(.*?\)\]\(.*?\)/g, '') // Remove badge links: [![alt](img)](href)
+    .replace(/!\[.*?\]\(.*?\)/g, '') // Remove markdown images
+    .replace(/<a[^>]*>\s*<img[^>]*>\s*<\/a>/gi, '') // Remove image-only links
+    .replace(/<img[^>]*>/gi, '') // Remove remaining img tags
+    .replace(/<\/?(?:div|p|span|center|h[1-6])[^>]*>/gi, '\n') // Unwrap layout tags, keep inner text
+    .replace(/<a[^>]*>\s*<\/a>/gi, '') // Drop anchors left empty after image removal
+    .replace(/[ \t]+\n/g, '\n') // Strip trailing whitespace
     .replace(/\n{3,}/g, '\n\n') // Clean up multiple newlines
     .trim();
 
