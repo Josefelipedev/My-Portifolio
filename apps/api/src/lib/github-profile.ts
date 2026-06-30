@@ -51,7 +51,10 @@ async function githubFetch<T>(endpoint: string): Promise<T | null> {
 
 export async function getGitHubProfileReadme(): Promise<GitHubProfile | null> {
   const token = process.env.GITHUB_TOKEN;
-  const user = await githubFetch<GitHubUser>('/user');
+  // Public endpoint with a fixed-username fallback so it works with or without
+  // a token (the VPS has one; local dev may not).
+  const username = process.env.GITHUB_USERNAME || 'Josefelipedev';
+  const user = await githubFetch<GitHubUser>(`/users/${username}`);
   if (!user) return null;
 
   const mapped = (content: string): GitHubProfile => ({

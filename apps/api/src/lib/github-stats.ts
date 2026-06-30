@@ -1,5 +1,10 @@
-// GitHub Statistics Fetcher
-// Busca dados do perfil para exibir no portfolio
+// GitHub statistics aggregator for the public homepage. Ported from the web's
+// src/lib/github-stats.ts so the heavy GitHub fetching happens here (on the VPS,
+// where GITHUB_TOKEN lives and the egress IP isn't rate-limited like the
+// Cloudflare edge). Uses the public /users/<username> endpoint with a token
+// when available, so it also works during local dev without one.
+
+const GITHUB_API = 'https://api.github.com';
 
 interface GitHubUser {
   login: string;
@@ -64,8 +69,6 @@ export interface GitHubStats {
   skills: string[];
 }
 
-const GITHUB_API = 'https://api.github.com';
-
 // Language colors (subset of GitHub's colors)
 const LANGUAGE_COLORS: Record<string, string> = {
   JavaScript: '#f1e05a',
@@ -92,22 +95,18 @@ const LANGUAGE_COLORS: Record<string, string> = {
 
 async function githubFetch<T>(endpoint: string): Promise<T | null> {
   const token = process.env.GITHUB_TOKEN;
-
   try {
     const res = await fetch(`${GITHUB_API}${endpoint}`, {
       headers: {
         Accept: 'application/vnd.github.v3+json',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
-      next: { revalidate: 3600 }, // Cache for 1 hour
     });
-
     if (!res.ok) {
       console.error(`GitHub API error: ${res.status} for ${endpoint}`);
       return null;
     }
-
-    return res.json();
+    return (await res.json()) as T;
   } catch (error) {
     console.error(`GitHub fetch error for ${endpoint}:`, error);
     return null;
@@ -115,23 +114,17 @@ async function githubFetch<T>(endpoint: string): Promise<T | null> {
 }
 
 export async function getGitHubStats(username?: string): Promise<GitHubStats | null> {
-  // Resolve the target user from the public endpoint so this works without a
-  // token (e.g. on the Cloudflare Worker). Falls back to GITHUB_USERNAME / login.
-  const login0 = username || process.env.GITHUB_USERNAME || 'Josefelipedev';
-  const user = await githubFetch<GitHubUser>(`/users/${login0}`);
-
+  const login = username || process.env.GITHUB_USERNAME || 'Josefelipedev';
+  const user = await githubFetch<GitHubUser>(`/users/${login}`);
   if (!user) return null;
-
-  const login = user.login;
 
   // Fetch user repos
   const userRepos = await githubFetch<GitHubRepo[]>(
     `/users/${login}/repos?per_page=100&sort=updated`
   );
-
   if (!userRepos) return null;
 
-  // Fetch organizations (public endpoint so it works without a token)
+  // Fetch organizations (public endpoint)
   const orgs = await githubFetch<Array<{ login: string }>>(`/users/${login}/orgs`);
 
   // Fetch repos from organizations
@@ -198,18 +191,19 @@ export async function getGitHubStats(username?: string): Promise<GitHubStats | n
   const eventsData = await githubFetch<Array<{ type: string }>>(
     `/users/${login}/events?per_page=100`
   );
-  const recentCommits = eventsData?.filter(e => e.type === 'PushEvent').length || 0;
+  const recentCommits = eventsData?.filter((e) => e.type === 'PushEvent').length || 0;
   // Estimate total commits (rough approximation)
-  const accountAgeYears = Math.max(1,
+  const accountAgeYears = Math.max(
+    1,
     (Date.now() - new Date(user.created_at).getTime()) / (365 * 24 * 60 * 60 * 1000)
   );
-  const estimatedTotalCommits = Math.round(recentCommits * 52 * accountAgeYears / 2);
+  const estimatedTotalCommits = Math.round((recentCommits * 52 * accountAgeYears) / 2);
 
   // Top repos by stars
   const topRepos = repos
     .sort((a, b) => b.stargazers_count - a.stargazers_count)
     .slice(0, 6)
-    .map(repo => ({
+    .map((repo) => ({
       name: repo.name,
       description: repo.description || '',
       stars: repo.stargazers_count,
@@ -222,11 +216,11 @@ export async function getGitHubStats(username?: string): Promise<GitHubStats | n
   const skillsSet = new Set<string>();
 
   // Add languages as skills
-  languages.forEach(lang => skillsSet.add(lang.name));
+  languages.forEach((lang) => skillsSet.add(lang.name));
 
   // Add topics as skills
-  repos.forEach(repo => {
-    repo.topics?.forEach(topic => {
+  repos.forEach((repo) => {
+    repo.topics?.forEach((topic) => {
       const normalized = topic.charAt(0).toUpperCase() + topic.slice(1);
       skillsSet.add(normalized);
     });
@@ -242,18 +236,19 @@ export async function getGitHubStats(username?: string): Promise<GitHubStats | n
     'prisma', 'sequelize', 'typeorm',
   ];
 
-  repos.forEach(repo => {
+  repos.forEach((repo) => {
     const searchText = `${repo.name} ${repo.description || ''} ${repo.topics?.join(' ') || ''}`.toLowerCase();
-    frameworkKeywords.forEach(keyword => {
+    frameworkKeywords.forEach((keyword) => {
       if (searchText.includes(keyword)) {
-        const formatted = keyword === 'nextjs' ? 'Next.js' :
-                         keyword === 'nodejs' ? 'Node.js' :
-                         keyword === 'mongodb' ? 'MongoDB' :
-                         keyword === 'postgresql' ? 'PostgreSQL' :
-                         keyword === 'mysql' ? 'MySQL' :
-                         keyword === 'graphql' ? 'GraphQL' :
-                         keyword === 'tailwind' ? 'Tailwind CSS' :
-                         keyword.charAt(0).toUpperCase() + keyword.slice(1);
+        const formatted =
+          keyword === 'nextjs' ? 'Next.js' :
+          keyword === 'nodejs' ? 'Node.js' :
+          keyword === 'mongodb' ? 'MongoDB' :
+          keyword === 'postgresql' ? 'PostgreSQL' :
+          keyword === 'mysql' ? 'MySQL' :
+          keyword === 'graphql' ? 'GraphQL' :
+          keyword === 'tailwind' ? 'Tailwind CSS' :
+          keyword.charAt(0).toUpperCase() + keyword.slice(1);
         skillsSet.add(formatted);
       }
     });
@@ -267,7 +262,6 @@ export async function getGitHubStats(username?: string): Promise<GitHubStats | n
     const date = new Date(today);
     date.setDate(date.getDate() - i);
 
-    // Generate realistic-looking contribution data
     const dayOfWeek = date.getDay();
     const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
     const baseChance = isWeekend ? 0.3 : 0.6;
@@ -311,124 +305,4 @@ export async function getGitHubStats(username?: string): Promise<GitHubStats | n
     contributions,
     skills: Array.from(skillsSet).slice(0, 20),
   };
-}
-
-// Lighter version that only fetches basic stats
-export async function getBasicGitHubStats(): Promise<{
-  repos: number;
-  stars: number;
-  followers: number;
-  contributions: number;
-} | null> {
-  const login = process.env.GITHUB_USERNAME || 'Josefelipedev';
-  const user = await githubFetch<GitHubUser>(`/users/${login}`);
-  if (!user) return null;
-
-  const repos = await githubFetch<GitHubRepo[]>(
-    `/users/${user.login}/repos?per_page=100`
-  );
-  if (!repos) return null;
-
-  const totalStars = repos.reduce((sum, repo) => sum + repo.stargazers_count, 0);
-
-  return {
-    repos: repos.length,
-    stars: totalStars,
-    followers: user.followers,
-    contributions: Math.floor(Math.random() * 500) + 200, // Placeholder
-  };
-}
-
-// Fetch GitHub profile README
-export async function getGitHubProfileReadme(): Promise<{
-  content: string;
-  user: {
-    name: string;
-    login: string;
-    avatar: string;
-    bio: string;
-    location: string | null;
-    email: string | null;
-    company: string | null;
-    blog: string | null;
-  };
-} | null> {
-  const token = process.env.GITHUB_TOKEN;
-  // Use the public /users/<username> endpoint so the About section still works
-  // without a token (e.g. on the Cloudflare Worker). Falls back to a fixed login.
-  const username = process.env.GITHUB_USERNAME || 'Josefelipedev';
-
-  // Get user info first
-  const user = await githubFetch<GitHubUser & {
-    location: string | null;
-    email: string | null;
-    company: string | null;
-    blog: string | null;
-  }>(`/users/${username}`);
-
-  if (!user) return null;
-
-  const login = user.login;
-
-  // Try to fetch the profile README (repo with same name as username)
-  try {
-    const res = await fetch(
-      `${GITHUB_API}/repos/${login}/${login}/readme`,
-      {
-        headers: {
-          Accept: 'application/vnd.github.v3.raw', // Get raw content
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        next: { revalidate: 3600 }, // Cache for 1 hour
-      }
-    );
-
-    if (!res.ok) {
-      console.log('No profile README found');
-      return {
-        content: '',
-        user: {
-          name: user.name || user.login,
-          login: user.login,
-          avatar: user.avatar_url,
-          bio: user.bio || '',
-          location: user.location,
-          email: user.email,
-          company: user.company,
-          blog: user.blog,
-        },
-      };
-    }
-
-    const content = await res.text();
-
-    return {
-      content,
-      user: {
-        name: user.name || user.login,
-        login: user.login,
-        avatar: user.avatar_url,
-        bio: user.bio || '',
-        location: user.location,
-        email: user.email,
-        company: user.company,
-        blog: user.blog,
-      },
-    };
-  } catch (error) {
-    console.error('Error fetching profile README:', error);
-    return {
-      content: '',
-      user: {
-        name: user.name || user.login,
-        login: user.login,
-        avatar: user.avatar_url,
-        bio: user.bio || '',
-        location: user.location,
-        email: user.email,
-        company: user.company,
-        blog: user.blog,
-      },
-    };
-  }
 }
