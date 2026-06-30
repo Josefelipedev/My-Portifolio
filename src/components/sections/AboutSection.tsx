@@ -1,13 +1,8 @@
-import { getGitHubProfileReadme } from '@/lib/github-stats';
+import { getGitHubProfileData } from '@/lib/data/github';
 import { AboutClient } from './AboutClient';
 
 export async function AboutSection() {
-  const profileData = await getGitHubProfileReadme();
+  const { readme, user } = await getGitHubProfileData();
 
-  return (
-    <AboutClient
-      readme={profileData?.content || ''}
-      user={profileData?.user || null}
-    />
-  );
+  return <AboutClient readme={readme || ''} user={user || null} />;
 }
