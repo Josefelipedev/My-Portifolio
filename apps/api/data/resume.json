@@ -14,6 +14,20 @@
   },
   "experience": [
     {
+      "title": "Web Developer",
+      "company": "Angry Ventures",
+      "location": "Portugal",
+      "startDate": "2026-01",
+      "endDate": "2026-08",
+      "responsibilities": [
+        "Developed and maintained WordPress websites including plugin work and technical improvements for client projects",
+        "Built user-facing pages and features in React focused on usability and reliable delivery",
+        "Developed Chrome extension features and supported browser-based workflows for internal and client use cases",
+        "Implemented API integrations with external platforms such as Cellebrite, eBay and Monday.com",
+        "Handled fast-turnaround web tasks and troubleshooting across WordPress, React and integration projects"
+      ]
+    },
+    {
       "title": "Mid-Level Developer",
       "company": "Tallk.me",
       "location": "Home Office / Brasil",
