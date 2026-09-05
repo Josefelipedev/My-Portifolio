@@ -9,8 +9,8 @@
     "birthDate": ""
   },
   "professionalSummary": {
-    "pt": "Desenvolvedor full-stack com ênfase em desenvolvimento back-end e experiência comprovada em projetos modernos e escaláveis. Possui graduação em Sistemas de Internet pelo IFC e está cursando Sistemas e Tecnologias de Informação na Universidade do Algarve, em Portugal. Planeja realizar um programa de pós-graduação em Segurança Cibernética e um Mestrado em Engenharia de Software, com o objetivo de aprofundar conhecimentos em sistemas de software seguros e de alto desempenho.",
-    "en": "Full-stack developer with a strong emphasis on back-end development and proven experience in designing and implementing modern, scalable solutions. Holds a Bachelor's degree in Internet Systems from IFC and is currently pursuing a degree in Systems and Information Technologies Engineering in Portugal. Planning to undertake a postgraduate program in Cybersecurity, followed by a Master's degree in Software Engineering, with the objective of deepening expertise in secure, high-performance software systems."
+    "pt": "Desenvolvedor full-stack com ênfase em desenvolvimento back-end e experiência comprovada em projetos modernos e escaláveis. Possui graduação em Sistemas de Internet pelo IFC e cursa o Mestrado em Engenharia Informática na Universidade do Algarve, em Portugal, aprofundando conhecimentos em engenharia de software, sistemas distribuídos e segurança.",
+    "en": "Full-stack developer with a strong emphasis on back-end development and proven experience in designing and implementing modern, scalable solutions. Holds a Bachelor's degree in Internet Systems from IFC and is currently pursuing a Master's degree in Informatics Engineering at Universidade do Algarve, Portugal, deepening expertise in software engineering, distributed systems, and security."
   },
   "experience": [
     {
@@ -87,12 +87,12 @@
       "description": "Degree focused on web, mobile, and intranet systems development, covering software engineering, networking, and databases, enabling work across the full development cycle"
     },
     {
-      "degree": "Systems and Information Technologies Engineering",
+      "degree": "Master's Degree in Informatics Engineering",
       "institution": "Universidade do Algarve",
       "location": "Faro, Portugal",
-      "startDate": "2025-09",
+      "startDate": "2026-09",
       "endDate": null,
-      "description": "Bachelor's degree focusing on information systems, software development, and intelligent technologies, covering mathematics, programming, AI, web, mobile, and networks"
+      "description": "Master's degree in informatics engineering, covering software engineering, distributed systems, data, security, and intelligent technologies applied to scalable products"
     }
   ],
   "skills": [
