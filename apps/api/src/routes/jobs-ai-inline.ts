@@ -20,6 +20,7 @@ import prisma from '../db';
 import resumeData from '../../data/resume.json';
 import { parseBody } from '../lib/api-utils';
 import { aiJobInfoSchema, aiExtractSchema } from '../schemas/jobs';
+import { completionLimits, DEFAULT_TOGETHER_MODEL } from '../lib/reasoning-model';
 
 const jobsAiInline = new Hono<AuthEnv>();
 
@@ -101,7 +102,7 @@ jobsAiInline.post('/jobs/saved/:id/enrich', requireAuth, requireCsrf, async (c) 
       .slice(0, 20000);
 
     const startTime = Date.now();
-    const model = process.env.TOGETHER_MODEL || 'meta-llama/Llama-3.3-70B-Instruct-Turbo';
+    const model = process.env.TOGETHER_MODEL || DEFAULT_TOGETHER_MODEL;
     let inputTokens = 0;
     let outputTokens = 0;
     let success = true;
@@ -142,7 +143,7 @@ Respond with ONLY the JSON object.`;
       const aiResponse = await client.chat.completions.create({
         model,
         messages: [{ role: 'user', content: prompt }],
-        max_tokens: 2000,
+        ...completionLimits(model, 2000),
         temperature: 0.1,
       });
 
@@ -263,7 +264,7 @@ jobsAiInline.post('/jobs/saved/:id/interview-prep', requireAuth, requireCsrf, as
       .map((e) => `${e.title} at ${e.company}: ${e.responsibilities.slice(0, 2).join('; ')}`)
       .join('\n');
 
-    const model = process.env.TOGETHER_MODEL || 'meta-llama/Llama-3.3-70B-Instruct-Turbo';
+    const model = process.env.TOGETHER_MODEL || DEFAULT_TOGETHER_MODEL;
     const startTime = Date.now();
     let inputTokens = 0;
     let outputTokens = 0;
@@ -326,7 +327,7 @@ Requirements:
       const aiResponse = await client.chat.completions.create({
         model,
         messages: [{ role: 'user', content: prompt }],
-        max_tokens: 3000,
+        ...completionLimits(model, 3000),
         temperature: 0.5,
       });
 
@@ -396,7 +397,7 @@ jobsAiInline.post('/jobs/generate-email', requireAuth, requireCsrf, async (c) =>
         .join('; ') || '';
 
     const startTime = Date.now();
-    const model = process.env.TOGETHER_MODEL || 'meta-llama/Llama-3.3-70B-Instruct-Turbo';
+    const model = process.env.TOGETHER_MODEL || DEFAULT_TOGETHER_MODEL;
     let inputTokens = 0;
     let outputTokens = 0;
     let success = true;
@@ -450,7 +451,7 @@ Return ONLY JSON:
       const aiResponse = await client.chat.completions.create({
         model,
         messages: [{ role: 'user', content: prompt }],
-        max_tokens: 1000,
+        ...completionLimits(model, 1000),
         temperature: 0.7,
       });
 
@@ -521,7 +522,7 @@ jobsAiInline.post('/jobs/cover-letter', requireAuth, requireCsrf, async (c) => {
         .join('; ') || '';
 
     const startTime = Date.now();
-    const model = process.env.TOGETHER_MODEL || 'meta-llama/Llama-3.3-70B-Instruct-Turbo';
+    const model = process.env.TOGETHER_MODEL || DEFAULT_TOGETHER_MODEL;
     let inputTokens = 0;
     let outputTokens = 0;
     let success = true;
@@ -556,7 +557,7 @@ Return ONLY the letter text (no JSON, no markdown).`;
       const aiResponse = await client.chat.completions.create({
         model,
         messages: [{ role: 'user', content: prompt }],
-        max_tokens: 1200,
+        ...completionLimits(model, 1200),
         temperature: 0.7,
       });
 
@@ -606,7 +607,7 @@ jobsAiInline.post('/jobs/extract', requireAuth, requireCsrf, async (c) => {
     }
 
     const startTime = Date.now();
-    const model = process.env.TOGETHER_MODEL || 'meta-llama/Llama-3.3-70B-Instruct-Turbo';
+    const model = process.env.TOGETHER_MODEL || DEFAULT_TOGETHER_MODEL;
     let inputTokens = 0;
     let outputTokens = 0;
     let success = true;
@@ -635,7 +636,7 @@ Return ONLY the JSON, no other text.`;
       const aiResponse = await client.chat.completions.create({
         model,
         messages: [{ role: 'user', content: prompt }],
-        max_tokens: 1500,
+        ...completionLimits(model, 1500),
         temperature: 0.3,
       });
 

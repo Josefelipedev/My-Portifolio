@@ -3,6 +3,7 @@
 
 import Together from 'together-ai';
 import { trackAIUsage, estimateTokens, checkQuotaLimits } from './ai-tracking';
+import { completionLimits, DEFAULT_TOGETHER_MODEL } from './reasoning-model';
 
 export interface YearlyRanking {
   year: number;
@@ -61,7 +62,7 @@ async function extractWithAI(html: string, year: number): Promise<YearlyRanking 
   if (!client) return null;
 
   const startTime = Date.now();
-  const model = process.env.TOGETHER_MODEL || 'meta-llama/Llama-3.3-70B-Instruct-Turbo';
+  const model = process.env.TOGETHER_MODEL || DEFAULT_TOGETHER_MODEL;
   let inputTokens = 0;
   let outputTokens = 0;
   let success = true;
@@ -104,7 +105,7 @@ IMPORTANT:
     const response = await client.chat.completions.create({
       model,
       messages: [{ role: 'user', content: prompt }],
-      max_tokens: 500,
+      ...completionLimits(model, 500),
       temperature: 0.1,
     });
 

@@ -1,6 +1,7 @@
 import Together from 'together-ai';
 import type { Prisma } from '@prisma/client';
 import { trackAIUsage, estimateTokens, checkQuotaLimits, type AIFeature } from './ai-tracking';
+import { completionLimits, DEFAULT_TOGETHER_MODEL } from './reasoning-model';
 
 // AI Provider types
 type AIProvider = 'ollama' | 'together' | 'anthropic';
@@ -29,7 +30,7 @@ function getAIConfig(): AIConfig {
     default:
       return {
         provider: 'together',
-        model: process.env.TOGETHER_MODEL || 'meta-llama/Llama-3.3-70B-Instruct-Turbo',
+        model: process.env.TOGETHER_MODEL || DEFAULT_TOGETHER_MODEL,
       };
   }
 }
@@ -77,7 +78,7 @@ async function callTogether(prompt: string, model: string, maxTokens = 500): Pro
   const response = await client.chat.completions.create({
     model,
     messages: [{ role: 'user', content: prompt }],
-    max_tokens: maxTokens,
+    ...completionLimits(model, maxTokens),
     temperature: 0.7,
   });
 
@@ -162,7 +163,7 @@ export async function callAIWithTracking(
       const response = await client.chat.completions.create({
         model: config.model,
         messages: [{ role: 'user', content: prompt }],
-        max_tokens: options.maxTokens || 500,
+        ...completionLimits(config.model, options.maxTokens || 500),
         temperature: options.temperature || 0.7,
       });
 

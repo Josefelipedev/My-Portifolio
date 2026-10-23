@@ -3,6 +3,7 @@ import Together from 'together-ai';
 import { trackAIUsage, estimateTokens, checkQuotaLimits } from '../ai-tracking';
 import prisma from '../../db';
 import resumeData from '../../../data/resume.json';
+import { completionLimits, DEFAULT_TOGETHER_MODEL } from '../reasoning-model';
 
 export interface AIJobAnalysis {
   grade: 'A' | 'B' | 'C' | 'D' | 'F';
@@ -59,7 +60,7 @@ export async function analyzeJob(savedJobId: string): Promise<AIJobAnalysis> {
     .map((e) => `${e.title} at ${e.company}`)
     .join('; ');
 
-  const model = process.env.TOGETHER_MODEL || 'meta-llama/Llama-3.3-70B-Instruct-Turbo';
+  const model = process.env.TOGETHER_MODEL || DEFAULT_TOGETHER_MODEL;
   const startTime = Date.now();
   let inputTokens = 0;
   let outputTokens = 0;
@@ -107,7 +108,7 @@ Return ONLY the JSON, no markdown, no explanation.`;
     const aiResponse = await client.chat.completions.create({
       model,
       messages: [{ role: 'user', content: prompt }],
-      max_tokens: 800,
+      ...completionLimits(model, 800),
       temperature: 0.3,
     });
 
