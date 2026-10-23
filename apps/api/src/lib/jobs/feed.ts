@@ -25,7 +25,8 @@ const DIGEST_MIN_SCORE = Number(process.env.JOBS_DIGEST_MIN_SCORE || 60);
 const DIGEST_WINDOW_DAYS = 3;
 // A run older than this without finishedAt crashed; it no longer blocks new runs.
 const RUN_TIMEOUT_MS = 30 * 60 * 1000;
-const EMBED_BATCH = 32;
+// Small batches keep each Ollama call well under its timeout on a busy VPS.
+const EMBED_BATCH = 16;
 const SCORE_PAGE = 200;
 // Bump when the score formula changes so every open posting is rescored.
 const SCORING_VERSION = 1;
@@ -57,10 +58,15 @@ export interface IngestResult {
 
 const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
 
-/** Stable 0-100 fit: semantic similarity blended with the keyword score. */
-export function computeMatchScore(keywordScore: number, semanticScore: number | null): number {
+/**
+ * Stable 0-100 fit: semantic similarity blended with the keyword score. Without
+ * an embedding there is no score (null): a keyword-only number is not comparable
+ * — a long posting naming many skills saturates it — and the next run retries
+ * the embedding.
+ */
+export function computeMatchScore(keywordScore: number, semanticScore: number | null): number | null {
+  if (semanticScore === null) return null;
   const keyword = clamp01(keywordScore / KEYWORD_CAP);
-  if (semanticScore === null) return Math.round(keyword * 100);
   const semantic = clamp01((semanticScore - SEMANTIC_FLOOR) / (SEMANTIC_CEIL - SEMANTIC_FLOOR));
   return Math.round((SEMANTIC_WEIGHT * semantic + (1 - SEMANTIC_WEIGHT) * keyword) * 100);
 }

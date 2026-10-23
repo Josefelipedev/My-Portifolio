@@ -25,8 +25,8 @@ const QUERY_INSTRUCT =
   'Instruct: Given a tech professional profile, retrieve job postings that best match their skills and experience.\nQuery: ';
 // Only the strongest keyword-ranked head is re-embedded, to bound cost/latency.
 const RERANK_HEAD = 100;
-// CPU-only Ollama on the VPS needs several seconds per batch.
-const OLLAMA_TIMEOUT_MS = 120_000;
+// CPU-only Ollama on a loaded VPS can take minutes per batch.
+const OLLAMA_TIMEOUT_MS = 300_000;
 
 function getClient(): Together | null {
   const apiKey = process.env.TOGETHER_API_KEY;
