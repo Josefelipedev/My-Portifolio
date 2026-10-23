@@ -9,9 +9,28 @@ on:
   workflow_dispatch:
 
 jobs:
+  validate:
+    name: Validate
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql://portfolio:portfolio@127.0.0.1:5432/portfolio
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run typecheck --workspace @portfolio/api
+      - run: npm run test:run
+      - run: npm run build
+
   deploy:
     name: Deploy to Production
     runs-on: ubuntu-latest
+    needs: validate
 
     steps:
       - name: Deploy via SSH
@@ -26,6 +45,9 @@ jobs:
             git pull origin main
             npm install --production=false
             npx prisma generate
+            # Prod was built with db push and has no _prisma_migrations rows;
+            # switch to migrate deploy only after baselining it with
+            # prisma migrate resolve --applied.
             npx prisma db push
             # Rebuild + restart the standalone API container (Docker layer cache
             # keeps unchanged builds fast).
