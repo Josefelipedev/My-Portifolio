@@ -69,11 +69,11 @@ describe('computeMatchScore', () => {
   it('stays within 0-100 and rewards semantic similarity', () => {
     expect(computeMatchScore(0, 0.1)).toBe(0);
     expect(computeMatchScore(1000, 0.99)).toBe(100);
-    expect(computeMatchScore(20, 0.6)).toBeGreaterThan(computeMatchScore(20, 0.4));
+    expect(computeMatchScore(20, 0.6)!).toBeGreaterThan(computeMatchScore(20, 0.4)!);
   });
 
-  it('falls back to the keyword score without an embedding', () => {
-    expect(computeMatchScore(20, null)).toBe(50);
+  it('leaves a posting unscored without an embedding', () => {
+    expect(computeMatchScore(1000, null)).toBeNull();
   });
 });
 
@@ -127,6 +127,23 @@ describe('runIngest', () => {
     const scoreUpdate = db.jobPosting.update.mock.calls.find((call) => call[0].data.profileHash)![0];
     expect(scoreUpdate.data).toMatchObject({ embedding: [1, 0], embeddingModel: 'qwen3-embedding:0.6b', semanticScore: 1, dealBreaker: null });
     expect(db.jobIngestRun.update).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'run1' } }));
+  });
+
+  it('stores no match score when the embedding call fails', async () => {
+    aggregator.searchJobs.mockResolvedValue([]);
+    semantic.embedTexts.mockResolvedValue(null);
+    db.jobPosting.findMany
+      .mockResolvedValueOnce([
+        { id: 'p1', externalId: 'arbeitnow-1', source: 'arbeitnow', title: 'Software Engineer', company: 'Acme', description: 'Node.js TypeScript '.repeat(50), url: 'u', location: 'Berlin', tags: [], embedding: [], embeddingModel: null },
+      ])
+      .mockResolvedValueOnce([]);
+
+    await runIngest();
+
+    const update = db.jobPosting.update.mock.calls[0][0];
+    expect(update.data.matchScore).toBeNull();
+    expect(update.data.keywordScore).toBeGreaterThan(0);
+    expect(update.data.embedding).toBeUndefined();
   });
 
   it('records source failures without aborting the run', async () => {
