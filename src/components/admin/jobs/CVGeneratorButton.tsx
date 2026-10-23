@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { type CustomCVContent } from '@/lib/jobs/cv-generator';
+import { type CustomCVContent } from '@/types/jobs';
 import { apiFetch } from '@/lib/api-fetch';
 import resumeData from '@/data/resume.json';
 
@@ -17,12 +17,11 @@ interface CVGeneratorButtonProps {
   onGenerated?: () => void;
 }
 
-async function downloadCVPdf(
+export async function createCVPdfBlob(
   cv: CustomCVContent,
   personalInfo: typeof resumeData.personalInfo,
   jobTitle: string,
   company: string,
-  filename: string
 ) {
   const [{ pdf }, { default: CVDocument }, React] = await Promise.all([
     import('@react-pdf/renderer'),
@@ -32,7 +31,17 @@ async function downloadCVPdf(
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const doc = React.createElement(CVDocument, { cv, personalInfo, jobTitle, company }) as any;
-  const blob = await pdf(doc).toBlob();
+  return pdf(doc).toBlob();
+}
+
+async function downloadCVPdf(
+  cv: CustomCVContent,
+  personalInfo: typeof resumeData.personalInfo,
+  jobTitle: string,
+  company: string,
+  filename: string
+) {
+  const blob = await createCVPdfBlob(cv, personalInfo, jobTitle, company);
 
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');

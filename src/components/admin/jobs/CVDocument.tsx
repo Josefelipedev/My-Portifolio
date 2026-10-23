@@ -1,7 +1,7 @@
 'use client';
 
 import { Document, Page, View, Text, StyleSheet, Link } from '@react-pdf/renderer';
-import { type CustomCVContent } from '@/lib/jobs/cv-generator';
+import { type CustomCVContent } from '@/types/jobs';
 
 interface PersonalInfo {
   name: string;
@@ -211,33 +211,28 @@ export default function CVDocument({ cv, personalInfo, jobTitle, company }: CVDo
           ))}
         </View>
 
-        {/* Projects */}
         {cv.projects && cv.projects.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Projects</Text>
-            {cv.projects.map((p, i) => (
-              <View key={i} style={styles.expEntry}>
-                <Text style={styles.expTitle}>{p.name}</Text>
-                <Text style={styles.bulletText}>{p.description}</Text>
-                {p.technologies && p.technologies.length > 0 && (
-                  <Text style={styles.expCompany}>{p.technologies.join(' · ')}</Text>
+            <Text style={styles.sectionTitle}>Selected Projects</Text>
+            {cv.projects.map((project, index) => (
+              <View key={index} style={styles.expEntry} wrap={false}>
+                <Text style={styles.expTitle}>{project.name}</Text>
+                <Text style={styles.bulletText}>{project.description}</Text>
+                {project.technologies && project.technologies.length > 0 && (
+                  <Text style={styles.expDates}>{project.technologies.join(' · ')}</Text>
                 )}
               </View>
             ))}
           </View>
         )}
 
-        {/* Certifications */}
         {cv.certifications && cv.certifications.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Certifications</Text>
-            {cv.certifications.map((cert, i) => (
-              <View key={i} style={styles.bulletRow}>
-                <Text style={styles.bullet}>•</Text>
-                <Text style={styles.bulletText}>
-                  {cert.name}{cert.issuer ? ` — ${cert.issuer}` : ''}{cert.year ? ` (${cert.year})` : ''}
-                </Text>
-              </View>
+            <Text style={styles.sectionTitle}>Relevant Certifications</Text>
+            {cv.certifications.map((certification, index) => (
+              <Text key={index} style={styles.bulletText}>
+                {certification.name}{certification.issuer ? ` · ${certification.issuer}` : ''}{certification.year ? ` · ${certification.year}` : ''}
+              </Text>
             ))}
           </View>
         )}
