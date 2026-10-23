@@ -4,6 +4,7 @@
 import Together from 'together-ai';
 import resumeData from '../../../data/resume.json';
 import { trackAIUsage, estimateTokens, checkQuotaLimits } from '../ai-tracking';
+import { completionLimits, DEFAULT_TOGETHER_MODEL } from '../reasoning-model';
 
 export interface AlertSuggestion {
   name: string;
@@ -36,7 +37,7 @@ export async function generateAlertSuggestions(): Promise<AlertSuggestion[]> {
   if (!client) return generateRuleBasedSuggestions(resume);
 
   const startTime = Date.now();
-  const model = process.env.TOGETHER_MODEL || 'meta-llama/Llama-3.3-70B-Instruct-Turbo';
+  const model = process.env.TOGETHER_MODEL || DEFAULT_TOGETHER_MODEL;
   let inputTokens = 0;
   let outputTokens = 0;
   let success = true;
@@ -81,7 +82,7 @@ Respond with ONLY the JSON array.`;
     const response = await client.chat.completions.create({
       model,
       messages: [{ role: 'user', content: prompt }],
-      max_tokens: 1500,
+      ...completionLimits(model, 1500),
       temperature: 0.7,
     });
 

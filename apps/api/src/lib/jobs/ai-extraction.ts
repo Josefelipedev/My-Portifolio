@@ -3,6 +3,7 @@
 import Together from 'together-ai';
 import type { AIExtractedJob } from './types';
 import { trackAIUsage, estimateTokens, checkQuotaLimits } from '../ai-tracking';
+import { completionLimits, DEFAULT_TOGETHER_MODEL } from '../reasoning-model';
 
 // Store last extraction details for debugging
 let lastExtractionDebug: {
@@ -49,7 +50,7 @@ export async function extractJobsWithAI(
   }
 
   const startTime = Date.now();
-  const model = process.env.TOGETHER_MODEL || 'meta-llama/Llama-3.3-70B-Instruct-Turbo';
+  const model = process.env.TOGETHER_MODEL || DEFAULT_TOGETHER_MODEL;
   let inputTokens = 0;
   let outputTokens = 0;
   let success = true;
@@ -101,7 +102,7 @@ Respond with ONLY the JSON array.`;
     const response = await client.chat.completions.create({
       model,
       messages: [{ role: 'user', content: prompt }],
-      max_tokens: 4000,
+      ...completionLimits(model, 4000),
       temperature: 0.1, // Low temperature for consistent extraction
     });
 
