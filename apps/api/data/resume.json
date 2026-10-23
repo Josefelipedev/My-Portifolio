@@ -9,22 +9,37 @@
     "birthDate": ""
   },
   "professionalSummary": {
-    "pt": "Desenvolvedor full-stack com ênfase em desenvolvimento back-end e experiência comprovada em projetos modernos e escaláveis. Possui graduação em Sistemas de Internet pelo IFC e cursa o Mestrado em Engenharia Informática na Universidade do Algarve, em Portugal, aprofundando conhecimentos em engenharia de software, sistemas distribuídos e segurança.",
-    "en": "Full-stack developer with a strong emphasis on back-end development and proven experience in designing and implementing modern, scalable solutions. Holds a Bachelor's degree in Internet Systems from IFC and is currently pursuing a Master's degree in Informatics Engineering at Universidade do Algarve, Portugal, deepening expertise in software engineering, distributed systems, and security."
+    "pt": "Desenvolvedor Full-Stack com foco em Back-End e mais de 3 anos de desenvolvimento com TypeScript, NestJS, Node.js, React e Python, construindo plataformas SaaS, produtos de comunicação com IA, microserviços orientados a eventos, sistemas em tempo real e integrações de API. Fundador e único engenheiro da TheChats.me (SaaS de mensagens/CRM com IA) e Web Developer em meio período na Angry Ventures. Evoluiu do suporte técnico, com Linux, SSH, logs, VoIP e Asterisk, para arquitetura de backend, refatoração de legado e produtos SaaS multi-tenant. Mestrando em Engenharia Informática na Universidade do Algarve.",
+    "en": "Backend-focused Full-Stack Software Engineer with 3+ years of software development in TypeScript, NestJS, Node.js, React and Python, building SaaS platforms, AI-powered communication products, event-driven microservices, real-time systems and API integrations. Founder and sole engineer of TheChats.me (AI-assisted messaging/CRM SaaS) and part-time Web Developer at Angry Ventures. Started in technical support with Linux, SSH, logs, VoIP and Asterisk, then moved into backend architecture, legacy refactoring and multi-tenant SaaS development. MSc student in Informatics Engineering at the University of Algarve."
   },
   "experience": [
     {
-      "title": "Web Developer",
+      "title": "Founder & Software Engineer",
+      "company": "TheChats.me",
+      "location": "Faro, Portugal / Remote",
+      "startDate": "2026-01",
+      "endDate": null,
+      "responsibilities": [
+        "Founder and sole engineer of an AI-assisted customer messaging platform (website live chat, shared inbox and CRM) that includes DropHub, a multichannel e-commerce module; designing, building and running the product end to end",
+        "Built a multi-tenant microservices backend with Node.js, TypeScript and NestJS 11 on PostgreSQL (Drizzle ORM), Redis and RabbitMQ: ~50 modules, role-based access, plan-based feature gating and a 96-endpoint Admin API documented in OpenAPI/Swagger",
+        "Developed the React 19/Vite dashboard (36+ modules, Zustand, TanStack Query, visual workflow/chatbot builder), an embeddable WebChat widget and an Astro marketing site and blog deployed on Cloudflare Workers",
+        "Built a real-time inbox over WebSockets (Socket.IO) with ticket workflows, SLA rules, CSAT surveys and analytics",
+        "Built the Python AI engine: RabbitMQ workers, multi-provider LLM agents (OpenAI, Anthropic, Together AI and self-hosted Ollama), an MCP server, RAG knowledge-base answers, ticket insights and lead scoring",
+        "Integrated Meta APIs (WhatsApp Cloud API, Instagram, Messenger) with OAuth and webhooks, Stripe billing and marketplace APIs (eBay, Etsy, WooCommerce, Vinted, Shopify) for DropHub, plus a Chrome MV3 extension",
+        "Run the infrastructure with Docker on Linux VPS servers, a WireGuard VPN, GitHub Actions CI/CD with self-hosted runners, GHCR and automated offsite backups; test suites with Jest, Vitest, Cypress and Pytest"
+      ]
+    },
+    {
+      "title": "Web Developer (Part-time)",
       "company": "Angry Ventures",
       "location": "Portugal",
       "startDate": "2026-01",
-      "endDate": "2026-08",
+      "endDate": null,
       "responsibilities": [
-        "Developed and maintained WordPress websites including plugin work and technical improvements for client projects",
-        "Built user-facing pages and features in React focused on usability and reliable delivery",
-        "Developed Chrome extension features and supported browser-based workflows for internal and client use cases",
-        "Implemented API integrations with external platforms such as Cellebrite, eBay and Monday.com",
-        "Handled fast-turnaround web tasks and troubleshooting across WordPress, React and integration projects"
+        "Developed and maintained web solutions, including WordPress plugins, fast WordPress maintenance tasks, React pages and technical improvements for digital products",
+        "Built a Google Chrome extension and implemented API integration features for external systems",
+        "Worked on integrations involving Cellebrite, eBay and Monday.com, connecting business workflows to third-party platforms",
+        "Delivered fixes, improvements and features with a focus on usability, maintainability, reliability and business requirements"
       ]
     },
     {
@@ -56,7 +71,7 @@
       "title": "IT Support Analyst",
       "company": "Tallk.me",
       "location": "Home Office / Brasil",
-      "startDate": "2022-09",
+      "startDate": "2022-12",
       "endDate": "2023-04",
       "responsibilities": [
         "Provided advanced technical support with SSH access for server and service maintenance",
@@ -70,7 +85,7 @@
       "company": "Tallk.me",
       "location": "Home Office / Brasil",
       "startDate": "2022-04",
-      "endDate": "2022-08",
+      "endDate": "2022-11",
       "responsibilities": [
         "Assisted in troubleshooting technical issues with SSH access",
         "Monitored logs, executed tests, and read backend source code",
@@ -94,8 +109,8 @@
   "education": [
     {
       "degree": "Internet Systems",
-      "institution": "Federal Institute of Santa Catarina – Camboriú",
-      "location": "Balneário Camboriú, Brasil",
+      "institution": "Instituto Federal Catarinense (IFC) – Campus Camboriú",
+      "location": "Camboriú, Brasil",
       "startDate": "2020-03",
       "endDate": "2024-12",
       "description": "Degree focused on web, mobile, and intranet systems development, covering software engineering, networking, and databases, enabling work across the full development cycle"
@@ -106,7 +121,7 @@
       "location": "Faro, Portugal",
       "startDate": "2026-09",
       "endDate": null,
-      "description": "Master's degree in informatics engineering, covering software engineering, distributed systems, data, security, and intelligent technologies applied to scalable products"
+      "description": "MSc in Informatics Engineering (2nd cycle), expected 2028. 1st-semester coursework: Machine Learning, Software Architecture, Modern Cryptography, Internet of Things, and Concurrent & Parallel Systems. Academic projects: OpenMP/MPI matrix multiplication with SLURM jobs on the Deucalion supercomputer, classic concurrency problems in C (fork, shared memory, POSIX semaphores), an ArchiMate model of Strapi CMS, linear regression and gradient descent with NumPy, and research on encryption in 4G/5G networks"
     }
   ],
   "skills": [
@@ -152,7 +167,7 @@
     },
     {
       "name": "TypeScript",
-      "level": 3,
+      "level": 5,
       "category": "backend"
     },
     {
@@ -164,6 +179,41 @@
       "name": "Flutter",
       "level": 3,
       "category": "mobile"
+    },
+    {
+      "name": "NestJS",
+      "level": 5,
+      "category": "backend"
+    },
+    {
+      "name": "PostgreSQL",
+      "level": 4,
+      "category": "backend"
+    },
+    {
+      "name": "TypeORM",
+      "level": 4,
+      "category": "backend"
+    },
+    {
+      "name": "Cloudflare Workers",
+      "level": 3,
+      "category": "devops"
+    },
+    {
+      "name": "WireGuard",
+      "level": 3,
+      "category": "devops"
+    },
+    {
+      "name": "Ollama",
+      "level": 3,
+      "category": "tools"
+    },
+    {
+      "name": "HPC (C, OpenMP, MPI, SLURM)",
+      "level": 2,
+      "category": "other"
     }
   ],
   "certifications": [
