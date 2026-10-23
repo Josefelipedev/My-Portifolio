@@ -30,7 +30,9 @@ export async function searchNetEmpregos(params: JobSearchParams): Promise<JobLis
       throw new Error(`Net-Empregos fetch error: ${response.status}`);
     }
 
-    const html = await response.text();
+    // The site serves ISO-8859-1 without a charset header; response.text()
+    // would decode it as UTF-8 and turn every accent into U+FFFD.
+    const html = new TextDecoder('iso-8859-1').decode(await response.arrayBuffer());
 
     const jobs: NetEmpregosJob[] = parseNetEmpregosHTML(html);
 

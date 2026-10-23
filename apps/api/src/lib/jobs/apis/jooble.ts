@@ -3,6 +3,8 @@
 import type { JobListing, JobSearchParams, JoobleResponse } from '../types';
 import { getJobApiKeys } from '../api-keys';
 
+const COUNTRY_LOCATIONS: Record<string, string> = { pt: 'Portugal', br: 'Brazil' };
+
 export async function searchJooble(params: JobSearchParams): Promise<JobListing[]> {
   const keys = await getJobApiKeys();
   const apiKey = keys.joobleApiKey;
@@ -13,9 +15,10 @@ export async function searchJooble(params: JobSearchParams): Promise<JobListing[
   }
 
   try {
-    // Jooble has different endpoints per country
-    const countryDomain = params.country === 'pt' ? 'pt' : params.country === 'br' ? 'br' : 'com';
+    // The key is for the global endpoint, which defaults to US postings when no
+    // location is sent; the country has to travel as the location.
     const url = `https://jooble.org/api/${apiKey}`;
+    const location = params.location || COUNTRY_LOCATIONS[params.country || ''] || '';
 
     const response = await fetch(url, {
       method: 'POST',
@@ -24,7 +27,7 @@ export async function searchJooble(params: JobSearchParams): Promise<JobListing[
       },
       body: JSON.stringify({
         keywords: params.keyword || '',
-        location: params.location || '',
+        location,
         page: 1,
       }),
       next: { revalidate: 300 },
