@@ -14,6 +14,13 @@ Um site de portfolio full-stack que permite showcase de projetos e experiências
 - **Integração GitHub** - Sync automático de repositórios
 - **Analytics** - Tracking de visitas e interações
 - **AI Features** - Resumo de projetos com Claude
+- **Busca de vagas** - Agregação de 17 fontes para Portugal, Brasil e remoto
+- **Busca inteligente** - Ranking semântico, matching com currículo, filtros, cache e deduplicação
+- **Pipeline de candidaturas** - Vagas salvas, timeline, alertas, follow-ups e analytics de conversão
+- **Pacotes de candidatura** - CV, carta, e-mail e snapshot da vaga versionados por candidatura
+- **Revisão e ATS** - Auditoria factual independente, extração do texto do PDF e cobertura de keywords
+- **Aprovação e envio** - Confirmação explícita do usuário, envio do e-mail arquivado com o PDF verificado, vínculo com a candidatura e congelamento da versão
+- **Preparação de entrevistas** - STAR e tópicos técnicos baseados nos materiais arquivados
 
 ## Tech Stack
 
@@ -25,7 +32,7 @@ Um site de portfolio full-stack que permite showcase de projetos e experiências
 | Banco de Dados | PostgreSQL |
 | ORM | Prisma |
 | Auth | JWT |
-| AI | Anthropic Claude SDK |
+| AI | Together AI e Anthropic Claude SDK |
 | Email | Nodemailer |
 | Testes | Vitest + React Testing Library |
 
@@ -63,6 +70,11 @@ Mensagens recebidas pelo formulário de contato.
 
 ### Analytics
 Page views, estatísticas de visitantes, geolocalização.
+
+### Job Search & Application Packages
+Busca multiportal, currículo editável, análise de fit, geração de documentos,
+revisão factual, verificação ATS, aprovação explícita antes do envio e histórico
+imutável das versões enviadas.
 
 ## Instalação
 
@@ -102,6 +114,10 @@ SMTP_PASS=app-password
 
 # AI (opcional)
 ANTHROPIC_API_KEY=sk-ant-xxx
+TOGETHER_API_KEY=xxx
+
+# API independente (frontend pós-split)
+NEXT_PUBLIC_API_BASE_URL=http://localhost:4000
 ```
 
 ## Uso
@@ -127,12 +143,17 @@ No painel admin você pode:
 - Ver mensagens de contato
 - Configurar informações do site
 - Ver analytics
+- Buscar, filtrar e salvar vagas
+- Preparar CV e carta específicos para cada vaga
+- Revisar e validar o PDF antes de enviar
+- Acompanhar candidaturas, alertas, follow-ups e entrevistas
 
 ## Comandos
 
 ```bash
 # Desenvolvimento
 npm run dev
+npm run api:dev
 
 # Build
 npm run build
@@ -142,6 +163,8 @@ npm start
 
 # Testes
 npm test
+npm run test:run
+npm run typecheck
 
 # Prisma
 npx prisma studio     # Interface visual do banco
@@ -155,11 +178,12 @@ npx prisma db push    # Push schema
 # Gerar hash de senha
 node scripts/hash-password.mjs NOVA_SENHA
 
-# Sync com GitHub
-node scripts/sync-github.mjs
+# Sincronizar skills/experiências do currículo
+npm run sync:resume
 
-# Sync skills do currículo
-node scripts/sync-resume.mjs
+# Rodar alertas e follow-ups no backend
+npm run alerts:run --workspace @portfolio/api
+npm run followups:run --workspace @portfolio/api
 ```
 
 ## Licença
