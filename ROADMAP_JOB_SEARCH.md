@@ -6,7 +6,7 @@ Last updated: 2026-10-24
 
 The application workflow is deployed (2026-10-23). Job discovery is moving from
 query-time fan-out to "ingest continuously, match locally": Phase 1 (the job
-feed) is implemented and validated locally, not deployed yet.
+feed) is in production since 2026-10-24.
 
 ### Job feed — Phase 1 (2026-10-24)
 
@@ -27,9 +27,10 @@ feed) is implemented and validated locally, not deployed yet.
   Net-Empregos was decoded as UTF-8 (broken accents), numeric HTML entities
   were left in titles.
 
-Deploy steps: pull `qwen3-embedding:0.6b` into the VPS Ollama, push `main`
-(`db push` creates the tables), port `JobFeed` + `JobsTabs` to
-`web/pages-build`, add the two crontab lines, run the first ingest.
+Production: `qwen3-embedding:0.6b` is pulled into the VPS Ollama; crontab runs
+`jobs:ingest` at 00:05/06:05/12:05/18:05 and `jobs:digest` at 08:30 (Lisbon
+time). First runs: 231 postings, ~1 min when nothing is new; embedding takes
+~8 s per posting while the VPS is loaded (load ~6-9 on 4 cores).
 
 ### Job feed — next phases
 
