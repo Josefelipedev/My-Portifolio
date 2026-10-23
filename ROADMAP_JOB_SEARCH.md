@@ -1,11 +1,43 @@
 # Job Search — Implementation Status
 
-Last updated: 2026-10-23
+Last updated: 2026-10-24
 
 ## Current status
 
-The high-impact application workflow is implemented, validated and committed
-(2026-10-23), rebased onto the Muse-Glimmer model switch. It is not deployed yet.
+The application workflow is deployed (2026-10-23). Job discovery is moving from
+query-time fan-out to "ingest continuously, match locally": Phase 1 (the job
+feed) is implemented and validated locally, not deployed yet.
+
+### Job feed — Phase 1 (2026-10-24)
+
+- `JobPosting` / `JobIngestRun` tables: postings deduplicated across sources and
+  runs by fingerprint, with `firstSeenAt` / `lastSeenAt` / `closedAt`.
+- `npm run jobs:ingest` (cron): role preferences + resume queries across the
+  existing sources, upsert, close postings unseen for `JOBS_STALE_DAYS`, embed new
+  postings once and store a stable 0-100 `matchScore` plus deal-breaker hits.
+- Embeddings moved to Ollama `qwen3-embedding:0.6b`: Together withdrew
+  `multilingual-e5-large-instruct` from serverless, which had silently disabled
+  the smart-search semantic re-rank. qwen3 ranked best of embeddinggemma,
+  nomic-embed-text and qwen3 on 328 real postings; the score band (0.30-0.65)
+  is calibrated on that set. Smart search reuses the feed's stored embeddings.
+- `npm run jobs:digest` (cron): e-mails the top new postings (score >= 60).
+- Admin "Feed" tab (default): filters, save to Saved Jobs, dismiss/restore,
+  manual "Update now".
+- Fixes found on the way: Jooble ignored the country (returned US postings),
+  Net-Empregos was decoded as UTF-8 (broken accents), numeric HTML entities
+  were left in titles.
+
+Deploy steps: pull `qwen3-embedding:0.6b` into the VPS Ollama, push `main`
+(`db push` creates the tables), port `JobFeed` + `JobsTabs` to
+`web/pages-build`, add the two crontab lines, run the first ingest.
+
+### Job feed — next phases
+
+- Phase 2: company watchlist (PT / remote-EU) seeded from career-ops' list, plus
+  Workable, SmartRecruiters, Recruitee, Personio and Teamtailor adapters.
+- Phase 3: JobSpy (LinkedIn, Indeed, Google Jobs) in the Python scraper.
+- Hard location filter from `preferredLocations` (Arbeitnow still brings
+  on-site DACH roles); cross-source dedupe when companies are named differently.
 
 ### Completed
 
