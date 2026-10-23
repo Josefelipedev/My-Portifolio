@@ -101,7 +101,7 @@ async function storedEmbeddings(jobs: JobListing[]): Promise<Map<string, number[
       where: { fingerprint: { in: jobs.map(normalizeJobKey) }, embeddingModel: EMBED_MODEL },
       select: { fingerprint: true, embedding: true },
     });
-    return new Map(rows.filter((row) => row.embedding.length).map((row) => [row.fingerprint, row.embedding]));
+    return new Map(rows.filter((row) => row.embedding?.length).map((row) => [row.fingerprint, row.embedding]));
   } catch {
     return new Map();
   }

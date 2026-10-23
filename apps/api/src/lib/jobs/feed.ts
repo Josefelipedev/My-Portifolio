@@ -164,6 +164,7 @@ async function upsertPostings(collected: Map<string, Collected>, now: Date) {
           jobType: job.jobType ?? null,
           salary: job.salary ?? null,
           tags: job.tags || [],
+          embedding: [],
           country: job.country ?? null,
           postedAt: job.postedAt ? new Date(job.postedAt) : null,
           firstSeenAt: now,
@@ -199,7 +200,13 @@ export async function scorePostings(resume: ResumeData): Promise<number> {
   const profile = await getProfileEmbedding(resume);
   const where = {
     closedAt: null,
-    OR: [{ profileHash: null }, { profileHash: { not: hash } }, ...(profile ? [{ embedding: { isEmpty: true } }] : [])],
+    // embeddingModel is written together with the embedding, so it also finds
+    // rows whose embedding column is NULL (isEmpty does not match NULL).
+    OR: [
+      { profileHash: null },
+      { profileHash: { not: hash } },
+      ...(profile ? [{ embeddingModel: null }, { embeddingModel: { not: EMBED_MODEL } }] : []),
+    ],
   };
 
   let scored = 0;
@@ -220,7 +227,7 @@ export async function scorePostings(resume: ResumeData): Promise<number> {
     // Reuse stored embeddings unless they came from another model.
     const embeddings = new Map<string, number[]>();
     for (const row of page) {
-      if (row.embedding.length && row.embeddingModel === EMBED_MODEL) embeddings.set(row.id, row.embedding);
+      if (row.embedding?.length && row.embeddingModel === EMBED_MODEL) embeddings.set(row.id, row.embedding);
     }
     const missing = profile ? page.filter((row) => !embeddings.has(row.id)) : [];
     for (let i = 0; i < missing.length; i += EMBED_BATCH) {

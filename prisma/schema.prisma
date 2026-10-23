@@ -396,7 +396,7 @@ model JobPosting {
   lastSeenAt     DateTime  @default(now())
   closedAt       DateTime?
 
-  embedding      Float[]   // posting embedding, computed once (empty until embedded)
+  embedding      Float[]   @default([]) // posting embedding, computed once (empty until embedded)
   embeddingModel String?
   keywordScore   Float?
   semanticScore  Float?    // cosine similarity to the resume profile
