@@ -29,6 +29,7 @@ import {
   getMonthUsage,
 } from '../lib/ai-tracking';
 import { honoCookieOptions } from '../lib/cookies';
+import { getClientIp } from '../lib/rate-limit';
 
 const router = new Hono<AuthEnv>();
 
@@ -467,10 +468,8 @@ router.post('/visits', async (c) => {
   const userAgent = c.req.header('user-agent') || undefined;
   const referrer = c.req.header('referer') || undefined;
 
-  const forwardedFor = c.req.header('x-forwarded-for');
-  const realIp = c.req.header('x-real-ip');
-  const rawIp = forwardedFor?.split(',')[0]?.trim() || realIp || undefined;
-  const ipAddress = anonymizeIP(rawIp);
+  const clientIp = getClientIp(c.req.raw.headers);
+  const ipAddress = anonymizeIP(clientIp === 'unknown' ? undefined : clientIp);
 
   const { device, browser, os } = parseUserAgent(userAgent || null);
 

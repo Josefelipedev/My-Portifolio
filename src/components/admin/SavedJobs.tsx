@@ -10,6 +10,7 @@ import { exportJobsToCSV, exportJobsToPDF, ExportableJob } from '@/lib/export';
 import { useToast } from '@/components/ui/Toast';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { apiFetch } from '@/lib/api-fetch';
+import { stripHtml } from '@/lib/html';
 
 interface EnrichedData {
   emails?: string[];
@@ -723,11 +724,6 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
     });
   };
 
-  const stripHtml = (html: string) => {
-    const tmp = document.createElement('div');
-    tmp.innerHTML = html;
-    return tmp.textContent || tmp.innerText || '';
-  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
