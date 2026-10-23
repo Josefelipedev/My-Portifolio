@@ -1,9 +1,12 @@
 import bcrypt from 'bcryptjs';
+import { randomBytes, randomInt } from 'node:crypto';
 import { SignJWT } from 'jose';
 import prisma from '../db';
 import { sendVerificationCode, sendLoginAlert } from './email';
 
 const CODE_EXPIRY_MINUTES = 10;
+const MAX_CODE_ATTEMPTS = 5; // wrong guesses before the pending code is burned
+const INVALID_CODE_REASON = 'Invalid or expired code';
 const SESSION_EXPIRY_DAYS = 14; // Session lasts 14 days
 const SESSION_EXPIRY_HOURS = SESSION_EXPIRY_DAYS * 24;
 
@@ -32,19 +35,14 @@ function anonymizeIP(ip: string): string {
   return ip;
 }
 
-// Generate a 6-digit verification code
+// Generate a 6-digit verification code (CSPRNG — Math.random is predictable)
 function generateCode(): string {
-  return Math.floor(100000 + Math.random() * 900000).toString();
+  return randomInt(100000, 1000000).toString();
 }
 
 // Generate a secure session token
 function generateSessionToken(): string {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  let token = '';
-  for (let i = 0; i < 64; i++) {
-    token += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return token;
+  return randomBytes(48).toString('base64url');
 }
 
 interface LoginStep1Result {
@@ -207,7 +205,8 @@ export async function verifyCodeAndCreateSession(
     });
 
     if (!verificationCode) {
-      await recordLoginAttempt(userId, requestInfo, false, 'Invalid or expired code');
+      await recordLoginAttempt(userId, requestInfo, false, INVALID_CODE_REASON);
+      await burnCodeAfterTooManyFailures(userId);
       return { success: false, error: 'Código inválido ou expirado' };
     }
 
@@ -317,6 +316,31 @@ export async function logout(jwt: string): Promise<boolean> {
 }
 
 // Record login attempt for history
+// A 6-digit code is only safe if guesses are capped per code, not per IP (IPs
+// rotate). Once the pending code has MAX_CODE_ATTEMPTS misses, invalidate it so
+// the user must log in again with the password to get a fresh one.
+async function burnCodeAfterTooManyFailures(userId: string): Promise<void> {
+  try {
+    const pending = await prisma.verificationCode.findFirst({
+      where: { userId, type: 'login', isUsed: false, expiresAt: { gt: new Date() } },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (!pending) return;
+
+    const failures = await prisma.loginHistory.count({
+      where: { userId, success: false, failReason: INVALID_CODE_REASON, createdAt: { gte: pending.createdAt } },
+    });
+    if (failures >= MAX_CODE_ATTEMPTS) {
+      await prisma.verificationCode.updateMany({
+        where: { userId, type: 'login', isUsed: false },
+        data: { isUsed: true },
+      });
+    }
+  } catch (error) {
+    console.error('Failed to check verification code attempts:', error);
+  }
+}
+
 async function recordLoginAttempt(
   userId: string | null,
   requestInfo: RequestInfo,

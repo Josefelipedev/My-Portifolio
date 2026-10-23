@@ -70,9 +70,18 @@ export function recordContactAttempt(ip: string): void {
   contactStore.set(ip, entry);
 }
 
-/** Extract the client IP from forwarding headers (parity with the web helper). */
+/**
+ * Extract the client IP. Prod sits behind Cloudflare, which overwrites
+ * CF-Connecting-IP with the real client address. The FIRST X-Forwarded-For
+ * entry is client-controlled (Cloudflare appends to it), so it must never key
+ * a rate limit — fall back to the LAST entry, added by the nearest proxy.
+ */
 export function getClientIp(headers: { get(name: string): string | null }): string {
+  const cfIp = headers.get('cf-connecting-ip');
+  if (cfIp) return cfIp.trim();
+  const realIp = headers.get('x-real-ip');
+  if (realIp) return realIp.trim();
   const forwarded = headers.get('x-forwarded-for');
-  if (forwarded) return forwarded.split(',')[0].trim();
-  return headers.get('x-real-ip') || 'unknown';
+  if (forwarded) return forwarded.split(',').pop()!.trim() || 'unknown';
+  return 'unknown';
 }
