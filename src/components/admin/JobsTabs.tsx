@@ -2,6 +2,7 @@
 
 import { useState, type ReactNode, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import JobFeed from './JobFeed';
 import JobSearch from './JobSearch';
 import SavedJobs from './SavedJobs';
 import JobApplications from './JobApplications';
@@ -18,18 +19,18 @@ interface JobsTabsProps {
   initialApplicationsCount: number;
 }
 
-type TabType = 'search' | 'saved' | 'applications' | 'pipeline' | 'analytics' | 'alerts' | 'companies' | 'scraper' | 'agent-costs' | 'resume';
+type TabType = 'feed' | 'search' | 'saved' | 'applications' | 'pipeline' | 'analytics' | 'alerts' | 'companies' | 'scraper' | 'agent-costs' | 'resume';
 
 export default function JobsTabs({ initialSavedCount, initialApplicationsCount }: JobsTabsProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const tabFromUrl = (searchParams.get('tab') as TabType) || 'search';
+  const tabFromUrl = (searchParams.get('tab') as TabType) || 'feed';
   const [activeTab, setActiveTab] = useState<TabType>(tabFromUrl);
   const [savedCount, setSavedCount] = useState(initialSavedCount);
   const [applicationsCount, setApplicationsCount] = useState(initialApplicationsCount);
 
   useEffect(() => {
-    const tab = (searchParams.get('tab') as TabType) || 'search';
+    const tab = (searchParams.get('tab') as TabType) || 'feed';
     setActiveTab(tab);
   }, [searchParams]);
 
@@ -57,6 +58,15 @@ export default function JobsTabs({ initialSavedCount, initialApplicationsCount }
   };
 
   const tabs: { id: TabType; label: string; count?: number; icon: ReactNode }[] = [
+    {
+      id: 'feed',
+      label: 'Feed',
+      icon: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+        </svg>
+      ),
+    },
     {
       id: 'search',
       label: 'Search Jobs',
@@ -180,6 +190,7 @@ export default function JobsTabs({ initialSavedCount, initialApplicationsCount }
 
       {/* Tab Content */}
       <div>
+        {activeTab === 'feed' && <JobFeed onJobSaved={handleJobSaved} />}
         {activeTab === 'search' && <JobSearch onJobSaved={handleJobSaved} />}
         {activeTab === 'saved' && (
           <SavedJobs
