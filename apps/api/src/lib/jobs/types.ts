@@ -84,6 +84,16 @@ export interface ResumeData {
   certifications: Array<{
     name: string;
   }>;
+  preferences?: {
+    targetRoles?: string[];
+    preferredLocations?: string[];
+    workModes?: string[];
+    minimumSalary?: string;
+    dealBreakers?: string[];
+    preferredIndustries?: string[];
+    availability?: string;
+    writingStyle?: string;
+  };
 }
 
 export interface SmartSearchResult {

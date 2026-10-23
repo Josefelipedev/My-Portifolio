@@ -46,7 +46,22 @@ interface ResumeData {
   experience: Experience[];
   certifications: Certification[];
   languages: Language[];
+  preferences: {
+    targetRoles: string[];
+    preferredLocations: string[];
+    workModes: string[];
+    minimumSalary: string;
+    dealBreakers: string[];
+    preferredIndustries: string[];
+    availability: string;
+    writingStyle: string;
+  };
 }
+
+const EMPTY_PREFERENCES: ResumeData['preferences'] = {
+  targetRoles: [], preferredLocations: [], workModes: [], minimumSalary: '',
+  dealBreakers: [], preferredIndustries: [], availability: '', writingStyle: '',
+};
 
 const EMPTY_RESUME: ResumeData = {
   personalInfo: { name: '', email: '', phone: '', address: '', linkedin: '', github: '' },
@@ -55,6 +70,7 @@ const EMPTY_RESUME: ResumeData = {
   experience: [],
   certifications: [],
   languages: [],
+  preferences: EMPTY_PREFERENCES,
 };
 
 const SKILL_CATEGORIES = ['backend', 'frontend', 'mobile', 'devops', 'database', 'other'];
@@ -64,13 +80,13 @@ export default function ResumeEditor() {
   const [resume, setResume] = useState<ResumeData>(EMPTY_RESUME);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [activeSection, setActiveSection] = useState<'personal' | 'skills' | 'experience' | 'certifications' | 'languages' | 'raw'>('skills');
+  const [activeSection, setActiveSection] = useState<'personal' | 'skills' | 'experience' | 'certifications' | 'languages' | 'preferences' | 'raw'>('skills');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     apiFetch('/api/jobs/resume')
       .then(r => r.json())
-      .then(d => { if (d.resume) setResume(d.resume); })
+      .then(d => { if (d.resume) setResume({ ...d.resume, preferences: { ...EMPTY_PREFERENCES, ...(d.resume.preferences || {}) } }); })
       .catch(() => showToast('Failed to load resume', 'error'))
       .finally(() => setLoading(false));
   }, [showToast]);
@@ -99,7 +115,7 @@ export default function ResumeEditor() {
     reader.onload = (ev) => {
       try {
         const parsed = JSON.parse(ev.target?.result as string) as ResumeData;
-        setResume(parsed);
+        setResume({ ...parsed, preferences: { ...EMPTY_PREFERENCES, ...(parsed.preferences || {}) } });
         showToast('JSON loaded — click Save to persist', 'success');
       } catch {
         showToast('Invalid JSON file', 'error');
@@ -198,6 +214,7 @@ export default function ResumeEditor() {
     { id: 'certifications' as const, label: '🏆 Certifications', count: resume.certifications.length },
     { id: 'personal' as const, label: '👤 Personal Info' },
     { id: 'languages' as const, label: '🌐 Languages', count: resume.languages.length },
+    { id: 'preferences' as const, label: '🎯 Career Preferences' },
     { id: 'raw' as const, label: '{ } Raw JSON' },
   ];
 
@@ -449,6 +466,43 @@ export default function ResumeEditor() {
           >
             + Add Language
           </button>
+        </div>
+      )}
+
+      {activeSection === 'preferences' && (
+        <div className="space-y-4 rounded-xl border border-zinc-200 p-4 dark:border-zinc-700">
+          <p className="text-sm text-zinc-500">These preferences influence search ranking, application writing and honest deal-breaker filtering.</p>
+          {([
+            ['targetRoles', 'Target roles', 'Full Stack Developer, Backend Engineer'],
+            ['preferredLocations', 'Preferred locations', 'Portugal, Remote Europe'],
+            ['workModes', 'Work modes', 'remote, hybrid'],
+            ['preferredIndustries', 'Preferred industries', 'SaaS, developer tools'],
+            ['dealBreakers', 'Deal-breakers', 'unpaid, mandatory relocation, on-call'],
+          ] as const).map(([field, label, placeholder]) => (
+            <div key={field}>
+              <label className="mb-1 block text-xs font-medium text-zinc-500">{label} <span className="font-normal">(comma-separated)</span></label>
+              <input
+                value={resume.preferences[field].join(', ')}
+                onChange={event => setResume(current => ({ ...current, preferences: { ...current.preferences, [field]: event.target.value.split(',').map(value => value.trim()).filter(Boolean) } }))}
+                placeholder={placeholder}
+                className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-600 dark:bg-zinc-800"
+              />
+            </div>
+          ))}
+          <div className="grid gap-3 md:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-zinc-500">Minimum salary</label>
+              <input value={resume.preferences.minimumSalary} onChange={event => setResume(current => ({ ...current, preferences: { ...current.preferences, minimumSalary: event.target.value } }))} placeholder="e.g. €45,000 gross/year" className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-600 dark:bg-zinc-800" />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-zinc-500">Availability</label>
+              <input value={resume.preferences.availability} onChange={event => setResume(current => ({ ...current, preferences: { ...current.preferences, availability: event.target.value } }))} placeholder="e.g. 30 days" className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-600 dark:bg-zinc-800" />
+            </div>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-zinc-500">Natural writing style</label>
+            <textarea value={resume.preferences.writingStyle} onChange={event => setResume(current => ({ ...current, preferences: { ...current.preferences, writingStyle: event.target.value } }))} rows={4} placeholder="Describe your preferred tone, phrases to avoid and how formal you want applications to sound." className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm dark:border-zinc-600 dark:bg-zinc-800" />
+          </div>
         </div>
       )}
 
