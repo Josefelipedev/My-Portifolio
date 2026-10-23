@@ -1,16 +1,18 @@
 # @portfolio/api
 
-Node API service for the portfolio, intended to run on the VPS (PM2). This is
-the **Phase 2** target of the migration: the route handlers currently under the
-web app's `src/app/api/*` will be ported here as [Hono](https://hono.dev) routes,
-reusing the Node-only libraries (Prisma/pg, nodemailer, job scraping, AI) that
-cannot run on the Cloudflare edge.
+Node/Hono API service for the portfolio. It runs in Docker on the VPS and owns
+the Node-only workloads: Prisma/PostgreSQL, e-mail, job aggregation and AI.
 
 ## Status
 
-Skeleton only. **Not yet wired into the deploy** — the web app still serves
-`/api/*` until the cutover. Cross-origin readiness (CORS + cookie domain) is
-already in place behind env vars (see repo root `.env.example`, Phase 3).
+Production backend. The frontend resolves `/api/*` through
+`NEXT_PUBLIC_API_BASE_URL`, with credentialed CORS and shared CSRF/auth cookies.
+The deploy workflow rebuilds this service after validation and syncs the schema
+with `prisma db push` (production has not been baselined for `prisma migrate deploy` yet).
+
+The API includes portfolio content, authentication, analytics, knowledge-base,
+job search, alerts, saved jobs, applications and versioned application packages
+(tailored CV, cover letter, independent review and ATS verification).
 
 ## Run locally
 

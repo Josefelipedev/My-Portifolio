@@ -191,6 +191,16 @@ jobsApplications.post('/jobs/saved/:id/apply', requireAuth, requireCsrf, async (
 
   const body = await parseBody(c, applySchema);
 
+  const linkedPackage = body.packageId
+    ? await prisma.applicationPackage.findFirst({
+        where: { id: body.packageId, savedJobId: savedJob.id },
+        select: { id: true },
+      })
+    : null;
+  if (body.packageId && !linkedPackage) {
+    return c.json({ error: 'Application package does not belong to this job' }, 400);
+  }
+
   const recipient = (body.recipient || savedJob.contactEmail || '').trim();
   const wantsEmail = body.sendApplicationEmail !== false;
 
@@ -246,6 +256,18 @@ jobsApplications.post('/jobs/saved/:id/apply', requireAuth, requireCsrf, async (
     },
     update: { status: 'applied', appliedAt, ...(emailed ? { emailSentAt, emailSentTo } : {}) },
   });
+
+  if (linkedPackage) {
+    await prisma.applicationPackage.update({
+      where: { id: linkedPackage.id },
+      data: {
+        applicationId: application.id,
+        status: 'sent',
+        sentAt: appliedAt,
+        recipient: emailed ? recipient : null,
+      },
+    });
+  }
 
   return c.json({ application, emailed, emailError, recipient: wantsEmail ? recipient : null }, 201);
 });
