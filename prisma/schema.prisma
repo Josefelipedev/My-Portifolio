@@ -369,6 +369,67 @@ model ApplicationArtifact {
 }
 
 // ==========================================
+// Job Feed (continuous ingestion + stored match scores)
+// ==========================================
+
+// One row per distinct opening, deduplicated across sources and ingestion runs
+// by fingerprint (normalized title + company). The cron keeps lastSeenAt fresh;
+// a posting not seen for JOBS_STALE_DAYS is presumed closed.
+model JobPosting {
+  id             String    @id @default(cuid())
+  fingerprint    String    @unique
+  externalId     String    // id of the most complete listing seen (SavedJob.externalId on save)
+  source         String
+  sources        String[]  // every source that listed it
+  title          String
+  company        String
+  companyLogo    String?
+  description    String    @db.Text
+  url            String
+  location       String?
+  jobType        String?
+  salary         String?
+  tags           String[]
+  country        String?
+  postedAt       DateTime?
+  firstSeenAt    DateTime  @default(now())
+  lastSeenAt     DateTime  @default(now())
+  closedAt       DateTime?
+
+  embedding      Float[]   // posting embedding, computed once (empty until embedded)
+  embeddingModel String?
+  keywordScore   Float?
+  semanticScore  Float?    // cosine similarity to the resume profile
+  matchScore     Int?      // 0-100 blend of semantic + keyword fit
+  dealBreaker    String?   // first career-preference deal-breaker found in the text
+  profileHash    String?   // resume/profile version the scores were computed for
+  scoredAt       DateTime?
+
+  status         String    @default("new") // new | saved | dismissed
+  digestedAt     DateTime?
+
+  @@index([closedAt, matchScore])
+  @@index([firstSeenAt])
+  @@index([status])
+  @@index([lastSeenAt])
+}
+
+model JobIngestRun {
+  id         String    @id @default(cuid())
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+  queries    String[]
+  found      Int       @default(0)
+  created    Int       @default(0)
+  updated    Int       @default(0)
+  closed     Int       @default(0)
+  scored     Int       @default(0)
+  errors     String?   @db.Text // JSON array of "source: message"
+
+  @@index([startedAt])
+}
+
+// ==========================================
 // Company Portal Tracker (Greenhouse / Ashby / Lever)
 // ==========================================
 

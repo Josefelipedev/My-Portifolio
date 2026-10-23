@@ -9,6 +9,8 @@
     "start": "tsx src/index.ts",
     "alerts:run": "tsx src/scripts/run-alerts.ts",
     "followups:run": "tsx src/scripts/run-followups.ts",
+    "jobs:ingest": "tsx src/scripts/run-ingest.ts",
+    "jobs:digest": "tsx src/scripts/run-digest.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

@@ -208,3 +208,9 @@ export const resumeUpdateSchema = z
     skills: z.array(z.unknown(), { error: 'skills must be an array' }),
   })
   .passthrough();
+
+// ── job feed ──────────────────────────────────────────────────────────────────
+
+export const jobFeedStatusSchema = z.object({
+  status: z.enum(['new', 'dismissed']),
+});
