@@ -1,29 +1,58 @@
 // Semantic re-ranking — embeds the candidate's profile and the job listings with
-// a multilingual embedding model (Together) and re-orders results by cosine
-// similarity blended with the existing keyword score. Degrades gracefully: any
-// failure (no API key, model error) leaves the input ordering untouched.
+// a multilingual embedding model and re-orders results by cosine similarity
+// blended with the existing keyword score. Degrades gracefully: any failure (no
+// provider, model error) leaves the input ordering untouched.
 
 import Together from 'together-ai';
 import { createHash } from 'node:crypto';
+import prisma from '../../db';
+import { normalizeJobKey } from './deduplication';
+import { cleanHtmlText } from './helpers';
 import type { JobListing, ResumeData } from './types';
 
-// Serverless multilingual model (PT + EN). Overridable via env.
-const EMBED_MODEL = process.env.TOGETHER_EMBED_MODEL || 'intfloat/multilingual-e5-large-instruct';
-// e5-instruct wants an instruction prefix on the query side; documents stay plain.
+// Together withdrew multilingual-e5-large-instruct from serverless in 2026 (its
+// only serverless embedder left is English-only), so the default is a local
+// Ollama model: qwen3-embedding:0.6b ranked PT/EN postings best of the
+// candidates tried. EMBED_PROVIDER=together keeps the hosted path available.
+export const EMBED_PROVIDER = process.env.EMBED_PROVIDER || (process.env.OLLAMA_URL ? 'ollama' : 'together');
+export const EMBED_MODEL =
+  EMBED_PROVIDER === 'ollama'
+    ? process.env.OLLAMA_EMBED_MODEL || 'qwen3-embedding:0.6b'
+    : process.env.TOGETHER_EMBED_MODEL || 'intfloat/multilingual-e5-large-instruct';
+// qwen3-embedding and e5-instruct want an instruction prefix on the query side;
+// documents stay plain.
 const QUERY_INSTRUCT =
   'Instruct: Given a tech professional profile, retrieve job postings that best match their skills and experience.\nQuery: ';
 // Only the strongest keyword-ranked head is re-embedded, to bound cost/latency.
 const RERANK_HEAD = 100;
+// CPU-only Ollama on the VPS needs several seconds per batch.
+const OLLAMA_TIMEOUT_MS = 120_000;
 
 function getClient(): Together | null {
   const apiKey = process.env.TOGETHER_API_KEY;
   return apiKey ? new Together({ apiKey }) : null;
 }
 
-async function embedTexts(texts: string[]): Promise<number[][] | null> {
-  const client = getClient();
-  if (!client || texts.length === 0) return null;
+async function embedWithOllama(texts: string[]): Promise<number[][]> {
+  const base = (process.env.OLLAMA_URL || 'http://localhost:11434').replace(/\/+$/, '');
+  const res = await fetch(`${base}/api/embed`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model: EMBED_MODEL, input: texts }),
+    signal: AbortSignal.timeout(OLLAMA_TIMEOUT_MS),
+  });
+  if (!res.ok) throw new Error(`Ollama embed ${res.status}: ${(await res.text()).slice(0, 200)}`);
+  const data = (await res.json()) as { embeddings?: number[][] };
+  if (!data.embeddings || data.embeddings.length !== texts.length) throw new Error('Ollama returned no embeddings');
+  return data.embeddings;
+}
+
+export async function embedTexts(texts: string[]): Promise<number[][] | null> {
+  if (texts.length === 0) return null;
   try {
+    if (EMBED_PROVIDER === 'ollama') return await embedWithOllama(texts);
+    const client = getClient();
+    if (!client) return null;
     const res = await client.embeddings.create({ model: EMBED_MODEL, input: texts });
     const sorted = [...res.data].sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
     return sorted.map((d) => d.embedding as number[]);
@@ -46,7 +75,7 @@ export function cosine(a: number[], b: number[]): number {
   return dot / (Math.sqrt(na) * Math.sqrt(nb));
 }
 
-function profileText(resume: ResumeData): string {
+export function profileText(resume: ResumeData): string {
   const skills = resume.skills?.map((s) => s.name).join(', ') || '';
   const exp =
     resume.experience
@@ -56,15 +85,32 @@ function profileText(resume: ResumeData): string {
   return `Skills: ${skills}\nExperience:\n${exp}\nCertifications: ${certs}`.trim();
 }
 
-function jobText(job: JobListing): string {
-  const tags = Array.isArray(job.tags) ? job.tags.join(', ') : '';
-  return `${job.title} at ${job.company}. ${tags}. ${(job.description || '').slice(0, 600)}`.trim();
+/** The document text embedded for a posting (feed ingestion and re-rank alike). */
+export function jobText(job: { title: string; company: string; location?: string | null; tags?: string[]; description: string }): string {
+  const tags = job.tags?.length ? `${job.tags.join(', ')}. ` : '';
+  const location = job.location ? ` (${job.location})` : '';
+  return `${job.title} at ${job.company}${location}. ${tags}${cleanHtmlText(job.description || '').slice(0, 1500)}`.trim();
+}
+
+// Postings the feed already embedded (same fingerprint and model) need no new
+// embedding call — on CPU-only Ollama that is the difference between an
+// instant and a slow interactive search.
+async function storedEmbeddings(jobs: JobListing[]): Promise<Map<string, number[]>> {
+  try {
+    const rows = await prisma.jobPosting.findMany({
+      where: { fingerprint: { in: jobs.map(normalizeJobKey) }, embeddingModel: EMBED_MODEL },
+      select: { fingerprint: true, embedding: true },
+    });
+    return new Map(rows.filter((row) => row.embedding.length).map((row) => [row.fingerprint, row.embedding]));
+  } catch {
+    return new Map();
+  }
 }
 
 // The profile embedding rarely changes, so cache it keyed by a content hash.
 let profileCache: { key: string; embedding: number[] } | null = null;
 
-async function getProfileEmbedding(resume: ResumeData): Promise<number[] | null> {
+export async function getProfileEmbedding(resume: ResumeData): Promise<number[] | null> {
   const text = profileText(resume);
   const key = createHash('sha256').update(`${EMBED_MODEL}|${text}`).digest('hex');
   if (profileCache?.key === key) return profileCache.embedding;
@@ -77,7 +123,8 @@ async function getProfileEmbedding(resume: ResumeData): Promise<number[] | null>
 /**
  * Re-rank keyword-scored jobs by semantic similarity to the resume. Blends
  * cosine similarity (0.6) with the normalized keyword score (0.4). Returns the
- * input unchanged on any failure. Only the top RERANK_HEAD are re-embedded.
+ * input unchanged on any failure. Only the top RERANK_HEAD are embedded, and
+ * only those the feed has not embedded already.
  */
 export async function applySemanticRerank(
   jobs: JobListing[],
@@ -88,11 +135,15 @@ export async function applySemanticRerank(
   const head = jobs.slice(0, RERANK_HEAD);
   const tail = jobs.slice(RERANK_HEAD);
 
-  const [profile, jobEmbeddings] = await Promise.all([
+  const stored = await storedEmbeddings(head);
+  const missing = head.filter((job) => !stored.has(normalizeJobKey(job)));
+  const [profile, fresh] = await Promise.all([
     getProfileEmbedding(resume),
-    embedTexts(head.map(jobText)),
+    missing.length ? embedTexts(missing.map(jobText)) : Promise.resolve([] as number[][]),
   ]);
-  if (!profile || !jobEmbeddings || jobEmbeddings.length !== head.length) return jobs;
+  if (!profile || !fresh || fresh.length !== missing.length) return jobs;
+  missing.forEach((job, i) => stored.set(normalizeJobKey(job), fresh[i]));
+  const jobEmbeddings = head.map((job) => stored.get(normalizeJobKey(job))!);
 
   const scores = head.map((j) => j.relevanceScore ?? 0);
   const minS = Math.min(...scores);
