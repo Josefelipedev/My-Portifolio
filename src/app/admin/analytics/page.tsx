@@ -4,6 +4,8 @@ import { redirect } from 'next/navigation';
 import AnalyticsPageWrapper from '@/components/admin/AnalyticsPageWrapper';
 import AnalyticsClient from './AnalyticsClient';
 
+export const dynamic = 'force-dynamic';
+
 export default async function AnalyticsPage() {
   if (!await isAuthenticated()) {
     redirect('/admin/login');

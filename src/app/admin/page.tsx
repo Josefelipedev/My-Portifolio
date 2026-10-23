@@ -1,6 +1,8 @@
 import prisma from '@/lib/prisma';
 import AdminPageWrapper from '@/components/admin/AdminPageWrapper';
 
+export const dynamic = 'force-dynamic';
+
 export default async function AdminPage() {
   const projects = await prisma.project.findMany({
     orderBy: [{ featured: 'desc' }, { createdAt: 'desc' }],
