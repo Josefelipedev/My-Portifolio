@@ -28,7 +28,9 @@ export type AIFeature =
   | 'alert-suggestions'
   | 'wakatime-ranking'
   | 'generate-email'
-  | 'cover-letter';
+  | 'cover-letter'
+  | 'application-package-draft'
+  | 'application-package-review';
 
 interface TrackingParams {
   feature: AIFeature;

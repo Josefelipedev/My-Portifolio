@@ -6,6 +6,7 @@ import AIGradeBadge from './jobs/AIGradeBadge';
 import AIAnalysisPanel, { type AIAnalysis } from './jobs/AIAnalysisPanel';
 import CVGeneratorButton from './jobs/CVGeneratorButton';
 import InterviewPrepModal, { type InterviewPrep } from './jobs/InterviewPrepModal';
+import ApplicationPackageModal from './jobs/ApplicationPackageModal';
 import { exportJobsToCSV, exportJobsToPDF, ExportableJob } from '@/lib/export';
 import { useToast } from '@/components/ui/Toast';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
@@ -93,6 +94,7 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
   // Interview Prep state
   const [generatingPrep, setGeneratingPrep] = useState<string | null>(null);
   const [prepModal, setPrepModal] = useState<{ job: SavedJob; prep: InterviewPrep } | null>(null);
+  const [packageJob, setPackageJob] = useState<SavedJob | null>(null);
   // Contact editing state
   const [editingContact, setEditingContact] = useState<string | null>(null);
   const [contactEmail, setContactEmail] = useState('');
@@ -186,6 +188,7 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
         body: JSON.stringify({
           status: 'applied',
           appliedAt: new Date().toISOString(),
+          sendApplicationEmail: false,
         }),
       });
 
@@ -1531,7 +1534,17 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
               >
                 {expandedId === job.id ? 'Show less' : 'Show more'}
               </button>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                <button
+                  onClick={() => setPackageJob(job)}
+                  className="flex items-center gap-1 rounded-lg bg-red-100 px-3 py-1.5 text-sm font-medium text-red-700 transition-colors hover:bg-red-200 dark:bg-red-900/30 dark:text-red-300 dark:hover:bg-red-900/50"
+                  title="Generate, independently review, version and ATS-check the application documents"
+                >
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414A1 1 0 0119 9.414V19a2 2 0 01-2 2z" />
+                  </svg>
+                  Prepare
+                </button>
                 {/* AI Analyze Button */}
                 <button
                   onClick={() => handleAnalyze(job)}
@@ -1659,6 +1672,14 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
           prep={prepModal.prep}
           jobTitle={prepModal.job.title}
           company={prepModal.job.company}
+        />
+      )}
+
+      {packageJob && (
+        <ApplicationPackageModal
+          job={packageJob}
+          onClose={() => setPackageJob(null)}
+          onSent={() => fetchSavedJobs(1)}
         />
       )}
 

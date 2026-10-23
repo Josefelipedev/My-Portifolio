@@ -86,6 +86,7 @@ export const applySchema = z.object({
   cvFilename: z.string().optional(),
   sendApplicationEmail: z.boolean().optional(),
   appliedAt: z.string().optional(),
+  packageId: z.string().optional(),
 });
 
 // ── company portals ───────────────────────────────────────────────────────────
@@ -117,6 +118,26 @@ export const batchCvSchema = z.object({
 
 export const batchAnalyzeSchema = z.object({
   jobIds: idsArray('jobIds array is required').max(20, 'Maximum 20 jobs per batch'),
+});
+
+export const applicationPackageUpdateSchema = z.object({
+  coverLetter: z.string().min(1).max(20_000).optional(),
+  emailSubject: z.string().min(1).max(500).optional(),
+  emailBody: z.string().min(1).max(20_000).optional(),
+  status: z.enum(['reviewed', 'ready']).optional(),
+});
+
+export const applicationPackageSendSchema = z.object({
+  recipient: z.email('A valid recipient e-mail is required').optional(),
+  sendEmail: z.boolean().optional(),
+  acknowledgedWarnings: z.boolean().optional(),
+  appliedAt: z.string().optional(),
+  note: z.string().max(500).optional(),
+});
+
+export const applicationPackagePdfSchema = z.object({
+  cvPdfBase64: z.string().min(100, 'A PDF is required').max(16_000_000, 'PDF is too large'),
+  filename: z.string().optional(),
 });
 
 // ── AI inline (email / cover letter / extract) ────────────────────────────────

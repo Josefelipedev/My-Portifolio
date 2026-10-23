@@ -289,6 +289,7 @@ model SavedJob {
   interviewPrep String?   @db.Text // JSON with STAR stories, tech topics, salary script
 
   application   JobApplication?
+  applicationPackages ApplicationPackage[]
 
   @@index([source])
   @@index([savedAt])
@@ -315,12 +316,56 @@ model JobApplication {
   emailSentAt   DateTime?
   emailSentTo   String?
 
+  packages      ApplicationPackage[]
+
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
   @@index([status])
   @@index([createdAt])
   @@index([appliedAt])
+}
+
+// Versioned, immutable-at-send-time bundle of everything prepared for one
+// application. A new preparation creates a new version instead of overwriting
+// the documents an employer may already have received.
+model ApplicationPackage {
+  id            String    @id @default(cuid())
+  savedJobId    String
+  savedJob      SavedJob  @relation(fields: [savedJobId], references: [id], onDelete: Cascade)
+  applicationId String?
+  application   JobApplication? @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+  version       Int
+  status        String    @default("draft") // draft | needs_review | reviewed | ready | sent
+  reviewStatus  String    @default("pending") // pending | passed | needs_changes
+  atsStatus     String    @default("pending") // pending | passed | failed
+  model         String?
+  recipient     String?
+  sentAt        DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  artifacts     ApplicationArtifact[]
+
+  @@unique([savedJobId, version])
+  @@index([savedJobId, createdAt])
+  @@index([applicationId])
+  @@index([status])
+}
+
+model ApplicationArtifact {
+  id            String    @id @default(cuid())
+  packageId     String
+  package       ApplicationPackage @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  kind          String    // job_snapshot | cv_json | cover_letter | email | review | ats_report | cv_pdf | cv_pdf_metadata | sent_email
+  content       String?   @db.Text
+  mimeType      String?
+  sha256        String?
+  metadata      String?   @db.Text
+  createdAt     DateTime  @default(now())
+
+  @@index([packageId, kind])
+  @@index([createdAt])
 }
 
 // ==========================================

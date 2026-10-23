@@ -10,6 +10,8 @@ vi.hoisted(() => {
 const db = vi.hoisted(() => ({
   session: { findFirst: vi.fn() },
   savedJob: { findUnique: vi.fn(), update: vi.fn() },
+  applicationPackage: { findFirst: vi.fn() },
+  resumeConfig: { findUnique: vi.fn() },
 }));
 
 const aiTracking = vi.hoisted(() => ({
@@ -82,6 +84,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   db.session.findFirst.mockResolvedValue({ id: 's', userId: 'u1', token: 's1', isValid: true });
   aiTracking.checkQuotaLimits.mockResolvedValue({ withinLimits: true });
+  db.applicationPackage.findFirst.mockResolvedValue(null);
+  db.resumeConfig.findUnique.mockResolvedValue(null);
   TogetherMock.mockReturnValue({ chat: { completions: { create } } });
 });
 

@@ -21,6 +21,7 @@ export const Errors = {
   Unauthorized: (message = 'Unauthorized') => new ApiError(message, 401, 'UNAUTHORIZED'),
   Forbidden: (message = 'Forbidden') => new ApiError(message, 403, 'FORBIDDEN'),
   NotFound: (message = 'Not found') => new ApiError(message, 404, 'NOT_FOUND'),
+  Conflict: (message = 'Conflict') => new ApiError(message, 409, 'CONFLICT'),
   RateLimited: (message = 'Too many requests') => new ApiError(message, 429, 'RATE_LIMITED'),
   Internal: (message = 'Internal server error') => new ApiError(message, 500, 'INTERNAL_ERROR'),
 };
