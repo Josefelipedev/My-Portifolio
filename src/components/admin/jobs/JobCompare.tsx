@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import MatchScoreBadge from './MatchScoreBadge';
+import { stripHtml } from '@/lib/html';
 
 interface ComparableJob {
   id: string;
@@ -31,12 +32,6 @@ export default function JobCompare({ jobs, onClose, onRemove }: JobCompareProps)
     return null;
   }
 
-  // Helper to strip HTML
-  const stripHtml = (html: string) => {
-    const tmp = document.createElement('div');
-    tmp.innerHTML = html;
-    return tmp.textContent || tmp.innerText || '';
-  };
 
   // Helper to parse tags
   const parseTags = (tags?: string) => {

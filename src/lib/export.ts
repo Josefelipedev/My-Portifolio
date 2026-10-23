@@ -1,4 +1,5 @@
 import Papa from 'papaparse';
+import { escapeHtml } from '@/lib/html';
 
 // Type definitions for export data
 export interface ExportableJob {
@@ -119,11 +120,11 @@ export function generateJobsReportHTML(jobs: ExportableJob[], title: string = 'S
     .map(
       (job) => `
     <div style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; margin-bottom: 12px;">
-      <h3 style="margin: 0 0 8px 0; color: #111827; font-size: 16px;">${job.title}</h3>
-      <p style="margin: 0 0 4px 0; color: #4b5563; font-size: 14px;">${job.company}</p>
-      ${job.location ? `<p style="margin: 0 0 4px 0; color: #6b7280; font-size: 12px;">Location: ${job.location}</p>` : ''}
-      ${job.salary ? `<p style="margin: 0 0 4px 0; color: #059669; font-size: 12px;">Salary: ${job.salary}</p>` : ''}
-      ${job.source ? `<p style="margin: 0; color: #9ca3af; font-size: 11px;">Source: ${job.source}</p>` : ''}
+      <h3 style="margin: 0 0 8px 0; color: #111827; font-size: 16px;">${escapeHtml(job.title)}</h3>
+      <p style="margin: 0 0 4px 0; color: #4b5563; font-size: 14px;">${escapeHtml(job.company)}</p>
+      ${job.location ? `<p style="margin: 0 0 4px 0; color: #6b7280; font-size: 12px;">Location: ${escapeHtml(job.location)}</p>` : ''}
+      ${job.salary ? `<p style="margin: 0 0 4px 0; color: #059669; font-size: 12px;">Salary: ${escapeHtml(job.salary)}</p>` : ''}
+      ${job.source ? `<p style="margin: 0; color: #9ca3af; font-size: 11px;">Source: ${escapeHtml(job.source)}</p>` : ''}
     </div>
   `
     )
@@ -132,7 +133,7 @@ export function generateJobsReportHTML(jobs: ExportableJob[], title: string = 'S
   return `
     <div style="max-width: 800px; margin: 0 auto;">
       <div style="text-align: center; margin-bottom: 24px; border-bottom: 2px solid #e5e7eb; padding-bottom: 16px;">
-        <h1 style="margin: 0 0 8px 0; color: #111827; font-size: 24px;">${title}</h1>
+        <h1 style="margin: 0 0 8px 0; color: #111827; font-size: 24px;">${escapeHtml(title)}</h1>
         <p style="margin: 0; color: #6b7280; font-size: 14px;">Generated on ${date}</p>
         <p style="margin: 8px 0 0 0; color: #4b5563; font-size: 14px;">Total Jobs: ${jobs.length}</p>
       </div>
@@ -173,7 +174,7 @@ export function generateApplicationsReportHTML(
     .map(
       ([status, apps]) => `
     <span style="display: inline-block; margin-right: 16px; padding: 4px 12px; background: ${statusColors[status] || '#6b7280'}20; color: ${statusColors[status] || '#6b7280'}; border-radius: 4px; font-size: 13px;">
-      ${status.charAt(0).toUpperCase() + status.slice(1)}: ${apps.length}
+      ${escapeHtml(status.charAt(0).toUpperCase() + status.slice(1))}: ${apps.length}
     </span>
   `
     )
@@ -185,17 +186,17 @@ export function generateApplicationsReportHTML(
     <div style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; margin-bottom: 12px;">
       <div style="display: flex; justify-content: space-between; align-items: flex-start;">
         <div>
-          <h3 style="margin: 0 0 8px 0; color: #111827; font-size: 16px;">${app.title}</h3>
-          <p style="margin: 0 0 4px 0; color: #4b5563; font-size: 14px;">${app.company}</p>
+          <h3 style="margin: 0 0 8px 0; color: #111827; font-size: 16px;">${escapeHtml(app.title)}</h3>
+          <p style="margin: 0 0 4px 0; color: #4b5563; font-size: 14px;">${escapeHtml(app.company)}</p>
         </div>
         <span style="padding: 4px 12px; background: ${statusColors[app.status] || '#6b7280'}20; color: ${statusColors[app.status] || '#6b7280'}; border-radius: 4px; font-size: 12px; font-weight: 500;">
-          ${app.status.charAt(0).toUpperCase() + app.status.slice(1)}
+          ${escapeHtml(app.status.charAt(0).toUpperCase() + app.status.slice(1))}
         </span>
       </div>
-      ${app.location ? `<p style="margin: 8px 0 4px 0; color: #6b7280; font-size: 12px;">Location: ${app.location}</p>` : ''}
+      ${app.location ? `<p style="margin: 8px 0 4px 0; color: #6b7280; font-size: 12px;">Location: ${escapeHtml(app.location)}</p>` : ''}
       ${app.appliedAt ? `<p style="margin: 0 0 4px 0; color: #6b7280; font-size: 12px;">Applied: ${new Date(app.appliedAt).toLocaleDateString()}</p>` : ''}
-      ${app.nextStep ? `<p style="margin: 0 0 4px 0; color: #f59e0b; font-size: 12px;">Next: ${app.nextStep}${app.nextStepDate ? ` on ${new Date(app.nextStepDate).toLocaleDateString()}` : ''}</p>` : ''}
-      ${app.notes ? `<p style="margin: 8px 0 0 0; padding: 8px; background: #f9fafb; border-radius: 4px; color: #4b5563; font-size: 12px;">${app.notes}</p>` : ''}
+      ${app.nextStep ? `<p style="margin: 0 0 4px 0; color: #f59e0b; font-size: 12px;">Next: ${escapeHtml(app.nextStep)}${app.nextStepDate ? ` on ${new Date(app.nextStepDate).toLocaleDateString()}` : ''}</p>` : ''}
+      ${app.notes ? `<p style="margin: 8px 0 0 0; padding: 8px; background: #f9fafb; border-radius: 4px; color: #4b5563; font-size: 12px;">${escapeHtml(app.notes)}</p>` : ''}
     </div>
   `
     )
@@ -204,7 +205,7 @@ export function generateApplicationsReportHTML(
   return `
     <div style="max-width: 800px; margin: 0 auto;">
       <div style="text-align: center; margin-bottom: 24px; border-bottom: 2px solid #e5e7eb; padding-bottom: 16px;">
-        <h1 style="margin: 0 0 8px 0; color: #111827; font-size: 24px;">${title}</h1>
+        <h1 style="margin: 0 0 8px 0; color: #111827; font-size: 24px;">${escapeHtml(title)}</h1>
         <p style="margin: 0; color: #6b7280; font-size: 14px;">Generated on ${date}</p>
         <p style="margin: 8px 0 0 0; color: #4b5563; font-size: 14px;">Total Applications: ${applications.length}</p>
         <div style="margin-top: 12px;">${statusSummary}</div>
