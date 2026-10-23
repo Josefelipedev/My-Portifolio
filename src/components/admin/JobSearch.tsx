@@ -8,6 +8,7 @@ import ApiKeySettings from './jobs/ApiKeySettings';
 import SourceHealthPanel from './jobs/SourceHealthPanel';
 import { MatchScoreWithReason, type MatchReason } from './jobs/MatchScoreBadge';
 import { apiFetch } from '@/lib/api-fetch';
+import { stripHtml } from '@/lib/html';
 
 interface JobListing {
   id: string;
@@ -681,11 +682,6 @@ export default function JobSearch({ onJobSaved }: JobSearchProps) {
     return date.toLocaleDateString();
   };
 
-  const stripHtml = (html: string) => {
-    const tmp = document.createElement('div');
-    tmp.innerHTML = html;
-    return tmp.textContent || tmp.innerText || '';
-  };
 
   const configuredApis = apiStatus.filter(api => api.configured).length;
   const totalApis = apiStatus.length;
