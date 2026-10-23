@@ -13,7 +13,20 @@ export function apiUrl(path: string): string {
   return `${API_BASE}${path}`;
 }
 
-/** fetch() against the API: resolves the base URL and sends cookies cross-origin. */
-export function apiFetch(path: string, options: RequestInit = {}): Promise<Response> {
-  return fetch(apiUrl(path), { credentials: 'include', ...options });
+/**
+ * fetch() against the API. State-changing requests automatically receive the
+ * double-submit CSRF token, so callers cannot accidentally bypass the shared
+ * security contract when moving between the same-origin and split API modes.
+ */
+export async function apiFetch(path: string, options: RequestInit = {}): Promise<Response> {
+  const method = (options.method || 'GET').toUpperCase();
+  const headers = new Headers(options.headers);
+  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method) && !headers.has('x-csrf-token')) {
+    const csrfResponse = await fetch(apiUrl('/api/csrf'), { credentials: 'include' });
+    if (!csrfResponse.ok) throw new Error('Failed to obtain CSRF token');
+    const data = await csrfResponse.json() as { csrfToken?: string };
+    if (!data.csrfToken) throw new Error('CSRF endpoint returned no token');
+    headers.set('x-csrf-token', data.csrfToken);
+  }
+  return fetch(apiUrl(path), { credentials: 'include', ...options, headers });
 }
