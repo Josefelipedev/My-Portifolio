@@ -61,6 +61,10 @@ export function extractKeywordsFromResume(resume: ResumeData): string[] {
     }
   }
 
+  for (const role of resume.preferences?.targetRoles || []) {
+    if (role.trim()) keywords.add(role.trim().toLowerCase());
+  }
+
   return Array.from(keywords);
 }
 

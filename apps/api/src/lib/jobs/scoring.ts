@@ -33,6 +33,8 @@ const SCORING_WEIGHTS = {
   keywordMatch: 2,
   skillMatch: 3,
   titleMatch: 5,
+  preferenceMatch: 5,
+  dealBreaker: -50,
 };
 
 const RELIABLE_SOURCES = ['linkedin', 'remoteok', 'remotive'];
@@ -128,6 +130,23 @@ export function calculateResumeMatchScore(
           score += SCORING_WEIGHTS.keywordMatch;
         }
       }
+    }
+  }
+
+  for (const preference of [
+    ...(resume.preferences?.targetRoles || []),
+    ...(resume.preferences?.preferredLocations || []),
+    ...(resume.preferences?.workModes || []),
+    ...(resume.preferences?.preferredIndustries || []),
+  ]) {
+    if (preference.trim() && jobText.includes(preference.trim().toLowerCase())) {
+      score += SCORING_WEIGHTS.preferenceMatch;
+    }
+  }
+
+  for (const dealBreaker of resume.preferences?.dealBreakers || []) {
+    if (dealBreaker.trim() && jobText.includes(dealBreaker.trim().toLowerCase())) {
+      score += SCORING_WEIGHTS.dealBreaker;
     }
   }
 

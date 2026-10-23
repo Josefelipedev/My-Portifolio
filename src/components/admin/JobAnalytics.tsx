@@ -62,6 +62,8 @@ interface AnalyticsData {
   totalSavedJobs: number;
   totalApplications: number;
   recentSearches: number;
+  fitCalibration: { grade: string; applications: number; interviews: number; offers: number; interviewRate: number }[];
+  skillGaps: { gap: string; count: number }[];
 }
 
 const COLORS = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#06b6d4', '#8b5cf6', '#ec4899'];
@@ -357,6 +359,41 @@ export default function JobAnalytics() {
           </div>
         </div>
       )}
+
+      <div className="grid gap-6 md:grid-cols-2">
+        <div className="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-700 dark:bg-zinc-800">
+          <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Fit score calibration</h3>
+          <p className="mb-4 text-sm text-zinc-500">Predicted AI grade compared with real interview outcomes.</p>
+          {data.fitCalibration?.length ? (
+            <div className="space-y-3">
+              {data.fitCalibration.map((row) => (
+                <div key={row.grade} className="flex items-center gap-3">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-100 font-bold text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300">{row.grade}</span>
+                  <div className="flex-1">
+                    <div className="flex justify-between text-sm"><span>{row.applications} applications</span><strong>{row.interviewRate}% interview rate</strong></div>
+                    <div className="mt-1 h-2 overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-700"><div className="h-full bg-indigo-500" style={{ width: `${row.interviewRate}%` }} /></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : <p className="text-sm text-zinc-500">Analyze and track more applications to calibrate fit scores.</p>}
+        </div>
+
+        <div className="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-700 dark:bg-zinc-800">
+          <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Recurring skill gaps</h3>
+          <p className="mb-4 text-sm text-zinc-500">Prioritized from gaps found across your analyzed jobs.</p>
+          {data.skillGaps?.length ? (
+            <div className="space-y-2">
+              {data.skillGaps.map((item, index) => (
+                <div key={item.gap} className="flex items-center justify-between rounded-lg bg-zinc-50 px-3 py-2 text-sm dark:bg-zinc-700/50">
+                  <span><strong className="mr-2 text-red-500">#{index + 1}</strong>{item.gap}</span>
+                  <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs text-red-700 dark:bg-red-900/30 dark:text-red-300">{item.count} jobs</span>
+                </div>
+              ))}
+            </div>
+          ) : <p className="text-sm text-zinc-500">No recurring gaps recorded yet.</p>}
+        </div>
+      </div>
     </div>
   );
 }

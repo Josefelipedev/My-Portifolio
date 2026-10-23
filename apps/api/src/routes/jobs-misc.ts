@@ -64,6 +64,8 @@ interface AnalyticsResponse {
   totalSavedJobs: number;
   totalApplications: number;
   recentSearches: number;
+  fitCalibration: { grade: string; applications: number; interviews: number; offers: number; interviewRate: number }[];
+  skillGaps: { gap: string; count: number }[];
 }
 
 jobsMisc.get('/jobs/analytics', requireAuth, async (c) => {
@@ -74,7 +76,7 @@ jobsMisc.get('/jobs/analytics', requireAuth, async (c) => {
       status: true,
       createdAt: true,
       appliedAt: true,
-      savedJob: { select: { source: true, company: true } },
+      savedJob: { select: { source: true, company: true, aiGrade: true } },
       timeline: true,
     },
   });
@@ -187,7 +189,7 @@ jobsMisc.get('/jobs/analytics', requireAuth, async (c) => {
 
   // Get top tags from saved jobs
   const allSavedJobs = await prisma.savedJob.findMany({
-    select: { tags: true, savedAt: true, application: { select: { id: true } } },
+    select: { tags: true, savedAt: true, aiAnalysis: true, application: { select: { id: true } } },
   });
 
   const tagCount = new Map<string, number>();
@@ -209,6 +211,44 @@ jobsMisc.get('/jobs/analytics', requireAuth, async (c) => {
     (j) => !j.application && new Date(j.savedAt) < staleThreshold,
   ).length;
 
+  // Compare predicted fit grades with real outcomes. This makes model quality
+  // visible instead of treating the AI score as ground truth.
+  const gradeMap = new Map<string, { grade: string; applications: number; interviews: number; offers: number }>();
+  for (const app of applications) {
+    const grade = app.savedJob?.aiGrade;
+    if (!grade) continue;
+    const row = gradeMap.get(grade) || { grade, applications: 0, interviews: 0, offers: 0 };
+    row.applications++;
+    if (app.status === 'interview' || app.status === 'offer') row.interviews++;
+    if (app.status === 'offer') row.offers++;
+    gradeMap.set(grade, row);
+  }
+  const fitCalibration = Array.from(gradeMap.values())
+    .map((row) => ({ ...row, interviewRate: row.applications ? Math.round((row.interviews / row.applications) * 100) : 0 }))
+    .sort((a, b) => a.grade.localeCompare(b.grade));
+
+  // Aggregate recurring AI-identified gaps into an actionable upskill queue.
+  const gapCount = new Map<string, number>();
+  for (const job of allSavedJobs) {
+    if (!job.aiAnalysis) continue;
+    try {
+      const analysis = JSON.parse(job.aiAnalysis) as { gaps?: unknown[] };
+      for (const rawGap of analysis.gaps || []) {
+        if (typeof rawGap !== 'string') continue;
+        const gap = rawGap.trim().replace(/\s+/g, ' ');
+        if (gap.length < 2) continue;
+        const key = gap.toLowerCase();
+        gapCount.set(key, (gapCount.get(key) || 0) + 1);
+      }
+    } catch {
+      // Ignore legacy malformed analysis rows.
+    }
+  }
+  const skillGaps = Array.from(gapCount.entries())
+    .map(([gap, count]) => ({ gap, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 12);
+
   const response: AnalyticsResponse = {
     funnel,
     weeklyActivity,
@@ -220,6 +260,8 @@ jobsMisc.get('/jobs/analytics', requireAuth, async (c) => {
     totalSavedJobs: savedJobsCount,
     totalApplications: applications.length,
     recentSearches: recentSearchesCount,
+    fitCalibration,
+    skillGaps,
   };
 
   return c.json(response);
