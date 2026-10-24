@@ -1,5 +1,9 @@
 // Jobicy API — free remote jobs, no key needed
-// Docs: https://jobicy.com/jobs-rss-feed
+// Docs: https://jobi.cy/apidocs
+//
+// The API rejects unknown parameters with a 400 (it dropped `search`; keyword
+// search is `tag`). `tag` also matches descriptions, so without an industry
+// filter it returns sales and support roles; default to `dev`.
 
 import type { JobListing, JobSearchParams } from '../types';
 
@@ -34,13 +38,10 @@ export async function searchJobicy(params: JobSearchParams): Promise<JobListing[
     url.searchParams.set('count', String(Math.min(params.limit || 50, 50)));
 
     if (params.keyword) {
-      url.searchParams.set('search', params.keyword);
+      url.searchParams.set('tag', params.keyword);
     }
 
-    // Map category if available
-    if (params.category) {
-      url.searchParams.set('industry', params.category);
-    }
+    url.searchParams.set('industry', params.category || 'dev');
 
     const response = await fetch(url.toString(), {
       headers: {
@@ -86,6 +87,6 @@ export async function searchJobicy(params: JobSearchParams): Promise<JobListing[
     });
   } catch (err) {
     console.error('Jobicy API error:', err);
-    return [];
+    throw err;
   }
 }

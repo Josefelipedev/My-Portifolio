@@ -9,6 +9,12 @@
 //   https://www.buscojobs.pt/vagas/ts1017/trabalho-de-tecnologia-da-informacao/{N}   (page N)
 // We page through that category and refine by keyword ourselves.
 // Detail URL is `/${slug(CargoVacante)}-ID-${IdOferta}`.
+//
+// The whole domain sits behind AWS WAF, which answers datacenter IPs (the VPS)
+// with a 405 captcha page (`x-amzn-waf-action: captcha`). That can't be solved
+// from here, so it is reported as a block rather than a generic HTTP error.
+// The category pages are the same for every keyword, so one fetch (or one
+// block) is shared by all the queries of an ingest run.
 
 import type { JobListing, JobSearchParams } from '../types';
 import { cleanHtmlText } from '../helpers';
@@ -17,6 +23,9 @@ const BASE_URL = 'https://www.buscojobs.pt';
 // ts1017 = "Tecnologia da informação" category (server-side filtered to tech)
 const IT_CATEGORY_PATH = '/vagas/ts1017/trabalho-de-tecnologia-da-informacao';
 const MAX_PAGES = 5; // ~15 offers/page
+const CATEGORY_CACHE_MS = 10 * 60 * 1000;
+
+let categoryCache: { at: number; offers: Promise<BuscoJobsOffer[]> } | null = null;
 
 interface BuscoJobsOffer {
   IdOferta: number;
@@ -34,25 +43,11 @@ interface BuscoJobsOffer {
 
 export async function searchBuscoJobs(params: JobSearchParams): Promise<JobListing[]> {
   try {
-    const pageUrls = Array.from({ length: MAX_PAGES }, (_, i) =>
-      i === 0
-        ? `${BASE_URL}${IT_CATEGORY_PATH}`
-        : `${BASE_URL}${IT_CATEGORY_PATH}/${i + 1}`
-    );
-
-    const pages = await Promise.all(pageUrls.map(fetchOffers));
-    const offers = pages.flat();
-
-    // Deduplicate by offer id across pages
-    const byId = new Map<number, BuscoJobsOffer>();
-    for (const offer of offers) {
-      if (offer?.IdOferta && offer.CargoVacante) byId.set(offer.IdOferta, offer);
-    }
-
+    const offers = await getCategoryOffers();
     const normalizedKeyword = normalize((params.keyword || '').trim());
 
     const jobs: JobListing[] = [];
-    for (const offer of Array.from(byId.values())) {
+    for (const offer of offers) {
       const title = cleanHtmlText(offer.CargoVacante);
       const description = cleanHtmlText(offer.Descripcion || '');
 
@@ -68,8 +63,32 @@ export async function searchBuscoJobs(params: JobSearchParams): Promise<JobListi
     return jobs.slice(0, params.limit || 50);
   } catch (err) {
     console.error('BuscoJobs scraping error:', err);
-    return [];
+    throw err;
   }
+}
+
+function getCategoryOffers(): Promise<BuscoJobsOffer[]> {
+  if (!categoryCache || Date.now() - categoryCache.at > CATEGORY_CACHE_MS) {
+    categoryCache = { at: Date.now(), offers: fetchCategoryOffers() };
+  }
+  return categoryCache.offers;
+}
+
+async function fetchCategoryOffers(): Promise<BuscoJobsOffer[]> {
+  // Page 1 first: when the WAF blocks it, it blocks the rest too.
+  const first = await fetchOffers(`${BASE_URL}${IT_CATEGORY_PATH}`);
+  const rest = await Promise.all(
+    Array.from({ length: MAX_PAGES - 1 }, (_, i) =>
+      fetchOffers(`${BASE_URL}${IT_CATEGORY_PATH}/${i + 2}`)
+    )
+  );
+
+  // Deduplicate by offer id across pages
+  const byId = new Map<number, BuscoJobsOffer>();
+  for (const offer of [first, ...rest].flat()) {
+    if (offer?.IdOferta && offer.CargoVacante) byId.set(offer.IdOferta, offer);
+  }
+  return Array.from(byId.values());
 }
 
 async function fetchOffers(url: string): Promise<BuscoJobsOffer[]> {
@@ -84,6 +103,9 @@ async function fetchOffers(url: string): Promise<BuscoJobsOffer[]> {
     next: { revalidate: 300 },
   });
 
+  if (response.headers.get('x-amzn-waf-action')) {
+    throw new Error(`BuscoJobs blocked by AWS WAF ${response.headers.get('x-amzn-waf-action')} (HTTP ${response.status}); this IP can't reach the site`);
+  }
   if (!response.ok) {
     throw new Error(`BuscoJobs fetch error: ${response.status}`);
   }
