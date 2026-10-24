@@ -43,7 +43,7 @@ export async function searchRemotive(params: JobSearchParams): Promise<JobListin
     }));
   } catch (error) {
     console.error('Remotive API error:', error);
-    return [];
+    throw error;
   }
 }
 

@@ -60,6 +60,6 @@ export async function searchJSearch(params: JobSearchParams): Promise<JobListing
     }));
   } catch (error) {
     console.error('JSearch API error:', error);
-    return [];
+    throw error;
   }
 }

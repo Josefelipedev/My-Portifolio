@@ -23,6 +23,6 @@ export async function searchGeekHunter(params: JobSearchParams): Promise<JobList
   } catch (error) {
     const err = error instanceof Error ? error : new Error(String(error));
     logger.error('geekhunter', `Scraping error: ${err.message}`, { error: err.message });
-    return [];
+    throw error;
   }
 }

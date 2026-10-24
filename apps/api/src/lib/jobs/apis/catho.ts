@@ -31,7 +31,7 @@ export async function searchCatho(params: JobSearchParams): Promise<JobListing[]
     return jobs.slice(0, params.limit || 50);
   } catch (error) {
     console.error('Catho scraping error:', error);
-    return [];
+    throw error;
   }
 }
 

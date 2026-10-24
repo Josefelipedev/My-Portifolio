@@ -83,7 +83,7 @@ export async function searchPythonScraper(
     }));
   } catch (error) {
     console.error('[PythonScraper] Error:', error);
-    return [];
+    throw error;
   }
 }
 

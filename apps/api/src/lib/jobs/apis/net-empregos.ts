@@ -51,7 +51,7 @@ export async function searchNetEmpregos(params: JobSearchParams): Promise<JobLis
     }));
   } catch (error) {
     console.error('Net-Empregos scraping error:', error);
-    return [];
+    throw error;
   }
 }
 

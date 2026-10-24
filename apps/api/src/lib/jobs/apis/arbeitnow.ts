@@ -55,6 +55,6 @@ export async function searchArbeitnow(params: JobSearchParams): Promise<JobListi
     }));
   } catch (error) {
     console.error('Arbeitnow API error:', error);
-    return [];
+    throw error;
   }
 }

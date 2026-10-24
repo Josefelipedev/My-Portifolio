@@ -19,6 +19,6 @@ export async function searchVagasComBr(params: JobSearchParams): Promise<JobList
   } catch (error) {
     const err = error instanceof Error ? error : new Error(String(error));
     logger.error('vagascombr', `Scraping error: ${err.message}`, { error: err.message });
-    return [];
+    throw error;
   }
 }

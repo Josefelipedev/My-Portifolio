@@ -31,6 +31,16 @@ export interface SourceError { source: string; error: string }
 let _lastSourceErrors: SourceError[] = [];
 export function getLastSourceErrors(): SourceError[] { return _lastSourceErrors; }
 
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+// Resolve to the listings of the sources that succeeded.
+async function fulfilled(promises: Promise<JobListing[]>[]): Promise<JobListing[]> {
+  const settled = await Promise.allSettled(promises);
+  return settled.flatMap((r) => (r.status === 'fulfilled' ? r.value : []));
+}
+
 export interface SourceHealth {
   source: string;
   ok: boolean;
@@ -118,7 +128,7 @@ export async function getSourceHealth(
           source: s.name,
           ok: false,
           count: 0,
-          error: e instanceof Error ? e.message : String(e),
+          error: errorMessage(e),
           latencyMs: Date.now() - start,
         };
       }
@@ -141,14 +151,17 @@ export async function searchJobs(
   // Check cache first
   const cachedResults = getCachedResults(params, sourcesList);
   if (cachedResults) {
+    _lastSourceErrors = [];
     return cachedResults;
   }
 
   const searches = buildSourceSearches(params, source);
 
+  // Sources throw on failure (after logging), so a broken source shows up
+  // here instead of looking like a source with no matches.
   const settled = await Promise.allSettled(searches.map(s => s.promise));
   _lastSourceErrors = settled
-    .map((r, i) => r.status === 'rejected' ? { source: searches[i].name, error: String((r as PromiseRejectedResult).reason) } : null)
+    .map((r, i) => r.status === 'rejected' ? { source: searches[i].name, error: errorMessage(r.reason) } : null)
     .filter((e): e is SourceError => e !== null);
 
   let allJobs = settled
@@ -189,24 +202,22 @@ export async function searchJobsByCountry(
 
   if (country === 'remote') {
     // Remote jobs - use RemoteOK and Remotive
-    const [remoteok, remotive] = await Promise.all([
+    const jobs = deduplicateJobs(await fulfilled([
       searchRemoteOK(params),
       searchRemotive(params),
-    ]);
-    const jobs = deduplicateJobs([...remoteok, ...remotive]);
+    ]));
     return jobs.slice(0, limit);
   }
 
   if (country === 'br' || country === 'pt') {
     params.country = country;
     // Country-specific - use Adzuna, Jooble, JSearch
-    const [adzuna, jooble, jsearch, arbeitnow] = await Promise.all([
+    const jobs = deduplicateJobs(await fulfilled([
       searchAdzuna(params),
       searchJooble(params),
       searchJSearch(params),
       country === 'pt' ? searchArbeitnow(params) : Promise.resolve([]),
-    ]);
-    const jobs = deduplicateJobs([...adzuna, ...jooble, ...jsearch, ...arbeitnow]);
+    ]));
     return jobs.slice(0, limit);
   }
 

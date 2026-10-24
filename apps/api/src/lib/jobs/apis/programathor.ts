@@ -29,7 +29,7 @@ export async function searchProgramathor(params: JobSearchParams): Promise<JobLi
     return jobs.slice(0, params.limit || 50);
   } catch (error) {
     console.error('Programathor scraping error:', error);
-    return [];
+    throw error;
   }
 }
 

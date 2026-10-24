@@ -26,7 +26,7 @@ export async function searchWeWorkRemotely(params: JobSearchParams): Promise<Job
     return jobs.slice(0, params.limit || 50);
   } catch (err) {
     console.error('WeWorkRemotely RSS error:', err);
-    return [];
+    throw err;
   }
 }
 
