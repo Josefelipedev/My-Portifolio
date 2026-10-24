@@ -50,7 +50,7 @@ export async function searchITJobs(params: JobSearchParams): Promise<JobListing[
     }));
   } catch (error) {
     console.error('ITJobs scraping error:', error);
-    return [];
+    throw error;
   }
 }
 

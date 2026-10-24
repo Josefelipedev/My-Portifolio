@@ -29,7 +29,7 @@ export async function searchLinkedIn(params: JobSearchParams): Promise<JobListin
     return jobs.slice(0, params.limit || 50);
   } catch (error) {
     console.error('LinkedIn scraping error:', error);
-    return [];
+    throw error;
   }
 }
 

@@ -51,6 +51,6 @@ export async function searchRemoteOK(params: JobSearchParams): Promise<JobListin
     }));
   } catch (error) {
     console.error('RemoteOK API error:', error);
-    return [];
+    throw error;
   }
 }

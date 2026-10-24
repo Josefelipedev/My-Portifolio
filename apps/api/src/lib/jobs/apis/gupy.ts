@@ -74,6 +74,6 @@ export async function searchGupy(params: JobSearchParams): Promise<JobListing[]>
     });
   } catch (error) {
     console.error('Gupy API error:', error);
-    return [];
+    throw error;
   }
 }

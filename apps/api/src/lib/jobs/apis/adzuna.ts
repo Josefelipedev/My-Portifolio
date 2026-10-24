@@ -56,6 +56,6 @@ export async function searchAdzuna(params: JobSearchParams): Promise<JobListing[
     }));
   } catch (error) {
     console.error('Adzuna API error:', error);
-    return [];
+    throw error;
   }
 }

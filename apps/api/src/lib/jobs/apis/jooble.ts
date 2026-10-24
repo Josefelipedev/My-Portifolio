@@ -56,6 +56,6 @@ export async function searchJooble(params: JobSearchParams): Promise<JobListing[
     }));
   } catch (error) {
     console.error('Jooble API error:', error);
-    return [];
+    throw error;
   }
 }
