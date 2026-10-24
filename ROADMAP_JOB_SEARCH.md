@@ -1,6 +1,6 @@
 # Job Search — Implementation Status
 
-Last updated: 2026-10-24
+Last updated: 2026-10-25
 
 ## Current status
 
@@ -28,9 +28,26 @@ feed) is in production since 2026-10-24.
   were left in titles.
 
 Production: `qwen3-embedding:0.6b` is pulled into the VPS Ollama; crontab runs
-`jobs:ingest` at 00:05/06:05/12:05/18:05 and `jobs:digest` at 08:30 (Lisbon
-time). First runs: 231 postings, ~1 min when nothing is new; embedding takes
-~8 s per posting while the VPS is loaded (load ~6-9 on 4 cores).
+`jobs:ingest` at 00:05/06:05/12:05/18:05 and `jobs:digest` at 08:30 in the
+VPS timezone (Europe/Berlin, one hour ahead of Lisbon). First runs: 231
+postings, ~1 min when nothing is new; embedding takes ~8 s per posting while
+the VPS is loaded (load ~6-9 on 4 cores).
+
+Source health (2026-10-25), from the first four production runs:
+
+- Sources used to log a failure and return `[]`, so a broken source looked
+  like one with no matches and `JobIngestRun.errors` stayed `null`. They now
+  rethrow; the aggregator records them and the Feed tab shows them as
+  "source issues".
+- Jobicy failed every run with a 400: the API dropped `search`. It now uses
+  `tag`, with `industry=dev` by default (`tag` alone also matches sales roles).
+- BuscoJobs fails every run from the VPS: AWS WAF answers datacenter IPs with
+  a 405 captcha on the whole domain. It works from a residential IP. The block
+  is reported as such and the category pages are fetched once per run instead
+  of once per query. Getting it back in production needs a residential proxy
+  (or dropping the source).
+- Adzuna has no credentials on the VPS (`ADZUNA_APP_ID` / `ADZUNA_APP_KEY`), so
+  it is skipped. LinkedIn occasionally answers 429.
 
 ### Job feed — next phases
 
@@ -74,12 +91,15 @@ time). First runs: 231 postings, ~1 min when nothing is new; embedding takes
 
 - `npm run typecheck`: pass
 - `npm run typecheck --workspace @portfolio/api`: pass
-- `npm run test:run`: 187 tests pass
+- `npm run test:run`: 209 tests pass
 - `npm run build`: pass
 - `npx prisma validate`: pass
 - `git diff --check`: pass
 
 ## Required before production use
+
+Steps 1-2 are done. Steps 3-4 are still open: as of 2026-10-25 the production
+DB has no `ApplicationPackage` rows.
 
 1. Push `main` (triggers the deploy); `db push` creates the
    `ApplicationPackage` / `ApplicationArtifact` tables.
