@@ -1,6 +1,6 @@
 // Job Search Aggregator - Main search function
 
-import type { JobListing, JobSearchParams, JobSource, ApiStatus } from './types';
+import type { JobListing, JobSearchParams, JobSource, JobSourceType, ApiStatus } from './types';
 import { filterJobsByAge, sortJobs } from './helpers';
 import { deduplicateJobs } from './deduplication';
 import { scoreJobs } from './scoring';
@@ -30,6 +30,17 @@ import { isPythonScraperAvailable } from './apis/python-scraper';
 export interface SourceError { source: string; error: string }
 let _lastSourceErrors: SourceError[] = [];
 export function getLastSourceErrors(): SourceError[] { return _lastSourceErrors; }
+
+// Sources this host can't use, e.g. JOBS_DISABLED_SOURCES=buscojobs on the VPS,
+// whose datacenter IP gets BuscoJobs' WAF captcha. Read per call so tests can set it.
+export function getDisabledSources(): Set<string> {
+  return new Set(
+    (process.env.JOBS_DISABLED_SOURCES || '')
+      .split(',')
+      .map((source) => source.trim().toLowerCase())
+      .filter(Boolean)
+  );
+}
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -65,17 +76,23 @@ function buildSourceSearches(
     : [countryParam];
   const isAllCountries = countries.includes('all');
   const shouldSearchCountry = (c: string) => isAllCountries || countries.includes(c);
+  const disabled = getDisabledSources();
+  // Selected explicitly or through 'all'; a disabled source is never searched.
+  const want = (type: JobSourceType) => !disabled.has(type) && (isAllSources || sources.includes(type));
+  // Country boards: explicit selection, or 'all' when their country is searched.
+  const wantIn = (type: JobSourceType, country: string) =>
+    !disabled.has(type) && (sources.includes(type) || (isAllSources && shouldSearchCountry(country)));
   const push = (name: string, promise: Promise<JobListing[]>) => searches.push({ name, promise });
 
   // ── Remote-first sources ──
   if (shouldSearchCountry('remote') || isAllCountries) {
-    if (isAllSources || sources.includes('remoteok')) push('RemoteOK', searchRemoteOK(params));
-    if (isAllSources || sources.includes('remotive')) push('Remotive', searchRemotive(params));
-    if (isAllSources || sources.includes('jobicy')) push('Jobicy', searchJobicy(params));
-    if (isAllSources || sources.includes('weworkremotely')) push('WeWorkRemotely', searchWeWorkRemotely(params));
+    if (want('remoteok')) push('RemoteOK', searchRemoteOK(params));
+    if (want('remotive')) push('Remotive', searchRemotive(params));
+    if (want('jobicy')) push('Jobicy', searchJobicy(params));
+    if (want('weworkremotely')) push('WeWorkRemotely', searchWeWorkRemotely(params));
   }
 
-  if ((isAllSources || sources.includes('arbeitnow')) && (shouldSearchCountry('pt') || shouldSearchCountry('remote') || isAllCountries)) {
+  if (want('arbeitnow') && (shouldSearchCountry('pt') || shouldSearchCountry('remote') || isAllCountries)) {
     push('Arbeitnow', searchArbeitnow(params));
   }
 
@@ -85,27 +102,27 @@ function buildSourceSearches(
 
   for (const country of countriesToSearch) {
     const countryParams = { ...params, country };
-    if (isAllSources || sources.includes('adzuna')) push(`Adzuna (${country})`, searchAdzuna(countryParams));
-    if (isAllSources || sources.includes('jooble')) push(`Jooble (${country})`, searchJooble(countryParams));
-    if (isAllSources || sources.includes('jsearch')) push(`JSearch (${country})`, searchJSearch(countryParams));
+    if (want('adzuna')) push(`Adzuna (${country})`, searchAdzuna(countryParams));
+    if (want('jooble')) push(`Jooble (${country})`, searchJooble(countryParams));
+    if (want('jsearch')) push(`JSearch (${country})`, searchJSearch(countryParams));
   }
 
-  if (sources.includes('netempregos') || (isAllSources && shouldSearchCountry('pt'))) push('Net-Empregos', searchNetEmpregos(params));
-  if (sources.includes('itjobs') || (isAllSources && shouldSearchCountry('pt'))) push('ITJobs.pt', searchITJobs(params));
-  if (sources.includes('buscojobs') || (isAllSources && shouldSearchCountry('pt'))) push('BuscoJobs.pt', searchBuscoJobs(params));
-  if (sources.includes('vagascombr') || (isAllSources && shouldSearchCountry('br'))) push('Vagas.com.br', searchVagasComBr(params));
-  if (sources.includes('geekhunter') || (isAllSources && shouldSearchCountry('br'))) push('GeekHunter', searchGeekHunter(params));
+  if (wantIn('netempregos', 'pt')) push('Net-Empregos', searchNetEmpregos(params));
+  if (wantIn('itjobs', 'pt')) push('ITJobs.pt', searchITJobs(params));
+  if (wantIn('buscojobs', 'pt')) push('BuscoJobs.pt', searchBuscoJobs(params));
+  if (wantIn('vagascombr', 'br')) push('Vagas.com.br', searchVagasComBr(params));
+  if (wantIn('geekhunter', 'br')) push('GeekHunter', searchGeekHunter(params));
 
-  if (sources.includes('linkedin') || isAllSources) {
+  if (want('linkedin')) {
     const linkedinCountries = countriesToSearch.length > 0
       ? countriesToSearch.filter((c) => c === 'br' || c === 'pt')
       : ['br'];
     for (const country of linkedinCountries) push(`LinkedIn (${country})`, searchLinkedIn({ ...params, country }));
   }
 
-  if (sources.includes('gupy') || (isAllSources && shouldSearchCountry('br'))) push('Gupy', searchGupy(params));
-  if (sources.includes('catho') || (isAllSources && shouldSearchCountry('br'))) push('Catho', searchCatho(params));
-  if (sources.includes('programathor') || (isAllSources && shouldSearchCountry('br'))) push('Programathor', searchProgramathor(params));
+  if (wantIn('gupy', 'br')) push('Gupy', searchGupy(params));
+  if (wantIn('catho', 'br')) push('Catho', searchCatho(params));
+  if (wantIn('programathor', 'br')) push('Programathor', searchProgramathor(params));
 
   return searches;
 }
@@ -231,21 +248,22 @@ export async function searchJobsByCountry(
 export function getApiStatus(): ApiStatus[] {
   const hasAIExtraction = isAIExtractionAvailable();
   const hasPythonScraper = !!process.env.PYTHON_SCRAPER_URL;
+  const disabled = getDisabledSources();
   return [
-    { name: 'RemoteOK', configured: true, needsKey: false },
-    { name: 'Remotive', configured: true, needsKey: false },
-    { name: 'Jobicy', configured: true, needsKey: false },
-    { name: 'WeWorkRemotely', configured: true, needsKey: false },
-    { name: 'Arbeitnow', configured: true, needsKey: false },
-    { name: 'Net-Empregos', configured: true, needsKey: false },
-    { name: 'ITJobs.pt', configured: true, needsKey: false },
-    { name: 'BuscoJobs.pt', configured: true, needsKey: false },
-    { name: 'Vagas.com.br', configured: true, needsKey: false },
-    { name: 'LinkedIn', configured: true, needsKey: false },
-    { name: 'GeekHunter', configured: true, needsKey: false },
-    { name: 'Gupy', configured: true, needsKey: false },
-    { name: 'Catho', configured: true, needsKey: false },
-    { name: 'Programathor', configured: true, needsKey: false },
+    { name: 'RemoteOK', configured: !disabled.has('remoteok'), needsKey: false },
+    { name: 'Remotive', configured: !disabled.has('remotive'), needsKey: false },
+    { name: 'Jobicy', configured: !disabled.has('jobicy'), needsKey: false },
+    { name: 'WeWorkRemotely', configured: !disabled.has('weworkremotely'), needsKey: false },
+    { name: 'Arbeitnow', configured: !disabled.has('arbeitnow'), needsKey: false },
+    { name: 'Net-Empregos', configured: !disabled.has('netempregos'), needsKey: false },
+    { name: 'ITJobs.pt', configured: !disabled.has('itjobs'), needsKey: false },
+    { name: 'BuscoJobs.pt', configured: !disabled.has('buscojobs'), needsKey: false },
+    { name: 'Vagas.com.br', configured: !disabled.has('vagascombr'), needsKey: false },
+    { name: 'LinkedIn', configured: !disabled.has('linkedin'), needsKey: false },
+    { name: 'GeekHunter', configured: !disabled.has('geekhunter'), needsKey: false },
+    { name: 'Gupy', configured: !disabled.has('gupy'), needsKey: false },
+    { name: 'Catho', configured: !disabled.has('catho'), needsKey: false },
+    { name: 'Programathor', configured: !disabled.has('programathor'), needsKey: false },
     { name: 'Python Scraper', configured: hasPythonScraper, needsKey: false },
     { name: 'AI Extraction', configured: hasAIExtraction, needsKey: true },
     { name: 'Adzuna', configured: !!(process.env.ADZUNA_APP_ID && process.env.ADZUNA_APP_KEY), needsKey: true },
