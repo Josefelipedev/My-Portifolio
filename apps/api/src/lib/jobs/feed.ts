@@ -28,8 +28,9 @@ const RUN_TIMEOUT_MS = 30 * 60 * 1000;
 // Small batches keep each Ollama call well under its timeout on a busy VPS.
 const EMBED_BATCH = 16;
 const SCORE_PAGE = 200;
-// Bump when the score formula changes so every open posting is rescored.
-const SCORING_VERSION = 1;
+// Bump when the score formula or the filters change so every open posting is
+// rescored. 2: location filter.
+const SCORING_VERSION = 2;
 
 // Each embedding model puts cosine similarities in its own band, which is
 // stretched to 0-1. qwen3's band was calibrated on 328 real PT/remote postings
@@ -79,6 +80,60 @@ export function findDealBreaker(job: JobListing, resume: ResumeData): string | n
     if (needle && text.includes(needle)) return term.trim();
   }
   return null;
+}
+
+const normalizeText = (value: string) =>
+  value.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+const hasWord = (text: string, word: string) =>
+  new RegExp(`(^|[^a-z0-9])${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|[^a-z0-9])`).test(text);
+
+const REMOTE_WORDS = ['remote', 'remoto', 'remota', 'teletrabalho', 'home office', 'anywhere', 'worldwide'];
+const REMOTE_ONLY_SOURCES = new Set(['remoteok', 'remotive', 'jobicy', 'weworkremotely']);
+// A remote posting's location is where candidates may live; these impose no limit.
+const UNRESTRICTED_GEO = ['remote', 'anywhere', 'worldwide', 'global', 'world'];
+// Country codes the sources set, and the regions a remote posting may name that
+// include that country.
+const COUNTRY_NAMES: Record<string, string[]> = { pt: ['portugal'], br: ['brasil', 'brazil'] };
+const REGIONS_INCLUDING: Record<string, string[]> = {
+  portugal: ['europe', 'eu', 'emea', 'iberia', 'european union'],
+  brasil: ['latam', 'latin america', 'south america', 'americas'],
+  brazil: ['latam', 'latin america', 'south america', 'americas'],
+};
+
+/**
+ * Why the posting is outside the preferred locations, or null when it fits (or
+ * its location is unknown). On-site and hybrid postings must be in a preferred
+ * place; remote ones need "Remote" preferred and a region that admits someone
+ * living in a preferred place ("USA only" doesn't).
+ */
+export function findLocationMismatch(job: JobListing, resume: ResumeData): string | null {
+  const preferred = (resume.preferences?.preferredLocations || []).map(normalizeText).filter(Boolean);
+  if (preferred.length === 0) return null;
+
+  const wantsRemote = preferred.some((place) => REMOTE_WORDS.includes(place));
+  const places = preferred.filter((place) => !REMOTE_WORDS.includes(place));
+  const location = normalizeText(cleanHtmlText(job.location || ''));
+  const countryNames = COUNTRY_NAMES[job.country || ''] || [];
+  const inPlace = places.some((place) => hasWord(location, place) || countryNames.includes(place));
+
+  const modeText = normalizeText(`${job.location || ''} ${job.jobType || ''} ${job.title}`);
+  const remote = job.country === 'remote' || REMOTE_ONLY_SOURCES.has(job.source)
+    || REMOTE_WORDS.some((word) => hasWord(modeText, word));
+  const label = (cleanHtmlText(job.location || '') || job.country || '').slice(0, 60);
+
+  if (!remote) {
+    if (inPlace || (!location && !countryNames.length)) return null;
+    return `location: ${label} (on-site)`;
+  }
+  if (!wantsRemote) return inPlace ? null : `location: ${label || 'remote'} (remote)`;
+  if (inPlace || !location) return null;
+
+  const accepted = [
+    ...UNRESTRICTED_GEO,
+    ...places,
+    ...places.flatMap((place) => REGIONS_INCLUDING[place] || []),
+  ];
+  return accepted.some((term) => hasWord(location, term)) ? null : `location: ${label} (remote)`;
 }
 
 /** Role preferences first, then the resume-derived queries smart search uses. */
@@ -218,7 +273,7 @@ export async function scorePostings(resume: ResumeData): Promise<number> {
       take: SCORE_PAGE,
       select: {
         id: true, externalId: true, source: true, title: true, company: true, description: true,
-        url: true, location: true, tags: true, embedding: true, embeddingModel: true,
+        url: true, location: true, jobType: true, country: true, tags: true, embedding: true, embeddingModel: true,
       },
     });
     if (page.length === 0) break;
@@ -248,6 +303,8 @@ export async function scorePostings(resume: ResumeData): Promise<number> {
           description: row.description,
           url: row.url,
           location: row.location ?? undefined,
+          jobType: row.jobType ?? undefined,
+          country: row.country ?? undefined,
           tags: row.tags,
         };
         const embedding = embeddings.get(row.id);
@@ -260,7 +317,7 @@ export async function scorePostings(resume: ResumeData): Promise<number> {
             keywordScore,
             semanticScore,
             matchScore: computeMatchScore(keywordScore, semanticScore),
-            dealBreaker: findDealBreaker(listing, resume),
+            dealBreaker: findDealBreaker(listing, resume) ?? findLocationMismatch(listing, resume),
             profileHash: hash,
             scoredAt: now,
           },
