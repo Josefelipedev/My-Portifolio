@@ -44,18 +44,28 @@ Source health (2026-10-25), from the first four production runs:
 - BuscoJobs fails every run from the VPS: AWS WAF answers datacenter IPs with
   a 405 captcha on the whole domain. It works from a residential IP. The block
   is reported as such and the category pages are fetched once per run instead
-  of once per query. Getting it back in production needs a residential proxy
-  (or dropping the source).
+  of once per query. It is switched off on the VPS with
+  `JOBS_DISABLED_SOURCES=buscojobs` (in `~/myportfolio/.env`); getting it back
+  in production needs a residential proxy.
 - Adzuna has no credentials on the VPS (`ADZUNA_APP_ID` / `ADZUNA_APP_KEY`), so
   it is skipped. LinkedIn occasionally answers 429.
+
+Location filter (2026-10-25): `findLocationMismatch` checks every posting
+against `preferredLocations` and stores the reason in `dealBreaker`, so the
+feed hides it by default and the digest skips it. On-site and hybrid postings
+must be in a preferred place (by name, or by the source's country code);
+remote ones need "Remote" preferred and a region that admits someone living
+in a preferred place (worldwide, Europe/EU/EMEA, or the place itself). Unknown
+locations are kept. On the 487 open postings it filtered 180: on-site roles in
+London, Paris, DACH and the Netherlands, and remote roles limited to the USA,
+Canada, UK and similar.
 
 ### Job feed — next phases
 
 - Phase 2: company watchlist (PT / remote-EU) seeded from career-ops' list, plus
   Workable, SmartRecruiters, Recruitee, Personio and Teamtailor adapters.
 - Phase 3: JobSpy (LinkedIn, Indeed, Google Jobs) in the Python scraper.
-- Hard location filter from `preferredLocations` (Arbeitnow still brings
-  on-site DACH roles); cross-source dedupe when companies are named differently.
+- Cross-source dedupe when companies are named differently.
 
 ### Completed
 
@@ -91,7 +101,7 @@ Source health (2026-10-25), from the first four production runs:
 
 - `npm run typecheck`: pass
 - `npm run typecheck --workspace @portfolio/api`: pass
-- `npm run test:run`: 209 tests pass
+- `npm run test:run`: 216 tests pass
 - `npm run build`: pass
 - `npx prisma validate`: pass
 - `git diff --check`: pass
