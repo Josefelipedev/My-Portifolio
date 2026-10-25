@@ -83,3 +83,20 @@ describe('searchJobs source errors', () => {
     expect(getLastSourceErrors()).toEqual([{ source: 'Jobicy', error: 'Jobicy API error: 400' }]);
   });
 });
+
+describe('JOBS_DISABLED_SOURCES', () => {
+  it('never searches a disabled source and reports it as not configured', async () => {
+    vi.stubEnv('JOBS_DISABLED_SOURCES', 'buscojobs, Jobicy');
+    fetchMock.mockResolvedValue(Response.json({ jobs: [] }));
+    const { searchJobs, getApiStatus } = await aggregator();
+
+    await searchJobs({ keyword: 'backend', country: 'remote,pt' }, ['jobicy', 'buscojobs']);
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    const status = Object.fromEntries(getApiStatus().map((s) => [s.name, s.configured]));
+    expect(status['BuscoJobs.pt']).toBe(false);
+    expect(status['Jobicy']).toBe(false);
+    expect(status['RemoteOK']).toBe(true);
+    vi.unstubAllEnvs();
+  });
+});
