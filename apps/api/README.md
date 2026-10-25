@@ -38,7 +38,12 @@ Embeddings default to Ollama (`EMBED_PROVIDER=ollama` when `OLLAMA_URL` is set)
 with `qwen3-embedding:0.6b` (`OLLAMA_EMBED_MODEL`); pull it once with
 `ollama pull qwen3-embedding:0.6b`. Tunables: `JOBS_INGEST_COUNTRIES`
 (default `pt,remote`), `JOBS_INGEST_MAX_QUERIES` (6), `JOBS_STALE_DAYS` (10),
-`JOBS_DIGEST_SIZE` (5), `JOBS_DIGEST_MIN_SCORE` (60), `SITE_URL` (digest link).
+`JOBS_DIGEST_SIZE` (5), `JOBS_DIGEST_MIN_SCORE` (60), `SITE_URL` (digest link),
+`JOBS_DISABLED_SOURCES` (comma-separated source ids this host never searches;
+the VPS sets `buscojobs`, whose WAF blocks datacenter IPs).
+
+Postings outside the resume's preferred locations are stored with a
+`location: …` deal-breaker, so the feed hides them and the digest skips them.
 
 ## Shared contracts
 

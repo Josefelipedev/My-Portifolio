@@ -124,6 +124,21 @@ describe('findLocationMismatch', () => {
     expect(findLocationMismatch(listing({ location: 'Portugal' }), onsiteOnly)).toBeNull();
   });
 
+  it('reads "Remote Europe" as remote wanted within Europe', () => {
+    const remoteEurope: ResumeData = {
+      ...resume,
+      preferences: { ...resume.preferences, preferredLocations: ['Remote Europe'] },
+    };
+    const remote = (location: string) =>
+      findLocationMismatch(listing({ source: 'jobicy', country: 'remote', location }), remoteEurope);
+    expect(remote('Europe')).toBeNull();
+    expect(remote('EMEA')).toBeNull();
+    expect(remote('Anywhere')).toBeNull();
+    expect(remote('USA')).toBe('location: USA (remote)');
+    expect(findLocationMismatch(listing({ source: 'arbeitnow', jobType: 'On-site', location: 'Lisboa, Portugal' }), remoteEurope))
+      .toBe('location: Lisboa, Portugal (on-site)');
+  });
+
   it('keeps everything without preferred locations, and unknown locations', () => {
     expect(findLocationMismatch(listing({ location: 'Berlin', jobType: 'On-site', source: 'arbeitnow' }), resume)).toBeNull();
     expect(at(undefined, { country: undefined })).toBeNull();

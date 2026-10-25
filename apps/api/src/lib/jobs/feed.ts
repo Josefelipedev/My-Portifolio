@@ -96,6 +96,7 @@ const UNRESTRICTED_GEO = ['remote', 'anywhere', 'worldwide', 'global', 'world'];
 const COUNTRY_NAMES: Record<string, string[]> = { pt: ['portugal'], br: ['brasil', 'brazil'] };
 const REGIONS_INCLUDING: Record<string, string[]> = {
   portugal: ['europe', 'eu', 'emea', 'iberia', 'european union'],
+  europe: ['eu', 'emea', 'european union'],
   brasil: ['latam', 'latin america', 'south america', 'americas'],
   brazil: ['latam', 'latin america', 'south america', 'americas'],
 };
@@ -103,15 +104,26 @@ const REGIONS_INCLUDING: Record<string, string[]> = {
 /**
  * Why the posting is outside the preferred locations, or null when it fits (or
  * its location is unknown). On-site and hybrid postings must be in a preferred
- * place; remote ones need "Remote" preferred and a region that admits someone
- * living in a preferred place ("USA only" doesn't).
+ * place; remote ones need "Remote" (or "Remote <region>") preferred and a
+ * region that admits someone living in a preferred place ("USA only" doesn't).
  */
 export function findLocationMismatch(job: JobListing, resume: ResumeData): string | null {
   const preferred = (resume.preferences?.preferredLocations || []).map(normalizeText).filter(Boolean);
   if (preferred.length === 0) return null;
 
-  const wantsRemote = preferred.some((place) => REMOTE_WORDS.includes(place));
-  const places = preferred.filter((place) => !REMOTE_WORDS.includes(place));
+  // "Remote Europe" → remote is wanted, and Europe is a region the candidate is in.
+  const remoteRegions: string[] = [];
+  const places: string[] = [];
+  let wantsRemote = false;
+  for (const entry of preferred) {
+    const word = REMOTE_WORDS.find((remoteWord) => entry === remoteWord || entry.startsWith(`${remoteWord} `));
+    if (!word) places.push(entry);
+    else {
+      wantsRemote = true;
+      const region = entry.slice(word.length).replace(/^[\s(-]+|[\s)]+$/g, '');
+      if (region) remoteRegions.push(region);
+    }
+  }
   const location = normalizeText(cleanHtmlText(job.location || ''));
   const countryNames = COUNTRY_NAMES[job.country || ''] || [];
   const inPlace = places.some((place) => hasWord(location, place) || countryNames.includes(place));
@@ -131,7 +143,8 @@ export function findLocationMismatch(job: JobListing, resume: ResumeData): strin
   const accepted = [
     ...UNRESTRICTED_GEO,
     ...places,
-    ...places.flatMap((place) => REGIONS_INCLUDING[place] || []),
+    ...remoteRegions,
+    ...[...places, ...remoteRegions].flatMap((place) => REGIONS_INCLUDING[place] || []),
   ];
   return accepted.some((term) => hasWord(location, term)) ? null : `location: ${label} (remote)`;
 }
