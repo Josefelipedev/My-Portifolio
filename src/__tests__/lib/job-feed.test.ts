@@ -26,6 +26,7 @@ import {
   computeMatchScore,
   digestHtml,
   findDealBreaker,
+  findLocationMismatch,
   runDigest,
   runIngest,
 } from '../../../apps/api/src/lib/jobs/feed';
@@ -81,6 +82,51 @@ describe('findDealBreaker', () => {
   it('returns the matching preference term, case-insensitively', () => {
     expect(findDealBreaker(listing({ description: 'Includes On-Call rotations' }), resume)).toBe('on-call');
     expect(findDealBreaker(listing(), resume)).toBeNull();
+  });
+});
+
+describe('findLocationMismatch', () => {
+  const located: ResumeData = {
+    ...resume,
+    preferences: { ...resume.preferences, preferredLocations: ['Faro', 'Algarve', 'Portugal', 'Remote'] },
+  };
+  const at = (location: string | undefined, overrides: Partial<JobListing> = {}) =>
+    findLocationMismatch(listing({ source: 'arbeitnow', country: 'eu', jobType: 'On-site', location, ...overrides }), located);
+
+  it('keeps on-site postings in a preferred place, by name or by country code', () => {
+    expect(at('Lisboa, Lisboa, Portugal')).toBeNull();
+    expect(at('Lisboa e Região', { source: 'linkedin', country: 'pt' })).toBeNull();
+    expect(at('Faro')).toBeNull();
+  });
+
+  it('filters on-site postings elsewhere', () => {
+    expect(at('Munich, Bavaria')).toBe('location: Munich, Bavaria (on-site)');
+    expect(at('London', { jobType: 'Full Time' })).toBe('location: London (on-site)');
+  });
+
+  it('keeps remote postings open to someone in Portugal and filters the rest', () => {
+    const remote = (location: string) => at(location, { source: 'jobicy', country: 'remote', jobType: 'Full-Time' });
+    expect(remote('Anywhere')).toBeNull();
+    expect(remote('EMEA,  LATAM,  Canada,  USA')).toBeNull();
+    expect(remote('Portugal')).toBeNull();
+    expect(remote('Canada,  USA')).toBe('location: Canada, USA (remote)');
+    expect(remote('Spain')).toBe('location: Spain (remote)');
+  });
+
+  it('reads remote from the location or title of mixed boards', () => {
+    expect(at('Paris or Remote')).toBeNull();
+    expect(at('Europe', { title: 'Principal Engineer | UK | Remote' })).toBeNull();
+  });
+
+  it('filters remote postings when remote is not preferred, unless they are in a preferred place', () => {
+    const onsiteOnly: ResumeData = { ...resume, preferences: { ...resume.preferences, preferredLocations: ['Portugal'] } };
+    expect(findLocationMismatch(listing({ location: 'Worldwide' }), onsiteOnly)).toBe('location: Worldwide (remote)');
+    expect(findLocationMismatch(listing({ location: 'Portugal' }), onsiteOnly)).toBeNull();
+  });
+
+  it('keeps everything without preferred locations, and unknown locations', () => {
+    expect(findLocationMismatch(listing({ location: 'Berlin', jobType: 'On-site', source: 'arbeitnow' }), resume)).toBeNull();
+    expect(at(undefined, { country: undefined })).toBeNull();
   });
 });
 
