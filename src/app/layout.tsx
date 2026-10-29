@@ -5,6 +5,7 @@ import ParticlesBackground from '@/components/ui/ParticlesBackground';
 import CustomCursor from '@/components/ui/CustomCursor';
 import GridBackground from '@/components/ui/GridBackground';
 import { Providers } from '@/components/Providers';
+import { UmamiAnalytics } from '@/components/UmamiAnalytics';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -92,6 +93,7 @@ export default function RootLayout({
           {/* Main Content */}
           <div className="relative z-10">{children}</div>
         </Providers>
+        <UmamiAnalytics />
       </body>
     </html>
   );
