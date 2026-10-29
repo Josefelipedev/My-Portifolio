@@ -3,6 +3,12 @@
 import Script from 'next/script';
 import { usePathname } from 'next/navigation';
 
+declare global {
+  interface Window {
+    umami?: { track: (event: string, data?: Record<string, unknown>) => void };
+  }
+}
+
 // Umami (self-hosted, cookieless). The admin area shares the root layout, so
 // it is excluded here. data-domains makes the tracker a no-op on localhost and
 // preview deployments.
