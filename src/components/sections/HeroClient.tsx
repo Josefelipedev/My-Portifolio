@@ -317,6 +317,7 @@ export default function HeroClient({ githubUrl, linkedinUrl, email, education = 
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 animate-fade-in-up delay-400">
               <a
                 href="#projects"
+                data-umami-event="hero-ver-projetos"
                 className="group relative px-8 py-4 bg-gradient-to-r from-red-500 to-purple-500 text-white font-medium rounded-full overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:shadow-red-500/30"
               >
                 <span className="relative z-10">
@@ -326,6 +327,7 @@ export default function HeroClient({ githubUrl, linkedinUrl, email, education = 
               </a>
               <a
                 href="#contact"
+                data-umami-event="hero-contacto"
                 className="group px-8 py-4 border-2 border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 font-medium rounded-full hover:border-red-500 dark:hover:border-red-500 hover:text-red-500 dark:hover:text-red-400 transition-all duration-300 hover:-translate-y-1"
               >
                 {t.hero.cta}
@@ -337,6 +339,7 @@ export default function HeroClient({ githubUrl, linkedinUrl, email, education = 
               {githubUrl && (
                 <a
                   href={githubUrl}
+                  data-umami-event="social-github"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="group p-3 rounded-full bg-zinc-100 dark:bg-zinc-800 hover:bg-gradient-to-r hover:from-red-500 hover:to-purple-500 transition-all duration-300 hover:scale-110 hover:shadow-lg hover:shadow-red-500/25"
@@ -350,6 +353,7 @@ export default function HeroClient({ githubUrl, linkedinUrl, email, education = 
               {linkedinUrl && (
                 <a
                   href={linkedinUrl}
+                  data-umami-event="social-linkedin"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="group p-3 rounded-full bg-zinc-100 dark:bg-zinc-800 hover:bg-gradient-to-r hover:from-red-500 hover:to-purple-500 transition-all duration-300 hover:scale-110 hover:shadow-lg hover:shadow-red-500/25"
@@ -363,6 +367,7 @@ export default function HeroClient({ githubUrl, linkedinUrl, email, education = 
               {email && (
                 <a
                   href={`mailto:${email}`}
+                  data-umami-event="social-email"
                   className="group p-3 rounded-full bg-zinc-100 dark:bg-zinc-800 hover:bg-gradient-to-r hover:from-red-500 hover:to-purple-500 transition-all duration-300 hover:scale-110 hover:shadow-lg hover:shadow-red-500/25"
                   aria-label="Email"
                 >

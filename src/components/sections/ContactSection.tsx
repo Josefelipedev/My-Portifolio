@@ -50,6 +50,8 @@ export function ContactSection() {
       }
 
       setStatus('success');
+      // O evento que mais importa no portfólio: alguém escreveu a pedir contacto.
+      window.umami?.track('contacto-enviado');
       setFormData({ name: '', email: '', message: '', honeypot: '' });
       setTurnstileToken(null);
       turnstileRef.current?.reset();

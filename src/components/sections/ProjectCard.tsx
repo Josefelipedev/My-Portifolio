@@ -144,6 +144,8 @@ function FeaturedProjectCard({ project, index }: { project: Project; index: numb
                   {project.repoUrl && (
                     <a
                       href={project.repoUrl}
+                      data-umami-event="projeto-codigo"
+                      data-umami-event-projeto={project.title}
                       target="_blank"
                       rel="noopener noreferrer"
                       aria-label={`View ${project.title} source code on GitHub`}
@@ -158,6 +160,8 @@ function FeaturedProjectCard({ project, index }: { project: Project; index: numb
                   {project.demoUrl && (
                     <a
                       href={project.demoUrl}
+                      data-umami-event="projeto-demo"
+                      data-umami-event-projeto={project.title}
                       target="_blank"
                       rel="noopener noreferrer"
                       aria-label={`View ${project.title} live demo`}
@@ -283,6 +287,8 @@ function DefaultProjectCard({ project, index }: { project: Project; index: numbe
               {project.repoUrl && (
                 <a
                   href={project.repoUrl}
+                  data-umami-event="projeto-codigo"
+                  data-umami-event-projeto={project.title}
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label={`View ${project.title} source code on GitHub`}
@@ -297,6 +303,8 @@ function DefaultProjectCard({ project, index }: { project: Project; index: numbe
               {project.demoUrl && (
                 <a
                   href={project.demoUrl}
+                  data-umami-event="projeto-demo"
+                  data-umami-event-projeto={project.title}
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label={`View ${project.title} live demo`}
