@@ -5,6 +5,7 @@ import prisma from '../../db';
 import { ApiError, Errors } from '../api-utils';
 import { sendEmail } from '../email';
 import { escapeHtml } from '../html';
+import { withOwnerContact } from '../owner-contact';
 import { estimateTokens, trackAIUsage, checkQuotaLimits, type AIFeature } from '../ai-tracking';
 import { generateCustomCV, type CustomCVContent } from './cv-generator';
 import { loadFullResumeData, type FullResumeData } from './resume-data';
@@ -293,10 +294,12 @@ export async function verifyPackagePdf(packageId: string, cvPdfBase64: string, f
   const keywords = packageKeywords(snapshot);
   const normalizedText = text.toLowerCase();
   const keywordCoverage = keywords.map((keyword) => ({ keyword, covered: normalizedText.includes(keyword.toLowerCase()) }));
+  // An empty phone would "match" any text, so a missing number fails the check.
+  const phoneDigits = withOwnerContact(resume.personalInfo).phone.replace(/\D/g, '');
   const checks = {
     textExtracted: text.length > 100,
     emailPresent: normalizedText.includes(resume.personalInfo.email.toLowerCase()),
-    phonePresent: normalizedText.replace(/\D/g, '').includes(resume.personalInfo.phone.replace(/\D/g, '')),
+    phonePresent: phoneDigits.length > 0 && normalizedText.replace(/\D/g, '').includes(phoneDigits),
     noBrokenGlyphs: !text.includes('�') && !/\(cid:\d+\)/i.test(text),
     pageCountAllowed: extracted.totalPages >= 1 && extracted.totalPages <= 2,
   };

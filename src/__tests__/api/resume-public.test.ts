@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -73,5 +73,37 @@ describe('GET /api/resume personal info', () => {
     const body = await (await getResume('?section=personal', await sessionCookie())).json();
 
     expect(body.personalInfo).toEqual(PERSONAL_INFO);
+  });
+
+  describe('when the committed resume has no phone or address', () => {
+    beforeAll(() => {
+      const dir = mkdtempSync(path.join(tmpdir(), 'resume-'));
+      const file = path.join(dir, 'resume.json');
+      writeFileSync(file, JSON.stringify({ personalInfo: { ...PERSONAL_INFO, phone: '', address: '' } }));
+      process.env.RESUME_JSON_PATH = file;
+    });
+
+    beforeEach(() => {
+      vi.stubEnv('OWNER_PHONE', '+351 911 111 111');
+      vi.stubEnv('OWNER_ADDRESS', 'Rua do Servidor 2, Faro');
+    });
+
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it('gives the owner the phone and address from the server env', async () => {
+      db.session.findFirst.mockResolvedValue({ id: 's', userId: 'u1', token: 's1', isValid: true });
+
+      const body = await (await getResume('?section=personal', await sessionCookie())).json();
+
+      expect(body.personalInfo).toMatchObject({ phone: '+351 911 111 111', address: 'Rua do Servidor 2, Faro' });
+    });
+
+    it('still keeps them from visitors', async () => {
+      const body = await (await getResume('?section=personal')).json();
+
+      expect(body.personalInfo).toEqual({ name: 'Jose', email: 'jose@example.com', linkedin: 'jose', github: 'jose' });
+    });
   });
 });

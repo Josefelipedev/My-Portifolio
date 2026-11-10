@@ -13,6 +13,7 @@ import path from 'node:path';
 import { requireAuth, validateSession, type AuthEnv } from '../lib/auth';
 import { requireCsrf } from '../lib/csrf';
 import { analyzeResumePDF, getCurrentAIProvider } from '../lib/claude';
+import { withOwnerContact } from '../lib/owner-contact';
 
 const resume = new Hono<AuthEnv>();
 
@@ -30,8 +31,14 @@ async function readResumeJson(): Promise<Record<string, unknown>> {
 }
 
 // GET /resume is public (the portfolio reads it), but the home address, phone
-// and birth date are only for the signed-in owner (the admin resume editor).
+// and birth date are only for the signed-in owner (the admin resume editor and
+// the CV PDFs). The phone and address live in the server env, not in git.
 const OWNER_ONLY_PERSONAL_FIELDS = ['phone', 'address', 'birthDate'];
+
+function ownerPersonalInfo(personalInfo: unknown): unknown {
+  if (!personalInfo || typeof personalInfo !== 'object') return personalInfo;
+  return withOwnerContact(personalInfo);
+}
 
 async function isOwner(c: Context): Promise<boolean> {
   const token = getCookie(c, 'auth_token');
@@ -116,7 +123,7 @@ resume.get('/resume', async (c) => {
   }
 
   const summary = data.professionalSummary as Record<string, string> | undefined;
-  const personalInfo = (await isOwner(c)) ? data.personalInfo : publicPersonalInfo(data.personalInfo);
+  const personalInfo = (await isOwner(c)) ? ownerPersonalInfo(data.personalInfo) : publicPersonalInfo(data.personalInfo);
   const response: Record<string, unknown> = { lastUpdated };
 
   const sections: Record<string, () => void> = {

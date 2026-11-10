@@ -1,9 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import resumeData from '@/data/resume.json';
 import type { CustomCVContent } from '@/types/jobs';
 import { apiFetch } from '@/lib/api-fetch';
+import { loadOwnerPersonalInfo } from '@/lib/owner-contact';
 import { createCVPdfBlob } from './CVGeneratorButton';
 import { useToast } from '@/components/ui/Toast';
 
@@ -173,7 +173,7 @@ export default function ApplicationPackageModal({ job, onClose, onSent }: Props)
     try {
       setVerifying(true);
       const filename = `cv-${job.company}-${job.title}.pdf`.toLowerCase().replace(/[^a-z0-9.]+/g, '-');
-      const blob = await createCVPdfBlob(selected.documents.cv, resumeData.personalInfo, job.title, job.company);
+      const blob = await createCVPdfBlob(selected.documents.cv, await loadOwnerPersonalInfo(), job.title, job.company);
       const response = await apiFetch(`/api/jobs/application-packages/${selected.id}/verify-pdf`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

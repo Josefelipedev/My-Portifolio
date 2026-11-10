@@ -12,6 +12,7 @@ import { useToast } from '@/components/ui/Toast';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { apiFetch } from '@/lib/api-fetch';
 import { stripHtml } from '@/lib/html';
+import { loadOwnerPersonalInfo } from '@/lib/owner-contact';
 
 interface EnrichedData {
   emails?: string[];
@@ -632,13 +633,12 @@ export default function SavedJobs({ onJobRemoved, onApplicationCreated }: SavedJ
       if (!response.ok) throw new Error(data.error || 'Batch CV generation failed');
 
       // Trigger PDF downloads for successful generations
-      const [{ pdf }, { default: CVDocument }, { default: resumeModule }, React] = await Promise.all([
+      const [{ pdf }, { default: CVDocument }, resumeInfo, React] = await Promise.all([
         import('@react-pdf/renderer'),
         import('@/components/admin/jobs/CVDocument'),
-        import('@/data/resume.json'),
+        loadOwnerPersonalInfo(),
         import('react'),
       ]);
-      const resumeInfo = resumeModule.personalInfo;
 
       for (const item of data.cvData) {
         if (!item.success || !item.customCV) continue;

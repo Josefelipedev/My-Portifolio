@@ -56,3 +56,7 @@ __pycache__/
 .venv/
 venv/
 ENV/
+
+# Resume PDFs hold private contact details; keep them out of the public repo.
+src/data/resume.pdf
+apps/api/data/resume.pdf

@@ -1,9 +1,9 @@
 // @vitest-environment node
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const db = vi.hoisted(() => ({
   applicationPackage: { findUnique: vi.fn(), update: vi.fn() },
-  applicationArtifact: { create: vi.fn() },
+  applicationArtifact: { create: vi.fn(), deleteMany: vi.fn() },
   jobApplication: { findUnique: vi.fn(), upsert: vi.fn() },
   $transaction: vi.fn(),
 }));
@@ -12,6 +12,11 @@ const email = vi.hoisted(() => ({ sendEmail: vi.fn() }));
 
 vi.mock('../../../apps/api/src/db', () => ({ default: db }));
 vi.mock('../../../apps/api/src/lib/email', () => email);
+
+const pdf = vi.hoisted(() => ({ extractText: vi.fn() }));
+const resume = vi.hoisted(() => ({ loadFullResumeData: vi.fn() }));
+vi.mock('unpdf', () => pdf);
+vi.mock('../../../apps/api/src/lib/jobs/resume-data', () => resume);
 
 import { sendApplicationPackage, verifyPackagePdf } from '../../../apps/api/src/lib/jobs/application-package';
 
@@ -176,5 +181,35 @@ describe('verifyPackagePdf', () => {
     db.applicationPackage.findUnique.mockResolvedValue({ ...buildPackage({ status: 'sent' }), artifacts: [] });
     await expect(verifyPackagePdf('p1', PDF_BASE64, 'cv.pdf')).rejects.toMatchObject({ statusCode: 409 });
     expect(db.$transaction).not.toHaveBeenCalled();
+  });
+});
+
+describe('verifyPackagePdf phone check', () => {
+  const CV_TEXT = 'Jose Silva jose@example.com +351 911 111 111 Backend developer with Node.js experience. '.repeat(3);
+
+  beforeEach(() => {
+    db.applicationPackage.findUnique.mockResolvedValue(buildPackage({ status: 'draft' }));
+    pdf.extractText.mockResolvedValue({ text: CV_TEXT, totalPages: 1 });
+    resume.loadFullResumeData.mockResolvedValue({ personalInfo: { email: 'jose@example.com', phone: '' } });
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('looks for the phone kept in the server env', async () => {
+    vi.stubEnv('OWNER_PHONE', '+351 911 111 111');
+
+    const report = await verifyPackagePdf('p1', PDF_BASE64, 'cv.pdf');
+
+    expect(report.checks.phonePresent).toBe(true);
+  });
+
+  it('fails the check when no phone is known instead of matching any text', async () => {
+    vi.stubEnv('OWNER_PHONE', '');
+
+    const report = await verifyPackagePdf('p1', PDF_BASE64, 'cv.pdf');
+
+    expect(report.checks.phonePresent).toBe(false);
   });
 });
