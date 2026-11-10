@@ -1002,7 +1002,7 @@ export default function ResumeAdminPage() {
                       type="tel"
                       value={contactInfo.phone}
                       onChange={(e) => setContactInfo({ ...contactInfo, phone: e.target.value })}
-                      placeholder="+351 913 884 527"
+                      placeholder="+351 9XX XXX XXX"
                       className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100"
                     />
                   </div>
