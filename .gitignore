@@ -58,3 +58,7 @@ ENV/
 # OpenNext / Wrangler build output (bundles the server env, secrets included)
 /.open-next/
 /.wrangler/
+
+# Resume PDFs hold private contact details; keep them out of the public repo.
+src/data/resume.pdf
+apps/api/data/resume.pdf
