@@ -29,7 +29,7 @@ import {
   getMonthUsage,
 } from '../lib/ai-tracking';
 import { honoCookieOptions } from '../lib/cookies';
-import { getClientIp } from '../lib/rate-limit';
+import { allowVisit, getClientIp } from '../lib/rate-limit';
 
 const router = new Hono<AuthEnv>();
 
@@ -460,23 +460,36 @@ router.get('/visits', requireAuth, async (c) => {
 });
 
 // POST - PUBLIC page-view tracking (web handler has no auth check).
+// Longest page path / header value stored per page view.
+const MAX_PAGE_LENGTH = 200;
+const MAX_HEADER_LENGTH = 500;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 router.post('/visits', async (c) => {
+  const clientIp = getClientIp(c.req.raw.headers);
+  if (!allowVisit(clientIp)) {
+    return c.json({ error: 'Too many requests' }, 429);
+  }
+
+  // The cookie is client-controlled; anything but the UUID we issued starts a new visitor.
   let visitorId = getCookie(c, 'visitor_id');
+  if (visitorId && !UUID_PATTERN.test(visitorId)) visitorId = undefined;
   const isNewVisitor = !visitorId;
   if (!visitorId) visitorId = randomUUID();
 
-  const userAgent = c.req.header('user-agent') || undefined;
-  const referrer = c.req.header('referer') || undefined;
+  const userAgent = c.req.header('user-agent')?.slice(0, MAX_HEADER_LENGTH) || undefined;
+  const referrer = c.req.header('referer')?.slice(0, MAX_HEADER_LENGTH) || undefined;
 
-  const clientIp = getClientIp(c.req.raw.headers);
   const ipAddress = anonymizeIP(clientIp === 'unknown' ? undefined : clientIp);
 
   const { device, browser, os } = parseUserAgent(userAgent || null);
 
   let page = '/';
   try {
-    const body = (await c.req.json()) as { page?: string };
-    page = body.page || '/';
+    const body = (await c.req.json()) as { page?: unknown };
+    if (typeof body.page === 'string' && body.page.startsWith('/')) {
+      page = body.page.slice(0, MAX_PAGE_LENGTH);
+    }
   } catch {
     // No body provided, use default
   }

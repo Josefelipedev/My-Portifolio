@@ -7,6 +7,7 @@
 import { createHash } from 'node:crypto';
 import prisma from '../../db';
 import { sendEmail } from '../email';
+import { escapeHtml, safeUrl } from '../html';
 import { searchJobs, getLastSourceErrors } from './aggregator';
 import { fetchJobPageText } from './careers-page-parser';
 import { scanAllPortals } from './portal-scanner';
@@ -431,19 +432,6 @@ export async function runIngest(): Promise<IngestResult> {
 }
 
 // ---- daily digest ----
-
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
-function safeUrl(value: string): string {
-  return /^https?:\/\//i.test(value) ? value : '#';
-}
 
 interface DigestJob {
   title: string;

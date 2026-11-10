@@ -7,6 +7,7 @@ import prisma from '../../db';
 import { searchJobs } from './aggregator';
 import type { JobSource, JobListing } from './types';
 import { sendEmail } from '../email';
+import { escapeHtml, safeUrl } from '../html';
 import { analyzeJob } from './ai-analysis';
 import { generateCustomCV } from './cv-generator';
 
@@ -100,12 +101,12 @@ function digestHtml(alert: AlertRow, jobs: MatchedJob[]): string {
   const items = jobs
     .map(
       (j) =>
-        `<li style="margin-bottom:10px"><a href="${j.url}" style="color:#dc2626;font-weight:600;text-decoration:none">${j.title}</a> — ${j.company}${j.location ? ` <span style="color:#64748b">(${j.location})</span>` : ''}</li>`
+        `<li style="margin-bottom:10px"><a href="${escapeHtml(safeUrl(j.url))}" style="color:#dc2626;font-weight:600;text-decoration:none">${escapeHtml(j.title)}</a> — ${escapeHtml(j.company)}${j.location ? ` <span style="color:#64748b">(${escapeHtml(j.location)})</span>` : ''}</li>`
     )
     .join('');
   return `<div style="font-family:system-ui,sans-serif;color:#0f172a">
     <h2 style="margin:0 0 4px">🔔 ${jobs.length} nova(s) vaga(s)</h2>
-    <p style="color:#64748b;margin:0 0 16px">Alerta <strong>${alert.name}</strong> · "${alert.keyword}"</p>
+    <p style="color:#64748b;margin:0 0 16px">Alerta <strong>${escapeHtml(alert.name)}</strong> · "${escapeHtml(alert.keyword)}"</p>
     <ul style="padding-left:18px">${items}</ul>
   </div>`;
 }

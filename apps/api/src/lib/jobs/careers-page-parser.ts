@@ -7,6 +7,7 @@
 // Pages that build their list in the browser have no such links in the HTML;
 // register those as portal type "manual" so the scan skips them.
 
+import { fetchPublicUrl } from '../safe-fetch';
 import { cleanHtmlText } from './helpers';
 
 export interface CareersPageJob {
@@ -95,7 +96,7 @@ export function extractJobPageText(html: string): string {
 }
 
 export async function fetchJobPageText(url: string): Promise<string> {
-  const response = await fetch(url, { headers: BROWSER_HEADERS, signal: AbortSignal.timeout(10000) });
+  const response = await fetchPublicUrl(url, { headers: BROWSER_HEADERS, signal: AbortSignal.timeout(10000) });
   if (!response.ok) throw new Error(`Job page error: ${response.status}`);
   return extractJobPageText(await response.text());
 }

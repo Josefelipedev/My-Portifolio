@@ -8,7 +8,7 @@ const db = vi.hoisted(() => ({
   experience: { findMany: vi.fn() },
   education: { findMany: vi.fn() },
 }));
-const email = vi.hoisted(() => ({ sendContactNotification: vi.fn(async () => true) }));
+const email = vi.hoisted(() => ({ sendContactNotification: vi.fn(async (..._args: unknown[]) => true) }));
 
 vi.mock('../../../apps/api/src/db', () => ({ default: db }));
 vi.mock('../../../apps/api/src/lib/email', () => email);
@@ -74,6 +74,20 @@ describe('POST /api/contact', () => {
     expect((await post('/api/contact', { ...validMsg, email: 'nope' }, 'ip-b')).status).toBe(400);
     expect((await post('/api/contact', { ...validMsg, message: 'short' }, 'ip-c')).status).toBe(400);
     expect(db.contactMessage.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects oversized name, subject and message with 400', async () => {
+    expect((await post('/api/contact', { ...validMsg, name: 'J'.repeat(101) }, 'ip-d')).status).toBe(400);
+    expect((await post('/api/contact', { ...validMsg, subject: 'S'.repeat(201) }, 'ip-e')).status).toBe(400);
+    expect((await post('/api/contact', { ...validMsg, message: 'M'.repeat(5001) }, 'ip-f')).status).toBe(400);
+    expect(db.contactMessage.create).not.toHaveBeenCalled();
+  });
+
+  it('keeps the subject on one line', async () => {
+    await post('/api/contact', { ...validMsg, subject: 'Hi\r\nBcc: someone@example.com' }, 'ip-g');
+
+    expect(db.contactMessage.create.mock.calls[0][0].data.subject).toBe('Hi Bcc: someone@example.com');
+    expect(email.sendContactNotification.mock.calls[0][2]).toBe('Hi Bcc: someone@example.com');
   });
 
   it('rate-limits after 5 attempts from the same IP (429)', async () => {

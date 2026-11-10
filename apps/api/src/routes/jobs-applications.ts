@@ -8,6 +8,7 @@ import { requireAuth, type AuthEnv } from '../lib/auth';
 import { requireCsrf } from '../lib/csrf';
 import { Errors, parseBody } from '../lib/api-utils';
 import { sendEmail } from '../lib/email';
+import { escapeHtml } from '../lib/html';
 import {
   applicationCreateSchema,
   applicationUpdateSchema,
@@ -228,7 +229,7 @@ jobsApplications.post('/jobs/saved/:id/apply', requireAuth, requireCsrf, async (
     emailed = await sendEmail({
       to: recipient,
       subject: body.subject?.trim() || `Candidatura — ${savedJob.title}`,
-      html: text.replace(/\n/g, '<br>'),
+      html: escapeHtml(text).replace(/\n/g, '<br>'),
       text,
       attachments,
     });

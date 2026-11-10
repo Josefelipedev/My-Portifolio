@@ -32,6 +32,8 @@ vi.mock('../../../apps/api/src/lib/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 vi.mock('together-ai', () => ({ default: TogetherMock }));
+// Job pages are fetched through the public-URL guard, which resolves the host.
+vi.mock('node:dns/promises', () => ({ lookup: vi.fn(async () => [{ address: '104.18.12.34', family: 4 }]) }));
 
 import app from '../../../apps/api/src/app';
 
@@ -205,5 +207,21 @@ describe('jobs inline-AI — enrich', () => {
       extracted: { email: 'hr@acme.com', emailsFound: 1 },
     });
     expect(db.savedJob.update).toHaveBeenCalled();
+  });
+
+  it('refuses to fetch a job URL that points inside the server', async () => {
+    db.savedJob.findUnique.mockResolvedValue({
+      id: 'j1',
+      title: 'Dev',
+      company: 'Acme',
+      url: 'http://127.0.0.1:11434/api/tags',
+    });
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+
+    const res = await authed('/api/jobs/saved/j1/enrich');
+
+    expect(res.status).toBe(400);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(db.savedJob.update).not.toHaveBeenCalled();
   });
 });

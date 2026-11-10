@@ -4,6 +4,7 @@ import { extractText } from 'unpdf';
 import prisma from '../../db';
 import { ApiError, Errors } from '../api-utils';
 import { sendEmail } from '../email';
+import { escapeHtml } from '../html';
 import { estimateTokens, trackAIUsage, checkQuotaLimits, type AIFeature } from '../ai-tracking';
 import { generateCustomCV, type CustomCVContent } from './cv-generator';
 import { loadFullResumeData, type FullResumeData } from './resume-data';
@@ -359,14 +360,6 @@ export function parseJson<T>(value: string | null | undefined, fallback: T): T {
   } catch {
     return fallback;
   }
-}
-
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
 }
 
 export async function sendApplicationPackage(packageId: string, options: SendPackageOptions) {

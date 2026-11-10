@@ -6,6 +6,8 @@ const db = vi.hoisted(() => ({
   portalSeenJob: { findMany: vi.fn(), createMany: vi.fn() },
 }));
 vi.mock('../../../apps/api/src/db', () => ({ default: db }));
+// Careers pages are fetched through the public-URL guard, which resolves the host.
+vi.mock('node:dns/promises', () => ({ lookup: vi.fn(async () => [{ address: '104.18.12.34', family: 4 }]) }));
 
 import {
   extractJobPageText,

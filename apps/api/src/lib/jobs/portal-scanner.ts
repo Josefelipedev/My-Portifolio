@@ -6,6 +6,7 @@
 // src/lib/jobs/portal-scanner.ts (prisma import path adjusted for the API).
 
 import prisma from '../../db';
+import { fetchPublicUrl } from '../safe-fetch';
 import { BROWSER_HEADERS, parseCareersPageJobs } from './careers-page-parser';
 import type { JobListing } from './types';
 
@@ -194,7 +195,7 @@ async function fetchCareersPageJobs(
   company: string,
   filters: TitleFilters
 ): Promise<JobListing[]> {
-  const response = await fetch(careersUrl, {
+  const response = await fetchPublicUrl(careersUrl, {
     headers: BROWSER_HEADERS,
     signal: AbortSignal.timeout(15000),
   });

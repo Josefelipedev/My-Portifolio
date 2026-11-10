@@ -11,6 +11,11 @@ import { checkContactRateLimit, recordContactAttempt, getClientIp } from '../lib
 const contact = new Hono();
 
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+// Upper bounds keep a single message from filling the table or the inbox.
+const MAX_NAME_LENGTH = 100;
+const MAX_EMAIL_LENGTH = 254;
+const MAX_SUBJECT_LENGTH = 200;
+const MAX_MESSAGE_LENGTH = 5000;
 const badRequest = (message: string) => ({ error: message, code: 'BAD_REQUEST' });
 
 contact.post('/contact', async (c) => {
@@ -47,16 +52,26 @@ contact.post('/contact', async (c) => {
   if (typeof name !== 'string' || name.trim().length < 2) {
     return c.json(badRequest('Name must be at least 2 characters'), 400);
   }
-  if (typeof email !== 'string' || !emailRegex.test(email)) {
+  if (name.trim().length > MAX_NAME_LENGTH) {
+    return c.json(badRequest(`Name must be at most ${MAX_NAME_LENGTH} characters`), 400);
+  }
+  if (typeof email !== 'string' || email.length > MAX_EMAIL_LENGTH || !emailRegex.test(email)) {
     return c.json(badRequest('Valid email is required'), 400);
+  }
+  if (typeof subject === 'string' && subject.trim().length > MAX_SUBJECT_LENGTH) {
+    return c.json(badRequest(`Subject must be at most ${MAX_SUBJECT_LENGTH} characters`), 400);
   }
   if (typeof message !== 'string' || message.trim().length < 10) {
     return c.json(badRequest('Message must be at least 10 characters'), 400);
   }
+  if (message.trim().length > MAX_MESSAGE_LENGTH) {
+    return c.json(badRequest(`Message must be at most ${MAX_MESSAGE_LENGTH} characters`), 400);
+  }
 
   recordContactAttempt(ip);
 
-  const cleanSubject = typeof subject === 'string' && subject.trim() ? subject.trim() : null;
+  // The subject also becomes the email's Subject header, so it stays on one line.
+  const cleanSubject = typeof subject === 'string' && subject.trim() ? subject.replace(/[\r\n]+/g, ' ').trim() : null;
   const contactMessage = await prisma.contactMessage.create({
     data: {
       name: name.trim(),

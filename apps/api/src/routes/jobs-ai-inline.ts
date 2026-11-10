@@ -14,6 +14,7 @@ import { Hono } from 'hono';
 import Together from 'together-ai';
 import { requireAuth, type AuthEnv } from '../lib/auth';
 import { requireCsrf } from '../lib/csrf';
+import { BlockedUrlError, fetchPublicUrl } from '../lib/safe-fetch';
 import { trackAIUsage, estimateTokens, checkQuotaLimits } from '../lib/ai-tracking';
 import { logger } from '../lib/logger';
 import prisma from '../db';
@@ -73,7 +74,7 @@ jobsAiInline.post('/jobs/saved/:id/enrich', requireAuth, requireCsrf, async (c) 
       url: savedJob.url,
     });
 
-    const response = await fetch(savedJob.url, {
+    const response = await fetchPublicUrl(savedJob.url, {
       headers: {
         'User-Agent':
           'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -230,7 +231,7 @@ Respond with ONLY the JSON object.`;
     logger.error('job-enrichment', `Enrichment failed: ${errorMessage}`, {
       error: errorMessage,
     });
-    return c.json({ error: errorMessage }, 500);
+    return c.json({ error: errorMessage }, error instanceof BlockedUrlError ? 400 : 500);
   }
 });
 

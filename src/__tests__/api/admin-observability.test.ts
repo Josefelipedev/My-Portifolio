@@ -123,6 +123,48 @@ describe('admin-observability public visits POST', () => {
     // new visitor -> a visitor_id cookie is set
     expect(res.headers.get('set-cookie')).toContain('visitor_id=');
   });
+
+  const visit = (ip: string, body: unknown, cookie?: string) =>
+    app.fetch(
+      new Request('http://local/api/visits', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'cf-connecting-ip': ip,
+          ...(cookie ? { cookie } : {}),
+        },
+        body: JSON.stringify(body),
+      }),
+    );
+
+  it('stops recording page views from one IP after 120 in an hour', async () => {
+    db.pageView.findFirst.mockResolvedValue(null);
+    db.pageView.create.mockResolvedValue({ id: 'pv1' });
+    db.siteStats.upsert.mockResolvedValue({ totalVisits: 1, uniqueVisits: 1 });
+
+    for (let i = 0; i < 120; i++) {
+      expect((await visit('203.0.113.7', { page: '/' })).status).toBe(200);
+    }
+    const blocked = await visit('203.0.113.7', { page: '/' });
+
+    expect(blocked.status).toBe(429);
+    expect(db.pageView.create).toHaveBeenCalledTimes(120);
+    expect((await visit('203.0.113.8', { page: '/' })).status).toBe(200);
+  });
+
+  it('stores only a bounded page path and ignores a forged visitor cookie', async () => {
+    db.pageView.findFirst.mockResolvedValue(null);
+    db.pageView.create.mockResolvedValue({ id: 'pv1' });
+    db.siteStats.upsert.mockResolvedValue({ totalVisits: 1, uniqueVisits: 1 });
+
+    await visit('203.0.113.9', { page: `/${'a'.repeat(500)}` }, `visitor_id=${'x'.repeat(300)}`);
+    await visit('203.0.113.9', { page: 'https://spam.example/buy' });
+
+    const [long, external] = db.pageView.create.mock.calls.map(([arg]) => arg.data);
+    expect(long.page).toHaveLength(200);
+    expect(long.visitorId).toMatch(/^[0-9a-f-]{36}$/);
+    expect(external.page).toBe('/');
+  });
 });
 
 describe('admin-observability deletes', () => {

@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer';
+import { escapeHtml } from './html';
 
 // Create transporter based on environment
 function createTransporter() {
@@ -86,7 +87,7 @@ export async function sendVerificationCode(email: string, code: string, name: st
     </head>
     <body>
       <div class="container">
-        <h1>Olá, ${name}!</h1>
+        <h1>Olá, ${escapeHtml(name)}!</h1>
         <p>Você está tentando fazer login no seu portfolio. Use o código abaixo para confirmar:</p>
         <div class="code">${code}</div>
         <p>Este código expira em <strong>10 minutos</strong>.</p>
@@ -117,6 +118,9 @@ export async function sendContactNotification(
   }
 
   const emailSubject = `📬 Nova mensagem: ${subject || 'Sem assunto'}`;
+  const replyHref = `mailto:${senderEmail.split('@').map(encodeURIComponent).join('@')}?subject=${encodeURIComponent(
+    `Re: ${subject || 'Contato via Portfolio'}`
+  )}`;
 
   const html = `
     <!DOCTYPE html>
@@ -146,25 +150,25 @@ export async function sendContactNotification(
         <div class="info">
           <div class="info-row">
             <div class="info-label">De</div>
-            <div class="info-value">${senderName}</div>
+            <div class="info-value">${escapeHtml(senderName)}</div>
           </div>
           <div class="info-row">
             <div class="info-label">Email</div>
-            <div class="info-value">${senderEmail}</div>
+            <div class="info-value">${escapeHtml(senderEmail)}</div>
           </div>
           ${subject ? `
           <div class="info-row">
             <div class="info-label">Assunto</div>
-            <div class="info-value">${subject}</div>
+            <div class="info-value">${escapeHtml(subject)}</div>
           </div>
           ` : ''}
         </div>
 
         <div class="message">
-          <div class="message-content">${message}</div>
+          <div class="message-content">${escapeHtml(message)}</div>
         </div>
 
-        <a href="mailto:${senderEmail}?subject=Re: ${subject || 'Contato via Portfolio'}" class="reply-btn">
+        <a href="${escapeHtml(replyHref)}" class="reply-btn">
           Responder
         </a>
       </div>
@@ -206,11 +210,11 @@ export async function sendLoginAlert(
     <body>
       <div class="container">
         <h1>Novo login detectado</h1>
-        <p>Olá ${name}, detectamos um novo login na sua conta:</p>
+        <p>Olá ${escapeHtml(name)}, detectamos um novo login na sua conta:</p>
         <div class="info">
           <div class="info-row">
             <span class="info-label">IP:</span>
-            <span class="info-value">${ipAddress}</span>
+            <span class="info-value">${escapeHtml(ipAddress)}</span>
           </div>
           <div class="info-row">
             <span class="info-label">Data:</span>
@@ -218,7 +222,7 @@ export async function sendLoginAlert(
           </div>
           <div class="info-row">
             <span class="info-label">Device:</span>
-            <span class="info-value">${userAgent.substring(0, 50)}...</span>
+            <span class="info-value">${escapeHtml(userAgent.substring(0, 50))}...</span>
           </div>
         </div>
         <div class="warning">
@@ -277,11 +281,11 @@ export async function sendScraperAlert(
         <div class="info">
           <div class="info-row">
             <div class="info-label">Scraper</div>
-            <div class="info-value">${scraperName}</div>
+            <div class="info-value">${escapeHtml(scraperName)}</div>
           </div>
           <div class="info-row">
             <div class="info-label">Keyword</div>
-            <div class="info-value">${keyword}</div>
+            <div class="info-value">${escapeHtml(keyword)}</div>
           </div>
           <div class="info-row">
             <div class="info-label">Jobs Found</div>
@@ -295,7 +299,7 @@ export async function sendScraperAlert(
 
         ${errorMessage ? `
         <div class="error-box">
-          <strong>Error:</strong> ${errorMessage}
+          <strong>Error:</strong> ${escapeHtml(errorMessage)}
         </div>
         ` : ''}
 

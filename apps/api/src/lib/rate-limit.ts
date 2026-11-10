@@ -70,6 +70,38 @@ export function recordContactAttempt(ip: string): void {
   contactStore.set(ip, entry);
 }
 
+// Page-view tracking (POST /visits) is public: cap it per IP so a script cannot
+// inflate the stats or fill the PageView table. The store is bounded too, so
+// many distinct IPs cannot grow it without limit.
+const VISITS_MAX = 120;
+const VISITS_WINDOW_MS = 60 * 60 * 1000;
+const VISITS_MAX_TRACKED_IPS = 10_000;
+const visitsStore = new Map<string, Entry>();
+
+export function allowVisit(ip: string): boolean {
+  const now = Date.now();
+  const entry = visitsStore.get(ip);
+  if (entry && now - entry.firstAttempt <= VISITS_WINDOW_MS) {
+    if (entry.count >= VISITS_MAX) return false;
+    entry.count += 1;
+    return true;
+  }
+
+  visitsStore.delete(ip);
+  if (visitsStore.size >= VISITS_MAX_TRACKED_IPS) {
+    visitsStore.forEach((value, key) => {
+      if (now - value.firstAttempt > VISITS_WINDOW_MS) visitsStore.delete(key);
+    });
+  }
+  if (visitsStore.size >= VISITS_MAX_TRACKED_IPS) {
+    // Still full of live entries: drop the oldest (Maps keep insertion order).
+    const oldest = visitsStore.keys().next().value;
+    if (oldest !== undefined) visitsStore.delete(oldest);
+  }
+  visitsStore.set(ip, { count: 1, firstAttempt: now });
+  return true;
+}
+
 /**
  * Extract the client IP. Prod sits behind Cloudflare, which overwrites
  * CF-Connecting-IP with the real client address. The FIRST X-Forwarded-For

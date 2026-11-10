@@ -6,10 +6,11 @@
 // The stored-PDF location is decoupled from the web's src/data via
 // RESUME_PDF_PATH (defaults to <cwd>/data/resume.pdf for the API service).
 
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
+import { getCookie } from 'hono/cookie';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import { requireAuth, type AuthEnv } from '../lib/auth';
+import { requireAuth, validateSession, type AuthEnv } from '../lib/auth';
 import { requireCsrf } from '../lib/csrf';
 import { analyzeResumePDF, getCurrentAIProvider } from '../lib/claude';
 
@@ -26,6 +27,22 @@ function resumeJsonPath(): string {
 async function readResumeJson(): Promise<Record<string, unknown>> {
   const content = await fs.readFile(resumeJsonPath(), 'utf-8');
   return JSON.parse(content) as Record<string, unknown>;
+}
+
+// GET /resume is public (the portfolio reads it), but the home address, phone
+// and birth date are only for the signed-in owner (the admin resume editor).
+const OWNER_ONLY_PERSONAL_FIELDS = ['phone', 'address', 'birthDate'];
+
+async function isOwner(c: Context): Promise<boolean> {
+  const token = getCookie(c, 'auth_token');
+  return token ? (await validateSession(token)).valid : false;
+}
+
+function publicPersonalInfo(personalInfo: unknown): unknown {
+  if (!personalInfo || typeof personalInfo !== 'object') return personalInfo;
+  const visible: Record<string, unknown> = { ...(personalInfo as Record<string, unknown>) };
+  OWNER_ONLY_PERSONAL_FIELDS.forEach((field) => delete visible[field]);
+  return visible;
 }
 
 async function extractTextFromPDF(buffer: Buffer): Promise<string> {
@@ -99,6 +116,7 @@ resume.get('/resume', async (c) => {
   }
 
   const summary = data.professionalSummary as Record<string, string> | undefined;
+  const personalInfo = (await isOwner(c)) ? data.personalInfo : publicPersonalInfo(data.personalInfo);
   const response: Record<string, unknown> = { lastUpdated };
 
   const sections: Record<string, () => void> = {
@@ -108,11 +126,11 @@ resume.get('/resume', async (c) => {
     skills: () => (response.skills = data.skills),
     certifications: () => (response.certifications = data.certifications),
     languages: () => (response.languages = data.languages),
-    personal: () => (response.personalInfo = data.personalInfo),
+    personal: () => (response.personalInfo = personalInfo),
   };
 
   if (section === 'all') {
-    response.personalInfo = data.personalInfo;
+    response.personalInfo = personalInfo;
     response.summary = summary?.[lang] || summary?.en;
     response.experience = data.experience;
     response.education = data.education;

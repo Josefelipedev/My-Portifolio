@@ -4,6 +4,7 @@
 
 import prisma from '../../db';
 import { sendEmail } from '../email';
+import { escapeHtml, safeUrl } from '../html';
 
 export interface FollowupResult {
   count: number;
@@ -58,8 +59,8 @@ export async function sendFollowupReminders(): Promise<FollowupResult> {
       (r) =>
         `<li style="margin-bottom:8px">
           <span style="font-weight:600;color:${r.overdue ? '#dc2626' : '#ca8a04'}">${r.overdue ? '⚠ Atrasado' : '📅 Hoje'} · ${r.dateLabel}</span>
-          — ${r.nextStep || 'Follow-up'}: ${r.url ? `<a href="${r.url}" style="color:#dc2626;text-decoration:none">${r.title}</a>` : `<strong>${r.title}</strong>`} @ ${r.company}
-          <span style="color:#94a3b8">(${r.status})</span>
+          — ${escapeHtml(r.nextStep || 'Follow-up')}: ${r.url ? `<a href="${escapeHtml(safeUrl(r.url))}" style="color:#dc2626;text-decoration:none">${escapeHtml(r.title)}</a>` : `<strong>${escapeHtml(r.title)}</strong>`} @ ${escapeHtml(r.company)}
+          <span style="color:#94a3b8">(${escapeHtml(r.status)})</span>
         </li>`
     )
     .join('');
