@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { type CustomCVContent } from '@/types/jobs';
 import { apiFetch } from '@/lib/api-fetch';
-import resumeData from '@/data/resume.json';
+import { loadOwnerPersonalInfo, type PersonalInfo } from '@/lib/owner-contact';
 
 interface Job {
   id: string;
@@ -19,7 +19,7 @@ interface CVGeneratorButtonProps {
 
 export async function createCVPdfBlob(
   cv: CustomCVContent,
-  personalInfo: typeof resumeData.personalInfo,
+  personalInfo: PersonalInfo,
   jobTitle: string,
   company: string,
 ) {
@@ -36,7 +36,7 @@ export async function createCVPdfBlob(
 
 async function downloadCVPdf(
   cv: CustomCVContent,
-  personalInfo: typeof resumeData.personalInfo,
+  personalInfo: PersonalInfo,
   jobTitle: string,
   company: string,
   filename: string
@@ -75,7 +75,7 @@ export default function CVGeneratorButton({ job, onGenerated }: CVGeneratorButto
       const customCV = data.customCV as CustomCVContent;
       const filename = `cv-${job.company.toLowerCase().replace(/\s+/g, '-')}-${job.title.toLowerCase().replace(/\s+/g, '-')}.pdf`;
 
-      await downloadCVPdf(customCV, resumeData.personalInfo, job.title, job.company, filename);
+      await downloadCVPdf(customCV, await loadOwnerPersonalInfo(), job.title, job.company, filename);
       onGenerated?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate CV');
