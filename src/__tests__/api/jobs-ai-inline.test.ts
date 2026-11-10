@@ -20,10 +20,13 @@ const aiTracking = vi.hoisted(() => ({
   checkQuotaLimits: vi.fn(),
 }));
 
-// Together SDK mock: new Together() -> { chat.completions.create }
+// Together SDK mock: new Together() -> { chat.completions.create }. A regular
+// function, because Vitest refuses to call an arrow-function mock with `new`.
 const create = vi.hoisted(() => vi.fn());
 const TogetherMock = vi.hoisted(() =>
-  vi.fn(() => ({ chat: { completions: { create } } })),
+  vi.fn(function () {
+    return { chat: { completions: { create } } };
+  }),
 );
 
 vi.mock('../../../apps/api/src/db', () => ({ default: db }));
@@ -88,7 +91,6 @@ beforeEach(() => {
   aiTracking.checkQuotaLimits.mockResolvedValue({ withinLimits: true });
   db.applicationPackage.findFirst.mockResolvedValue(null);
   db.resumeConfig.findUnique.mockResolvedValue(null);
-  TogetherMock.mockReturnValue({ chat: { completions: { create } } });
 });
 
 describe('jobs inline-AI — auth & csrf', () => {
