@@ -10,11 +10,18 @@ const email = vi.hoisted(() => ({ sendEmail: vi.fn() }));
 const aggregator = vi.hoisted(() => ({ searchJobs: vi.fn(), getLastSourceErrors: vi.fn() }));
 const semantic = vi.hoisted(() => ({ embedTexts: vi.fn(), getProfileEmbedding: vi.fn() }));
 const resumeData = vi.hoisted(() => ({ loadFullResumeData: vi.fn() }));
+const portals = vi.hoisted(() => ({ scanAllPortals: vi.fn() }));
+const careersPage = vi.hoisted(() => ({ fetchJobPageText: vi.fn() }));
 
 vi.mock('../../../apps/api/src/db', () => ({ default: db }));
 vi.mock('../../../apps/api/src/lib/email', () => email);
 vi.mock('../../../apps/api/src/lib/jobs/aggregator', () => aggregator);
 vi.mock('../../../apps/api/src/lib/jobs/resume-data', () => resumeData);
+vi.mock('../../../apps/api/src/lib/jobs/portal-scanner', () => portals);
+vi.mock('../../../apps/api/src/lib/jobs/careers-page-parser', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../apps/api/src/lib/jobs/careers-page-parser')>()),
+  ...careersPage,
+}));
 vi.mock('../../../apps/api/src/lib/jobs/semantic', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../apps/api/src/lib/jobs/semantic')>()),
   ...semantic,
@@ -61,6 +68,7 @@ beforeEach(() => {
   db.$transaction.mockImplementation(async (ops: unknown[]) => ops);
   db.jobPosting.update.mockImplementation((args: unknown) => args);
   aggregator.getLastSourceErrors.mockReturnValue([]);
+  portals.scanAllPortals.mockResolvedValue([]);
   resumeData.loadFullResumeData.mockResolvedValue(resume);
   semantic.getProfileEmbedding.mockResolvedValue([1, 0]);
   semantic.embedTexts.mockImplementation(async (texts: string[]) => texts.map(() => [1, 0]));
@@ -217,6 +225,100 @@ describe('runIngest', () => {
     expect(result.errors).toEqual(expect.arrayContaining(['backend engineer: boom', 'Jobicy: 400']));
     const finished = db.jobIngestRun.update.mock.calls[0][0].data;
     expect(JSON.parse(finished.errors)).toEqual(result.errors);
+  });
+
+  const portalScan = (company: string, jobs: JobListing[], errors: string[] = []) => ({
+    company,
+    portalType: 'custom',
+    jobs,
+    newJobs: [],
+    totalFound: jobs.length,
+    errors,
+  });
+  const portalJob = (overrides: Partial<JobListing>) =>
+    listing({ id: overrides.url, source: 'ats', description: '', ...overrides });
+
+  it('adds company-portal listings to the feed with the text of their own page', async () => {
+    aggregator.searchJobs.mockResolvedValue([]);
+    portals.scanAllPortals.mockResolvedValue([
+      portalScan('Growin', [
+        portalJob({
+          title: 'Backend Developer - NodeJS',
+          company: 'Growin',
+          url: 'https://www.growin.com/job-apply/96d7d088d6/backend-developer-nodejs',
+        }),
+      ]),
+      portalScan('Aubay', [], ['No job links found on the careers page']),
+    ]);
+    careersPage.fetchJobPageText.mockResolvedValue('Node.js, TypeScript and PostgreSQL. Lisbon, hybrid.');
+    db.jobPosting.findMany.mockResolvedValue([]);
+
+    const result = await runIngest();
+
+    expect(result.found).toBe(1);
+    expect(careersPage.fetchJobPageText).toHaveBeenCalledWith(
+      'https://www.growin.com/job-apply/96d7d088d6/backend-developer-nodejs'
+    );
+    const created = db.jobPosting.createMany.mock.calls[0][0].data;
+    expect(created[0]).toMatchObject({
+      fingerprint: 'backenddevelopernodejs-growin',
+      source: 'ats',
+      sources: ['ats'],
+      company: 'Growin',
+      description: 'Node.js, TypeScript and PostgreSQL. Lisbon, hybrid.',
+    });
+    expect(result.errors).toContain('Aubay: No job links found on the careers page');
+  });
+
+  it('refreshes a portal posting already in the feed without fetching its page again', async () => {
+    aggregator.searchJobs.mockResolvedValue([]);
+    portals.scanAllPortals.mockResolvedValue([
+      portalScan('KWAN', [
+        portalJob({ title: 'Backend Developer Golang', company: 'KWAN', url: 'https://www.kwan.com/job-detail/x-8571' }),
+      ]),
+    ]);
+    db.jobPosting.findMany
+      .mockResolvedValueOnce([{ id: 'p-k', fingerprint: 'backenddevelopergolang-kwan', sources: ['ats'] }])
+      .mockResolvedValue([]);
+
+    const result = await runIngest();
+
+    expect(careersPage.fetchJobPageText).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ created: 0, updated: 1 });
+    expect(db.jobPosting.updateMany).toHaveBeenCalledWith({
+      where: { id: { in: ['p-k'] } },
+      data: expect.objectContaining({ closedAt: null }),
+    });
+  });
+
+  it('keeps a portal posting whose own page fails to load', async () => {
+    aggregator.searchJobs.mockResolvedValue([]);
+    portals.scanAllPortals.mockResolvedValue([
+      portalScan('Fyld', [
+        portalJob({ title: 'Fullstack Node.js Developer', company: 'Fyld', url: 'https://www.fyld.pt/job-apply/1/fullstack' }),
+      ]),
+    ]);
+    careersPage.fetchJobPageText.mockRejectedValue(new Error('Job page error: 503'));
+    db.jobPosting.findMany.mockResolvedValue([]);
+
+    const result = await runIngest();
+
+    expect(result.created).toBe(1);
+    expect(db.jobPosting.createMany.mock.calls[0][0].data[0]).toMatchObject({
+      title: 'Fullstack Node.js Developer',
+      description: '',
+    });
+  });
+
+  it('records a failing portal scan without aborting the run', async () => {
+    aggregator.searchJobs.mockResolvedValue([listing()]);
+    portals.scanAllPortals.mockRejectedValue(new Error('db down'));
+    db.jobPosting.findMany.mockResolvedValue([]);
+
+    const result = await runIngest();
+
+    expect(result.created).toBe(1);
+    expect(result.errors).toContain('company portals: db down');
   });
 });
 

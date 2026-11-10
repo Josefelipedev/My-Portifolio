@@ -7,7 +7,10 @@ const db = vi.hoisted(() => ({
 }));
 vi.mock('../../../apps/api/src/db', () => ({ default: db }));
 
-import { parseCareersPageJobs } from '../../../apps/api/src/lib/jobs/careers-page-parser';
+import {
+  extractJobPageText,
+  parseCareersPageJobs,
+} from '../../../apps/api/src/lib/jobs/careers-page-parser';
 import { scanAllPortals } from '../../../apps/api/src/lib/jobs/portal-scanner';
 import {
   CONSULTANCY_PORTALS,
@@ -94,6 +97,24 @@ describe('parseCareersPageJobs', () => {
   });
 });
 
+describe('extractJobPageText', () => {
+  it('reads the main content without scripts, navigation or footer', () => {
+    const html = `<html><head><style>.x{}</style></head><body>
+      <nav><a href="/">Home</a><a href="/jobs">Jobs</a></nav>
+      <main><h1>Backend Developer (Golang)</h1><p>Lisbon, Portugal</p>
+        <ul><li>Node</li><li>SQL</li></ul><script>track()</script></main>
+      <footer>© KWAN</footer></body></html>`;
+
+    expect(extractJobPageText(html)).toBe('Backend Developer (Golang) Lisbon, Portugal Node SQL');
+  });
+
+  it('falls back to the body when the page has no main or article', () => {
+    const html = '<body><header>Menu</header><div class="job"><h2>.Net Developer</h2>Full Time</div></body>';
+
+    expect(extractJobPageText(html)).toBe('.Net Developer Full Time');
+  });
+});
+
 describe('scanAllPortals with careers pages', () => {
   const fetchMock = vi.fn();
 
@@ -162,6 +183,32 @@ describe('scanAllPortals with careers pages', () => {
       ],
       skipDuplicates: true,
     });
+  });
+
+  it('returns every filtered job for the feed and only the unseen ones as new', async () => {
+    db.companyPortal.findMany.mockResolvedValue([
+      {
+        id: 'p3',
+        company: 'Fyld',
+        careersUrl: 'https://www.fyld.pt/it-jobs/',
+        portalType: 'custom',
+        portalSlug: null,
+        titleFilters: null,
+      },
+    ]);
+    fetchMock.mockResolvedValue({
+      ok: true,
+      url: 'https://www.fyld.pt/it-jobs/',
+      text: async () => `
+        <a href="/job-apply/aa/fullstack-node"><h2>Fullstack Node.js Developer</h2></a>
+        <a href="/job-apply/bb/java-developer"><h2>Java Developer</h2></a>`,
+    });
+    db.portalSeenJob.findMany.mockResolvedValue([{ url: 'https://www.fyld.pt/job-apply/aa/fullstack-node' }]);
+
+    const [result] = await scanAllPortals();
+
+    expect(result.jobs.map((j) => j.title)).toEqual(['Fullstack Node.js Developer', 'Java Developer']);
+    expect(result.newJobs.map((j) => j.title)).toEqual(['Java Developer']);
   });
 
   it('reports a careers page without job links as an error, not as zero jobs', async () => {

@@ -29,6 +29,17 @@ const TITLE_ELEMENT = /<(div|span|p|strong)\b[^>]*\bclass\s*=\s*["'][^"']*\btitl
 
 const MIN_TITLE_LENGTH = 3;
 const MAX_TITLE_LENGTH = 200;
+const JOB_PAGE_TEXT_LENGTH = 4000;
+
+// Some careers sites answer bare fetch() clients with a bot page.
+export const BROWSER_HEADERS = {
+  'User-Agent':
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+  Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+  'Accept-Language': 'pt-PT,pt;q=0.9,en-US;q=0.8,en;q=0.7',
+};
+
+const PAGE_CHROME = /<(script|style|noscript|svg|template|nav|header|footer|form)\b[\s\S]*?<\/\1>/gi;
 
 /** Extracts the job postings linked from a careers page's HTML. */
 export function parseCareersPageJobs(html: string, pageUrl: string): CareersPageJob[] {
@@ -65,6 +76,28 @@ export function parseCareersPageJobs(html: string, pageUrl: string): CareersPage
   }
 
   return Array.from(jobs, ([url, { title }]) => ({ title, url }));
+}
+
+/**
+ * Readable text of a job's own page: the <main> (or <article>, or <body>)
+ * content without scripts, navigation, header, footer and forms. Careers-page
+ * listings carry only a title, so this is what the feed embeds and scores.
+ */
+export function extractJobPageText(html: string): string {
+  const content = html.replace(PAGE_CHROME, ' ');
+  const region =
+    content.match(/<main\b[^>]*>([\s\S]*?)<\/main>/i)?.[1] ??
+    content.match(/<article\b[^>]*>([\s\S]*?)<\/article>/i)?.[1] ??
+    content.match(/<body\b[^>]*>([\s\S]*)<\/body>/i)?.[1] ??
+    content;
+  // Tags become spaces so "<li>Node</li><li>SQL</li>" does not read "NodeSQL".
+  return cleanHtmlText(region.replace(/<[^>]+>/g, ' ')).slice(0, JOB_PAGE_TEXT_LENGTH);
+}
+
+export async function fetchJobPageText(url: string): Promise<string> {
+  const response = await fetch(url, { headers: BROWSER_HEADERS, signal: AbortSignal.timeout(10000) });
+  if (!response.ok) throw new Error(`Job page error: ${response.status}`);
+  return extractJobPageText(await response.text());
 }
 
 function isJobUrl(url: URL, page: URL): boolean {

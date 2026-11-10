@@ -6,7 +6,7 @@
 // src/lib/jobs/portal-scanner.ts (prisma import path adjusted for the API).
 
 import prisma from '../../db';
-import { parseCareersPageJobs } from './careers-page-parser';
+import { BROWSER_HEADERS, parseCareersPageJobs } from './careers-page-parser';
 import type { JobListing } from './types';
 
 export const MANUAL_PORTAL_TYPE = 'manual';
@@ -19,6 +19,9 @@ export interface TitleFilters {
 export interface PortalScanResult {
   company: string;
   portalType: string;
+  /** Every listing that passed the title filters on this scan (the feed ingests these). */
+  jobs: JobListing[];
+  /** The subset not seen on a previous scan of this portal. */
   newJobs: JobListing[];
   totalFound: number;
   errors: string[];
@@ -192,12 +195,7 @@ async function fetchCareersPageJobs(
   filters: TitleFilters
 ): Promise<JobListing[]> {
   const response = await fetch(careersUrl, {
-    headers: {
-      'User-Agent':
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-      'Accept-Language': 'pt-PT,pt;q=0.9,en-US;q=0.8,en;q=0.7',
-    },
+    headers: BROWSER_HEADERS,
     signal: AbortSignal.timeout(15000),
   });
 
@@ -303,6 +301,7 @@ export async function scanAllPortals(): Promise<PortalScanResult[]> {
       return {
         company: portal.company,
         portalType: portal.portalType,
+        jobs,
         newJobs,
         totalFound,
         errors,
@@ -315,6 +314,7 @@ export async function scanAllPortals(): Promise<PortalScanResult[]> {
     return {
       company: portals[i].company,
       portalType: portals[i].portalType,
+      jobs: [],
       newJobs: [],
       totalFound: 0,
       errors: [r.reason instanceof Error ? r.reason.message : 'Unknown error'],

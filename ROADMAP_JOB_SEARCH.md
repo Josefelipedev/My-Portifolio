@@ -75,8 +75,14 @@ Canada, UK and similar.
   Engineering, Experis, Mind Source, Olisipo, Syone, Affinity and Caixa Mágica
   are manual. Title filters keep Node/TypeScript/backend/full-stack roles and
   drop lead, architect and manager roles.
-- Portal scans still run only from the admin "Scan" button; feeding them into
-  the job feed belongs to Phase 2 below.
+- `jobs:ingest` (cron and the Feed tab's "Update now") also scans every active
+  non-manual portal and adds all listings that pass its title filters to
+  `JobPosting` with source `ats`, so they are deduplicated, closed when stale,
+  scored and e-mailed like the aggregator postings. A new careers-page posting
+  gets the text of its own page as description (fetched once); a posting
+  already in the feed is only refreshed. Portal failures appear in the run's
+  "source issues" as `<company>: <error>`. The Companies tab is for managing the
+  list; its "Scan All" button is a preview.
 
 ### Job feed — next phases
 

@@ -1,13 +1,15 @@
 // Job feed — "ingest continuously, match locally". A cron pulls the aggregator
-// sources into JobPosting (deduplicated across sources and runs), embeds each
-// posting once and stores a stable 0-100 match score against the resume. The
-// admin feed and the daily digest read those rows instead of fanning out to
-// every board on each search.
+// sources and the company-tracker portals into JobPosting (deduplicated across
+// sources and runs), embeds each posting once and stores a stable 0-100 match
+// score against the resume. The admin feed and the daily digest read those rows
+// instead of fanning out to every board on each search.
 
 import { createHash } from 'node:crypto';
 import prisma from '../../db';
 import { sendEmail } from '../email';
 import { searchJobs, getLastSourceErrors } from './aggregator';
+import { fetchJobPageText } from './careers-page-parser';
+import { scanAllPortals } from './portal-scanner';
 import { normalizeJobKey, getCompletenessScore } from './deduplication';
 import { cleanHtmlText } from './helpers';
 import { calculateResumeMatchScore } from './scoring';
@@ -27,6 +29,9 @@ const DIGEST_WINDOW_DAYS = 3;
 const RUN_TIMEOUT_MS = 30 * 60 * 1000;
 // Small batches keep each Ollama call well under its timeout on a busy VPS.
 const EMBED_BATCH = 16;
+// Parallel fetches of new careers-page postings' own pages (their listings
+// carry only a title).
+const JOB_PAGE_CONCURRENCY = 4;
 const SCORE_PAGE = 200;
 // Bump when the score formula or the filters change so every open posting is
 // rescored. 2: location filter.
@@ -174,6 +179,21 @@ export async function isIngestRunning(now = new Date()): Promise<boolean> {
 
 type Collected = JobListing & { allSources: Set<string> };
 
+/** Merges one listing in, keeping the most complete copy of a duplicate. */
+function addListing(byKey: Map<string, Collected>, listing: JobListing): void {
+  if (!listing.title?.trim() || !listing.url) return;
+  const key = normalizeJobKey(listing);
+  const existing = byKey.get(key);
+  if (!existing) {
+    byKey.set(key, { ...listing, allSources: new Set([listing.source]) });
+    return;
+  }
+  existing.allSources.add(listing.source);
+  if (getCompletenessScore(listing) > getCompletenessScore(existing)) {
+    byKey.set(key, { ...listing, allSources: existing.allSources });
+  }
+}
+
 async function collectListings(queries: string[], errors: Set<string>): Promise<Map<string, Collected>> {
   const byKey = new Map<string, Collected>();
   for (const keyword of queries) {
@@ -183,24 +203,48 @@ async function collectListings(queries: string[], errors: Set<string>): Promise<
         'all'
       );
       for (const error of getLastSourceErrors()) errors.add(`${error.source}: ${error.error}`);
-      for (const listing of listings) {
-        if (!listing.title?.trim() || !listing.url) continue;
-        const key = normalizeJobKey(listing);
-        const existing = byKey.get(key);
-        if (!existing) {
-          byKey.set(key, { ...listing, allSources: new Set([listing.source]) });
-          continue;
-        }
-        existing.allSources.add(listing.source);
-        if (getCompletenessScore(listing) > getCompletenessScore(existing)) {
-          byKey.set(key, { ...listing, allSources: existing.allSources });
-        }
-      }
+      for (const listing of listings) addListing(byKey, listing);
     } catch (error) {
       errors.add(`${keyword}: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
   return byKey;
+}
+
+/**
+ * Adds every listing the company-tracker portals show now (after their title
+ * filters). All of them, not only the ones new to the portal: seeing a posting
+ * again is what keeps it open in the feed.
+ */
+async function collectPortalListings(byKey: Map<string, Collected>, errors: Set<string>): Promise<void> {
+  try {
+    for (const result of await scanAllPortals()) {
+      for (const error of result.errors) errors.add(`${result.company}: ${error}`);
+      for (const job of result.jobs) addListing(byKey, job);
+    }
+  } catch (error) {
+    errors.add(`company portals: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+/**
+ * Careers-page listings carry only a title; give each new one the text of its
+ * own page so the embedding and keyword score have something to work with. A
+ * page that fails to load leaves the posting title-only.
+ */
+async function addJobPageText(jobs: Collected[]): Promise<void> {
+  const pending = jobs.filter((job) => job.source === 'ats' && !job.description);
+  for (let i = 0; i < pending.length; i += JOB_PAGE_CONCURRENCY) {
+    await Promise.all(
+      pending.slice(i, i + JOB_PAGE_CONCURRENCY).map(async (job) => {
+        try {
+          job.description = await fetchJobPageText(job.url);
+        } catch {
+          // keep the posting; it is scored on its title
+        }
+      })
+    );
+  }
 }
 
 async function upsertPostings(collected: Map<string, Collected>, now: Date) {
@@ -215,6 +259,7 @@ async function upsertPostings(collected: Map<string, Collected>, now: Date) {
 
   const fresh = keys.filter((key) => !existingByKey.has(key));
   if (fresh.length) {
+    await addJobPageText(fresh.map((key) => collected.get(key)!));
     await prisma.jobPosting.createMany({
       data: fresh.map((key) => {
         const job = collected.get(key)!;
@@ -354,6 +399,7 @@ export async function runIngest(): Promise<IngestResult> {
 
     const now = new Date();
     const collected = await collectListings(result.queries, errors);
+    await collectPortalListings(collected, errors);
     result.found = collected.size;
     Object.assign(result, await upsertPostings(collected, now));
 
