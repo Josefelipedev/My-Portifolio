@@ -17,7 +17,7 @@ vi.mock('next/navigation', () => ({
 // Mock environment variables for tests
 process.env.JWT_SECRET = 'test-jwt-secret';
 process.env.PASSWORD_HASH = '$2a$10$test-hash';
-process.env.NODE_ENV = 'test';
+vi.stubEnv('NODE_ENV', 'test');
 
 // Reset mocks between tests
 beforeEach(() => {

@@ -111,7 +111,8 @@ export default function ScraperStatus({ defaultExpanded = false }: ScraperStatus
       setTesting(true);
       const alertParam = sendAlertOnFail ? '&alert=true' : '';
       const response = await apiFetch(
-        `/api/admin/scraper-logs?action=test&source=${testSource}&keyword=${encodeURIComponent(testKeyword)}${alertParam}`
+        `/api/admin/scraper-logs?action=test&source=${testSource}&keyword=${encodeURIComponent(testKeyword)}${alertParam}`,
+        { method: 'POST' }
       );
       const data = await response.json();
       setInfo(data);
@@ -151,7 +152,7 @@ export default function ScraperStatus({ defaultExpanded = false }: ScraperStatus
 
   const clearDebugFiles = async () => {
     try {
-      const response = await apiFetch('/api/admin/scraper-logs?action=clear-debug');
+      const response = await apiFetch('/api/admin/scraper-logs?action=clear-debug', { method: 'POST' });
       if (response.ok) {
         fetchStatus();
         setSelectedDebugFile(null);

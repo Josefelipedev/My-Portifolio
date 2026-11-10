@@ -54,3 +54,7 @@ __pycache__/
 .venv/
 venv/
 ENV/
+
+# OpenNext / Wrangler build output (bundles the server env, secrets included)
+/.open-next/
+/.wrangler/
