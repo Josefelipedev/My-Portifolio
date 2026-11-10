@@ -42,7 +42,19 @@ const PORTAL_TYPE_CONFIG: Record<string, { label: string; color: string }> = {
   greenhouse: { label: 'Greenhouse', color: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' },
   ashby: { label: 'Ashby', color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' },
   lever: { label: 'Lever', color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' },
-  custom: { label: 'Custom', color: 'bg-zinc-100 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300' },
+  custom: { label: 'Careers page', color: 'bg-zinc-100 text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300' },
+  manual: { label: 'Manual', color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' },
+};
+
+// Portal types read through an ATS API, which needs the board slug.
+const ATS_PORTAL_TYPES = new Set(['greenhouse', 'ashby', 'lever']);
+
+const EMPTY_NEW_PORTAL = {
+  company: '',
+  careersUrl: '',
+  includeKeywords: '',
+  excludeKeywords: '',
+  manualOnly: false,
 };
 
 const EMPTY_FILTERS: TitleFilters = { include: [], exclude: [] };
@@ -56,12 +68,7 @@ export default function CompanyTracker() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  const [newPortal, setNewPortal] = useState({
-    company: '',
-    careersUrl: '',
-    includeKeywords: '',
-    excludeKeywords: '',
-  });
+  const [newPortal, setNewPortal] = useState(EMPTY_NEW_PORTAL);
 
   useEffect(() => {
     fetchPortals();
@@ -98,6 +105,7 @@ export default function CompanyTracker() {
           company: newPortal.company,
           careersUrl: newPortal.careersUrl,
           titleFilters,
+          ...(newPortal.manualOnly && { portalType: 'manual' }),
         }),
       });
 
@@ -107,7 +115,7 @@ export default function CompanyTracker() {
       }
 
       await fetchPortals();
-      setNewPortal({ company: '', careersUrl: '', includeKeywords: '', excludeKeywords: '' });
+      setNewPortal(EMPTY_NEW_PORTAL);
       setShowAddForm(false);
       showSuccess('Empresa adicionada!');
     } catch (err) {
@@ -286,6 +294,14 @@ export default function CompanyTracker() {
               />
             </div>
           </div>
+          <label className="flex items-center gap-2 text-xs text-zinc-600 dark:text-zinc-400">
+            <input
+              type="checkbox"
+              checked={newPortal.manualOnly}
+              onChange={(e) => setNewPortal({ ...newPortal, manualOnly: e.target.checked })}
+            />
+            Só link, sem scan automático (para páginas que carregam as vagas no browser)
+          </label>
           <div className="flex gap-2 pt-2">
             <button
               onClick={handleAdd}
@@ -358,7 +374,7 @@ export default function CompanyTracker() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
           </svg>
           <p className="text-sm">Nenhuma empresa adicionada ainda.</p>
-          <p className="text-xs mt-1">Adicione empresas com Greenhouse, Ashby ou Lever para monitorar vagas automaticamente.</p>
+          <p className="text-xs mt-1">Adicione empresas com Greenhouse, Ashby, Lever ou página de carreiras própria para monitorar vagas automaticamente.</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -385,7 +401,7 @@ export default function CompanyTracker() {
                         <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${config.color}`}>
                           {config.label}
                         </span>
-                        {!portal.portalSlug && portal.portalType !== 'custom' && (
+                        {!portal.portalSlug && ATS_PORTAL_TYPES.has(portal.portalType) && (
                           <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400">
                             Slug não detectado
                           </span>

@@ -60,6 +60,24 @@ locations are kept. On the 487 open postings it filtered 180: on-site roles in
 London, Paris, DACH and the Netherlands, and remote roles limited to the USA,
 Canada, UK and similar.
 
+### Company tracker — Portuguese IT consultancies (2026-11-10)
+
+- Portal type `custom` is now scanned: `careers-page-parser.ts` reads the job
+  links off a company's own careers page (a job path segment followed by an id,
+  on the page's own site), with the title from the card heading or, for
+  "View Role" buttons, from the URL slug. A page with no job links is reported
+  as a source issue, not as zero jobs.
+- New portal type `manual`: a tracked link the scan skips, for pages that load
+  their jobs in the browser. The add form has a "Só link" checkbox for it.
+- `npm run jobs:seed-portals` (API workspace) adds 16 consultancies, skipping
+  companies already tracked: KWAN, Noesis, Fyld, Growin, Wire IT and HumanIT
+  are scanned (careers-page.com boards included); Dellent, Aubay, PrimeIT, Bee
+  Engineering, Experis, Mind Source, Olisipo, Syone, Affinity and Caixa Mágica
+  are manual. Title filters keep Node/TypeScript/backend/full-stack roles and
+  drop lead, architect and manager roles.
+- Portal scans still run only from the admin "Scan" button; feeding them into
+  the job feed belongs to Phase 2 below.
+
 ### Job feed — next phases
 
 - Phase 2: company watchlist (PT / remote-EU) seeded from career-ops' list, plus

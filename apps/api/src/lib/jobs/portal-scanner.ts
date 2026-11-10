@@ -1,9 +1,15 @@
-// ATS Portal Scanner — Greenhouse, Ashby, Lever
-// Fetches job listings directly from ATS public APIs. Ported from the web app's
+// Company Portal Scanner — Greenhouse, Ashby, Lever and plain careers pages
+// Fetches job listings directly from ATS public APIs, or reads the job links
+// off a company's own careers page (portal type "custom"). Portals of type
+// "manual" are tracked links only: their pages build the job list in the
+// browser, so the scan skips them. Ported from the web app's
 // src/lib/jobs/portal-scanner.ts (prisma import path adjusted for the API).
 
 import prisma from '../../db';
+import { parseCareersPageJobs } from './careers-page-parser';
 import type { JobListing } from './types';
+
+export const MANUAL_PORTAL_TYPE = 'manual';
 
 export interface TitleFilters {
   include: string[];
@@ -178,6 +184,48 @@ async function fetchLeverJobs(
   return applyTitleFilters(jobs, filters);
 }
 
+// ─── Careers page (custom) ───────────────────────────────────────────────────
+
+async function fetchCareersPageJobs(
+  careersUrl: string,
+  company: string,
+  filters: TitleFilters
+): Promise<JobListing[]> {
+  const response = await fetch(careersUrl, {
+    headers: {
+      'User-Agent':
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      'Accept-Language': 'pt-PT,pt;q=0.9,en-US;q=0.8,en;q=0.7',
+    },
+    signal: AbortSignal.timeout(15000),
+  });
+
+  if (!response.ok) throw new Error(`Careers page error: ${response.status}`);
+
+  const html = await response.text();
+  const links = parseCareersPageJobs(html, response.url || careersUrl);
+
+  // An empty result is far more often a page that renders its list in the
+  // browser (or a changed layout) than a company with no openings at all.
+  if (links.length === 0) {
+    throw new Error(
+      `No job links found on the careers page; if it loads its jobs in the browser, set the portal type to "${MANUAL_PORTAL_TYPE}"`
+    );
+  }
+
+  const jobs: JobListing[] = links.map((link) => ({
+    id: link.url,
+    source: 'ats' as const,
+    title: link.title,
+    company,
+    description: '',
+    url: link.url,
+  }));
+
+  return applyTitleFilters(jobs, filters);
+}
+
 // ─── Deduplication ───────────────────────────────────────────────────────────
 
 // Returns the jobs not yet seen in a previous scan of this portal (delta since
@@ -209,7 +257,7 @@ async function deduplicateAndRecord(portalId: string, jobs: JobListing[]): Promi
 
 export async function scanAllPortals(): Promise<PortalScanResult[]> {
   const portals = await prisma.companyPortal.findMany({
-    where: { isActive: true },
+    where: { isActive: true, portalType: { not: MANUAL_PORTAL_TYPE } },
     orderBy: { company: 'asc' },
   });
 
@@ -232,6 +280,8 @@ export async function scanAllPortals(): Promise<PortalScanResult[]> {
           jobs = await fetchAshbyJobs(slug, portal.company, filters);
         } else if (portal.portalType === 'lever') {
           jobs = await fetchLeverJobs(slug, portal.company, filters);
+        } else if (portal.portalType === 'custom') {
+          jobs = await fetchCareersPageJobs(portal.careersUrl, portal.company, filters);
         } else {
           errors.push(`Portal type "${portal.portalType}" not supported`);
         }

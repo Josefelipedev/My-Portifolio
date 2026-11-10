@@ -11,6 +11,7 @@
     "followups:run": "tsx src/scripts/run-followups.ts",
     "jobs:ingest": "tsx src/scripts/run-ingest.ts",
     "jobs:digest": "tsx src/scripts/run-digest.ts",
+    "jobs:seed-portals": "tsx src/scripts/seed-consultancy-portals.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
